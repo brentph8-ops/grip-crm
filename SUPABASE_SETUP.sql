@@ -32,17 +32,18 @@ create trigger grip_data_updated_at
 
 alter table grip_data enable row level security;
 
--- Single-user policy: only bphillips@garlandco.com can read/write data.
--- If you transfer this app to another rep, update the email here and
--- run this block again in the SQL editor.
+-- Multi-user policy: any @garlandco.com Google account can sign in.
+-- Each rep gets their own isolated data silo (user_id scoped).
+-- To restrict to a single email, replace the LIKE check with = 'email@domain.com'.
 drop policy if exists "Users own their data" on grip_data;
 drop policy if exists "Authorized rep only" on grip_data;
-create policy "Authorized rep only"
+drop policy if exists "Garland reps own their data" on grip_data;
+create policy "Garland reps own their data"
   on grip_data for all
   using  (auth.uid() = user_id
-          AND auth.jwt() ->> 'email' = 'bphillips@garlandco.com')
+          AND auth.jwt() ->> 'email' LIKE '%@garlandco.com')
   with check (auth.uid() = user_id
-          AND auth.jwt() ->> 'email' = 'bphillips@garlandco.com');
+          AND auth.jwt() ->> 'email' LIKE '%@garlandco.com');
 
 
 -- ── Contractor portal tokens ──────────────────────────────────────
@@ -67,12 +68,13 @@ alter table contractor_tokens enable row level security;
 
 drop policy if exists "Reps manage their own tokens" on contractor_tokens;
 drop policy if exists "Authorized rep manages tokens" on contractor_tokens;
-create policy "Authorized rep manages tokens"
+drop policy if exists "Garland reps manage tokens" on contractor_tokens;
+create policy "Garland reps manage tokens"
   on contractor_tokens for all
   using  (auth.uid() = user_id
-          AND auth.jwt() ->> 'email' = 'bphillips@garlandco.com')
+          AND auth.jwt() ->> 'email' LIKE '%@garlandco.com')
   with check (auth.uid() = user_id
-          AND auth.jwt() ->> 'email' = 'bphillips@garlandco.com');
+          AND auth.jwt() ->> 'email' LIKE '%@garlandco.com');
 
 -- Contractors can read a token row by its token value (public portal access)
 drop policy if exists "Public can read token by value" on contractor_tokens;

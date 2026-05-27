@@ -245,14 +245,20 @@
       const user = session?.user || null;
 
       if (event === "SIGNED_IN") {
-        // ── Single-user access guard ─────────────────────────────
-        const authorizedEmail = window.GRIP_AUTHORIZED_EMAIL;
-        if (authorizedEmail && user?.email !== authorizedEmail) {
+        // ── Access guard: check email or domain ──────────────────
+        const userEmail   = user?.email || "";
+        const userDomain  = userEmail.split("@")[1] || "";
+        const reqEmail    = window.GRIP_AUTHORIZED_EMAIL  || "";
+        const reqDomain   = window.GRIP_AUTHORIZED_DOMAIN || "";
+        const emailOk  = !reqEmail  || userEmail  === reqEmail;
+        const domainOk = !reqDomain || userDomain === reqDomain;
+        if (!emailOk || !domainOk) {
           await client.auth.signOut();
           showAuthOverlay(true);
           const errEl = document.getElementById("gripAuthError");
           if (errEl) {
-            errEl.textContent = `Access denied — this app is authorized for ${authorizedEmail} only.`;
+            const expected = reqEmail || `@${reqDomain}`;
+            errEl.textContent = `Access denied — this app requires a ${expected} Google account.`;
             errEl.hidden = false;
           }
           return;
@@ -309,11 +315,10 @@
     signInWithGoogle() {
       const client = getClient();
       if (!client) return;
-      // hd hint pre-selects the authorized Google Workspace domain
-      // in the account chooser. The email guard above is the real lock.
-      const hd = window.GRIP_AUTHORIZED_EMAIL
-        ? window.GRIP_AUTHORIZED_EMAIL.split("@")[1]
-        : undefined;
+      // hd hint pre-selects the authorized Google Workspace domain.
+      // The guard above is the real lock.
+      const hd = window.GRIP_AUTHORIZED_DOMAIN
+        || (window.GRIP_AUTHORIZED_EMAIL ? window.GRIP_AUTHORIZED_EMAIL.split("@")[1] : undefined);
       client.auth.signInWithOAuth({
         provider: "google",
         options: {

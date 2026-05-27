@@ -3600,7 +3600,23 @@ function renderDashboard() {
     dashboardPanel("Proposals by Client Type", tableRows(countBy(proposals.map((proposal) => ({ entity: proposalEntity(proposal) })), "entity"), "proposals")),
     dashboardPanel("Top 5 Contractors by Proposal Wins", topContractorRows(topContractors, "wins")),
     dashboardPanel("Top 5 Contractors by Proposal Opportunities", topContractorRows(topContractors, "opportunities")),
+    dashboardPanel("Punch Lists", punchListDashboardRows()),
   ].join("");
+}
+
+function punchListDashboardRows() {
+  const lists = readStorageJson("garlandPunchLists", []);
+  if (!lists.length) return [metricRow("No punch lists yet", "", "punchList")];
+  const open = lists.filter((l) => l.status !== "Closed" && l.status !== "Complete");
+  const closed = lists.filter((l) => l.status === "Closed" || l.status === "Complete");
+  const withItems = lists.filter((l) => Array.isArray(l.items) && l.items.length > 0);
+  const openItems = withItems.reduce((sum, l) => sum + (l.items || []).filter((i) => !i.resolved).length, 0);
+  return [
+    metricRow("Total Lists", lists.length, "punchList"),
+    metricRow("Open Lists", open.length, "punchList"),
+    metricRow("Closed Lists", closed.length, "punchList"),
+    metricRow("Open Items", openItems, "punchList"),
+  ];
 }
 
 function renderFollowUpQueue() {

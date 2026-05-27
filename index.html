@@ -4,6 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>GRIP</title>
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#e8600a" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="GRIP" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
     <link rel="stylesheet" href="src/styles.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
     <script src="src/supabase-client.js"></script>
@@ -26,7 +32,7 @@
         <button class="secondary-button" id="gripContinueLocalButton" type="button">
           Continue without sign-in (local only)
         </button>
-        <p class="auth-note">Authorized access only — bphillips@garlandco.com. Local mode keeps data on this device; sign in for cross-device sync and the contractor portal.</p>
+        <p class="auth-note">Authorized for @garlandco.com accounts. Each rep gets their own private data. Local mode keeps data on this device only.</p>
       </div>
     </div>
 
@@ -2090,5 +2096,14 @@
     <script src="src/data.js"></script>
     <script src="src/grip-sync.js"></script>
     <script src="src/app.js"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/grip-crm/sw.js')
+            .then(reg => console.log('GRIP SW registered', reg.scope))
+            .catch(err => console.warn('GRIP SW registration failed:', err));
+        });
+      }
+    </script>
   </body>
 </html>
