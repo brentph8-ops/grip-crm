@@ -41,7 +41,14 @@
     const { createClient } = window.supabase;
     window._gripSupabaseClient = createClient(
       window.GRIP_SUPABASE_URL,
-      window.GRIP_SUPABASE_ANON
+      window.GRIP_SUPABASE_ANON,
+      {
+        auth: {
+          flowType: "pkce",          // required for Safari / iPhone OAuth
+          detectSessionInUrl: true,
+          persistSession: true,
+        },
+      }
     );
     return window._gripSupabaseClient;
   }
