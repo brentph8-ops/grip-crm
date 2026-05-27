@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contractor Punch List — GRIP</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --blue:   #0057a8;
+      --orange: #f58220;
+      --line:   #d5dfec;
+      --panel:  #f4f8ff;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--panel);
+      color: #111;
+      font-size: 15px;
+      line-height: 1.5;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    header {
+      background: var(--blue);
+      color: #fff;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    header h1 { font-size: 1rem; font-weight: 700; }
+    header p  { font-size: 0.78rem; opacity: 0.8; }
+
+    .logo-mark {
+      width: 36px; height: 36px;
+      border-radius: 8px;
+      background: var(--orange);
+      display: grid; place-items: center;
+      font-weight: 900; font-size: 1rem; color: #fff;
+      flex-shrink: 0;
+    }
+
+    main { max-width: 680px; margin: 0 auto; padding: 20px 16px; }
+
+    #loadingState, #errorState, #successState { text-align: center; padding: 60px 20px; }
+    #errorState { color: #b00; }
+
+    .meta-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+
+    .meta-card h2 { color: var(--blue); font-size: 1.1rem; margin-bottom: 8px; }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px 16px;
+      font-size: 0.85rem;
+    }
+
+    .meta-grid span { font-weight: 600; }
+
+    .instructions {
+      background: #fffbe8;
+      border: 1px solid #e5d98a;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 0.85rem;
+      margin-bottom: 20px;
+    }
+
+    .punch-item {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 10px;
+    }
+
+    .item-number {
+      font-weight: 800;
+      color: var(--blue);
+      font-size: 0.85rem;
+    }
+
+    .badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+
+    .badge-critical { background: #bd0808; color: #fff; }
+    .badge-warning  { background: #fff0df; color: #8a3f00; }
+    .badge-normal   { background: #e3f1ff; color: #0057a8; }
+
+    .item-detail p { font-size: 0.87rem; margin: 4px 0; }
+    .item-detail strong { color: #333; }
+
+    .item-photos {
+      display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0;
+    }
+
+    .item-photos img {
+      width: 80px; height: 60px;
+      object-fit: cover;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+    }
+
+    .completion-section {
+      border-top: 1px solid var(--line);
+      margin-top: 12px;
+      padding-top: 12px;
+    }
+
+    .completion-section label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: #333;
+    }
+
+    textarea, input[type="text"] {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 0.87rem;
+      font-family: inherit;
+      resize: vertical;
+      min-height: 70px;
+    }
+
+    input[type="text"] { min-height: unset; }
+
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0;
+      font-size: 0.87rem;
+    }
+
+    .check-row input[type="checkbox"] {
+      width: 18px; height: 18px;
+      accent-color: var(--blue);
+      flex-shrink: 0;
+    }
+
+    .photo-upload-area {
+      border: 2px dashed var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+      font-size: 0.8rem;
+      color: #666;
+      margin: 8px 0;
+      cursor: pointer;
+    }
+
+    .photo-upload-area:hover { border-color: var(--orange); }
+
+    .photo-input { display: none; }
+
+    .photo-thumbs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+    .photo-thumbs img {
+      width: 70px; height: 55px;
+      object-fit: cover;
+      border-radius: 4px;
+      border: 1px solid var(--line);
+    }
+
+    .overall-notes {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 16px;
+      margin: 20px 0;
+    }
+
+    .overall-notes h3 {
+      font-size: 0.95rem;
+      color: var(--blue);
+      margin-bottom: 10px;
+    }
+
+    .submit-area {
+      position: sticky;
+      bottom: 0;
+      background: var(--panel);
+      padding: 12px 0 20px;
+      border-top: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: var(--orange);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 14px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      width: 100%;
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .submit-note {
+      font-size: 0.78rem;
+      color: #666;
+      text-align: center;
+    }
+
+    #submitProgress { text-align: center; padding: 16px; color: var(--blue); display: none; }
+
+    .success-icon { font-size: 3rem; margin-bottom: 16px; }
+    #successState h2 { color: var(--blue); margin-bottom: 8px; }
+
+    @media (max-width: 480px) {
+      .meta-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo-mark">G</div>
+  <div>
+    <h1>GRIP Contractor Punch List</h1>
+    <p>Garland Relationship Intelligence Platform</p>
+  </div>
+</header>
+
+<main>
+  <div id="loadingState">
+    <p>Loading punch list…</p>
+  </div>
+
+  <div id="errorState" hidden>
+    <p id="errorMessage">This link is invalid or has expired. Contact your Garland rep.</p>
+  </div>
+
+  <div id="punchContent" hidden>
+    <div class="meta-card">
+      <h2 id="punchTitle"></h2>
+      <div class="meta-grid">
+        <div><span>Project:</span> <span id="punchProject"></span></div>
+        <div><span>Client:</span> <span id="punchClient"></span></div>
+        <div><span>Contractor:</span> <span id="punchContractor"></span></div>
+        <div><span>Due Date:</span> <span id="punchDue"></span></div>
+      </div>
+    </div>
+
+    <div class="instructions">
+      <strong>Instructions:</strong> For each item below, describe the work you performed and upload an after photo. Items marked <strong>Warranty Critical</strong> or <strong>Leak Risk</strong> require water test confirmation. Tap <strong>Submit Completed Work</strong> when finished.
+    </div>
+
+    <div id="itemsList"></div>
+
+    <div class="overall-notes">
+      <h3>Overall Completion Notes</h3>
+      <label for="overallNotes">Any additional notes, access information, or outstanding concerns:</label>
+      <textarea id="overallNotes" placeholder="e.g. Drain D-2 required clearing before resealing. North parapet completed first visit, south parapet scheduled for follow-up."></textarea>
+    </div>
+
+    <div class="submit-area">
+      <button class="btn-primary" id="submitButton" type="button">Submit Completed Work</button>
+      <div id="submitProgress">Submitting… please wait.</div>
+      <p class="submit-note">By submitting you confirm the listed corrections have been completed per Garland specifications.</p>
+    </div>
+  </div>
+
+  <div id="successState" hidden>
+    <div class="success-icon">✅</div>
+    <h2>Submission Received</h2>
+    <p>Your completed punch list has been sent to the Garland rep for review. You will be contacted if any items require further correction.</p>
+  </div>
+</main>
+
+<script src="src/supabase-client.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="src/contractor.js"></script>
+</body>
+</html>
