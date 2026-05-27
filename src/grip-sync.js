@@ -319,10 +319,14 @@
       // The guard above is the real lock.
       const hd = window.GRIP_AUTHORIZED_DOMAIN
         || (window.GRIP_AUTHORIZED_EMAIL ? window.GRIP_AUTHORIZED_EMAIL.split("@")[1] : undefined);
+      // Use the canonical Pages URL so redirect always matches Supabase's allowlist
+      const redirectTo = window.location.origin.includes("github.io")
+        ? "https://brentph8-ops.github.io/grip-crm/"
+        : window.location.href;
       client.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: window.location.href,
+          redirectTo,
           queryParams: hd ? { hd } : {},
         },
       });
