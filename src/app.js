@@ -2685,13 +2685,13 @@ function renderPunchDraftPreview(kind, existing = []) {
   const files = [...existing, ...(state.punchDraftFiles?.[kind] || [])];
   target.innerHTML = files.length
     ? files.map((file) => `<div class="task-attachment-chip">${String(file.file_type || "").startsWith("image/") ? `<img src="${file.dataUrl || file.thumbnail_url}" alt="${escapeHtml(file.file_name || "Punch photo")}" />` : `<span>${escapeHtml((file.file_name || "File").split(".").pop()?.toUpperCase() || "FILE")}</span>`}<strong>${escapeHtml(file.file_name || "File")}</strong><small>${fileSizeLabel(file.size)}</small></div>`).join("")
-    : `<p class="empty-state">No ${kind} photos yet.</p>`;
+    : `<p class="empty-state" data-icon="📷">No ${kind} photos yet.</p>`;
 }
 
 function savePunchListFromForm(formEl) {
   const form = new FormData(formEl);
   const project = findRecord("project", form.get("project_id"));
-  if (!project) showToast("Choose a project first.", "warning"); return;
+  if (!project) { showToast("Choose a project first.", "warning") return; }
   const id = form.get("punch_list_id") || `punch-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const existing = findPunchList(id);
   const now = new Date().toISOString();
@@ -2745,7 +2745,7 @@ function savePunchListFromForm(formEl) {
     created_at: existing?.created_at || now,
     updated_at: now,
   });
-  if (!item.description && !item.required_correction) showToast("Add a punch item issue or required correction first.", "warning"); return;
+  if (!item.description && !item.required_correction) { showToast("Add a punch item issue or required correction first.", "warning") return; }
   if (existing) state.punchLists = state.punchLists.map((existingList) => (existingList.punch_list_id === id ? list : existingList));
   else state.punchLists.unshift(list);
   state.punchDraftFiles = { before: [], after: [] };
@@ -2769,7 +2769,7 @@ function updatePunchItemStatus(listId, itemId, status, note = "") {
   const list = findPunchList(listId);
   const item = list?.items?.find((entry) => entry.punch_item_id === itemId);
   if (!list || !item) return;
-  if (status === "Submitted for Review" && !(item.contractor_completion_photos || []).length) showToast("Completion photo required before submitting this punch item for review.", "warning"); return;
+  if (status === "Submitted for Review" && !(item.contractor_completion_photos || []).length) { showToast("Completion photo required before submitting this punch item for review.", "warning") return; }
   if (status === "Rejected" || status === "Needs Additional Correction") {
     const reason = prompt("Rejection reason or correction note:", note || punchRejectionReasons[0]);
     if (reason === null) return;
@@ -2911,7 +2911,7 @@ function exportPunchListPdf(list, ownerMode = false) {
     </div>`;
   }).join("");
   const win = window.open("", "_blank");
-  if (!win) showToast("Allow pop-ups to export the punch list report.", "warning"); return;
+  if (!win) { showToast("Allow pop-ups to export the punch list report.", "warning") return; }
   const title = ownerMode ? `Final Closeout — ${list.title}` : `Contractor Punch List — ${list.title}`;
   win.document.write(`<html><head><title>${escapeHtml(title)}</title><style>${style}</style></head><body>
     <h1>${escapeHtml(title)}</h1>
@@ -3108,7 +3108,7 @@ function saveTaskFromForm(formEl) {
     updated_at: now,
     completed_at: status === "Completed" ? existing?.completed_at || now : "",
   });
-  if (!task.title) showToast("Add a task title first.", "warning"); return;
+  if (!task.title) { showToast("Add a task title first.", "warning") return; }
   if (existing) state.tasks = state.tasks.map((item) => (item.task_id === id ? task : item));
   else state.tasks.unshift(task);
   state.taskDraftFiles = [];
@@ -3218,7 +3218,7 @@ function renderTaskAttachmentPreview(files) {
           </div>`
         )
         .join("")
-    : `<p class="empty-state">No task attachments yet.</p>`;
+    : `<p class="empty-state" data-icon="📎">No task attachments yet.</p>`;
 }
 
 function completeTask(taskId, checked) {
@@ -3271,7 +3271,7 @@ function showTaskDetail(task) {
     </section>
     <section class="detail-section">
       <h4>Attachments</h4>
-      ${task.attachments?.length ? `<div class="file-list">${task.attachments.map((file) => { const href = file.url || file.dataUrl; return `<div class="file-row">${href ? `<a href="${escapeHtml(href)}" ${file.url ? 'target="_blank" rel="noopener"' : `download="${escapeHtml(file.file_name || "attachment")}"`}>${escapeHtml(file.file_name)}</a>` : escapeHtml(file.file_name)}</div>`; }).join("")}</div>` : `<p class="empty-state">No attachments.</p>`}
+      ${task.attachments?.length ? `<div class="file-list">${task.attachments.map((file) => { const href = file.url || file.dataUrl; return `<div class="file-row">${href ? `<a href="${escapeHtml(href)}" ${file.url ? 'target="_blank" rel="noopener"' : `download="${escapeHtml(file.file_name || "attachment")}"`}>${escapeHtml(file.file_name)}</a>` : escapeHtml(file.file_name)}</div>`; }).join("")}</div>` : `<p class="empty-state" data-icon="📎">No attachments.</p>`}
     </section>
     <section class="danger-zone"><button class="delete-button" data-delete-task="${escapeHtml(task.task_id)}" type="button">Delete Task</button></section>
   `;
@@ -5031,7 +5031,7 @@ function renderFavoriteSystems() {
   if (!byId("favoriteSystemsList")) return;
   byId("favoriteSystemsList").innerHTML = state.favoriteSystems.length
     ? state.favoriteSystems.map(favoriteSystemCard).join("")
-    : `<p class="empty-state">No systems saved yet. Build a system, then click Save to My Systems.</p>`;
+    : `<p class="empty-state" data-icon="🏛">No systems saved yet. Build a system, then click Save to My Systems.</p>`;
 }
 
 function loadFavoriteSystem(id) {
@@ -6439,7 +6439,7 @@ function showAccountDetail(record) {
         <button class="primary-button" type="submit">Add activity</button>
       </form>
       <div class="activity-list">
-        ${accountActivityEntries(record).length ? accountActivityEntries(record).map(activityEntry).join("") : `<p class="empty-state">No activity logged yet.</p>`}
+        ${accountActivityEntries(record).length ? accountActivityEntries(record).map(activityEntry).join("") : `<p class="empty-state" data-icon="📅">No activity logged yet.</p>`}
       </div>
     </section>
 
@@ -6541,13 +6541,13 @@ function accountProfileTabContent(account, activeTab) {
   if (activeTab === "projects") {
     return `<section class="detail-section">
       <h4>Projects</h4>
-      <div class="stack-list">${related.projects.length ? related.projects.map(accountProjectMiniRecord).join("") : `<p class="empty-state">No linked projects yet.</p>`}</div>
+      <div class="stack-list">${related.projects.length ? related.projects.map(accountProjectMiniRecord).join("") : `<p class="empty-state" data-icon="🏗">No linked projects yet.</p>`}</div>
     </section>`;
   }
   if (activeTab === "proposals") {
     return `<section class="detail-section">
       <h4>Proposals</h4>
-      <div class="stack-list">${related.proposals.length ? related.proposals.map(accountProposalMiniRecord).join("") : `<p class="empty-state">No linked proposals yet.</p>`}</div>
+      <div class="stack-list">${related.proposals.length ? related.proposals.map(accountProposalMiniRecord).join("") : `<p class="empty-state" data-icon="📄">No linked proposals yet.</p>`}</div>
     </section>`;
   }
   if (activeTab === "activity") {
@@ -6558,7 +6558,7 @@ function accountProfileTabContent(account, activeTab) {
         <textarea name="activity" class="note-box" placeholder="Add new activity" required></textarea>
         <button class="primary-button" type="submit">Add activity</button>
       </form>
-      <div class="activity-list">${entries.length ? entries.map(activityEntry).join("") : `<p class="empty-state">No activity logged yet.</p>`}</div>
+      <div class="activity-list">${entries.length ? entries.map(activityEntry).join("") : `<p class="empty-state" data-icon="📅">No activity logged yet.</p>`}</div>
     </section>`;
   }
   if (activeTab === "notes") {
@@ -6696,7 +6696,7 @@ function accountForRecordActivity(type, id) {
 
 function logRecordActivity(type, id) {
   const account = accountForRecordActivity(type, id);
-  if (!account) showToast("I could not find a linked account for this record. Open the account and log the activity there.", "error"); return;
+  if (!account) { showToast("I could not find a linked account for this record. Open the account and log the activity there.", "error") return; }
   const note = prompt("Log activity", "");
   if (!String(note || "").trim()) return;
   addAccountActivity(account.id, note, false, { source: type === "account" ? "Account" : type === "project" ? "Project" : "Proposal" });
@@ -6862,7 +6862,7 @@ function renderCallList() {
           </div>`
         )
         .join("")
-    : `<p class="empty-state">No call list assignments yet.</p>`;
+    : `<p class="empty-state" data-icon="📋">No call list assignments yet.</p>`;
   const callItems = accounts
         .map((account) => {
           const key = callCompletionKey(day, account.id);
@@ -6895,7 +6895,7 @@ function renderCallList() {
           <button class="kanban-nav kanban-nav-right" data-kanban-scroll="right" type="button" aria-label="Scroll kanban right">›</button>
         </div>`
       : callItems.join("")
-    : `<p class="empty-state">No calls assigned for ${escapeHtml(day)}.</p>`;
+    : `<p class="empty-state" data-icon="☏">No calls assigned for ${escapeHtml(day)}.</p>`;
 }
 
 function noteTakerRecords() {
@@ -7264,7 +7264,7 @@ function contractorQuickContent(name) {
   <section class="detail-section">
     <h4>Support Contacts</h4>
     <div class="stack-list">
-      ${supportContacts.length ? supportContacts.map((contact, index) => supportContactCard(profile.companyName, contact, index)).join("") : `<p class="empty-state">No support contacts yet.</p>`}
+      ${supportContacts.length ? supportContacts.map((contact, index) => supportContactCard(profile.companyName, contact, index)).join("") : `<p class="empty-state" data-icon="👤">No support contacts yet.</p>`}
     </div>
     <button class="secondary-button support-add-button" data-add-support-contact="${escapeHtml(profile.companyName)}" type="button">Add support contact</button>
   </section>
@@ -7299,7 +7299,7 @@ function openAccountDialog(accountId = "") {
   form.elements.address.value = account?.address || "";
   byId("deleteAccountDialogButton").hidden = !account;
   byId("accountDialogActivity").innerHTML = account
-    ? accountActivityEntries(account).slice(0, 5).map(activityEntry).join("") || `<p class="empty-state">No activity logged yet.</p>`
+    ? accountActivityEntries(account).slice(0, 5).map(activityEntry).join("") || `<p class="empty-state" data-icon="📅">No activity logged yet.</p>`
     : "";
   openDialog("accountDialog");
 }
@@ -7347,7 +7347,7 @@ function saveAccountFromDialog(form) {
 
 function renameAccount(accountId) {
   const account = findRecord("account", accountId);
-  if (!account) showToast("I could not find that account.", "error"); return;
+  if (!account) { showToast("I could not find that account.", "error") return; }
   const oldName = account.client || "";
   const nextName = prompt("Rename account", oldName);
   const cleaned = String(nextName || "").trim();
@@ -7682,7 +7682,7 @@ function accountProfileHtml(account) {
 
 function exportAccountProfilePdf(accountId) {
   const account = findRecord("account", accountId);
-  if (!account) showToast("I could not find that account.", "error"); return;
+  if (!account) { showToast("I could not find that account.", "error") return; }
   const printWindow = window.open("", "_blank");
   if (!printWindow) {
     showToast("Your browser blocked the export window. Allow pop-ups for GRIP, then try again.", "warning");
@@ -7787,7 +7787,7 @@ function importAccountContactsCsv(file) {
   const reader = new FileReader();
   reader.onload = () => {
     const rows = parseCsv(String(reader.result || ""));
-    if (rows.length < 2) showToast("No contacts found in that CSV.", "warning"); return;
+    if (rows.length < 2) { showToast("No contacts found in that CSV.", "warning") return; }
     const headers = rows[0].map((header) => normalize(header));
     const indexOf = (...names) => headers.findIndex((header) => names.some((name) => header.includes(name)));
     const idx = {
@@ -7984,7 +7984,7 @@ function uploadBox(recordId, category, label) {
                 </div>`
               )
               .join("")
-          : `<p class="empty-state">No files uploaded yet.</p>`
+          : `<p class="empty-state" data-icon="📁">No files uploaded yet.</p>`
       }
     </div>
     ${driveLinkForm(recordId, category)}
@@ -8040,7 +8040,7 @@ function saveDriveLink(recordId, category, formEl) {
   const form = new FormData(formEl);
   const url = String(form.get("driveUrl") || "").trim();
   if (!url) return;
-  if (!/^https?:\/\//i.test(url)) showToast("Paste a full Google Drive link that starts with https://", "warning"); return;
+  if (!/^https?:\/\//i.test(url)) { showToast("Paste a full Google Drive link that starts with https://", "warning") return; }
   if (!state.attachments[recordId]) state.attachments[recordId] = {};
   if (!state.attachments[recordId][category]) state.attachments[recordId][category] = [];
   state.attachments[recordId][category].push({
@@ -8145,7 +8145,7 @@ function checklistUploadBox(projectId, item) {
                 </div>`
               )
               .join("")
-          : `<p class="empty-state">Drop photos here or use Upload / Camera.</p>`
+          : `<p class="empty-state" data-icon="📷">Drop photos here or use Upload / Camera.</p>`
       }
     </div>
   </div>`;
@@ -8358,7 +8358,7 @@ function saveUploadedScopeToDatabase(recordId, fileIndex, scopeCategory) {
   const type = findRecord("project", recordId) ? "project" : "proposal";
   const uploadCategory = scopeUploadCategory(type);
   const file = state.attachments[recordId]?.[uploadCategory]?.[Number(fileIndex)];
-  if (!file) showToast("Choose an uploaded scope first.", "warning"); return;
+  if (!file) { showToast("Choose an uploaded scope first.", "warning") return; }
   const entry = {
     id: `scope-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     name: file.name,
@@ -8381,7 +8381,7 @@ function saveUploadedScopeToDatabase(recordId, fileIndex, scopeCategory) {
 
 function attachScopeFromDatabase(recordId, scopeId) {
   const item = scopeDatabaseRecords().find((entry) => entry.id === scopeId);
-  if (!item) showToast("Choose a saved scope first.", "warning"); return;
+  if (!item) { showToast("Choose a saved scope first.", "warning") return; }
   const type = findRecord("project", recordId) ? "project" : "proposal";
   const uploadCategory = scopeUploadCategory(type);
   if (!state.attachments[recordId]) state.attachments[recordId] = {};
@@ -9010,7 +9010,7 @@ function saveStandaloneScope(formEl) {
   const form = new FormData(formEl);
   const file = formEl.elements.file.files?.[0];
   const generatedText = scopeTemplateText(form);
-  if (!file && !String(form.get("scopeType") || form.get("project") || form.get("overview") || scopeManualWorkItems(form).join(" ")).trim()) showToast("Upload a scope or fill in the template fields.", "warning"); return;
+  if (!file && !String(form.get("scopeType") || form.get("project") || form.get("overview") || scopeManualWorkItems(form).join(" ")).trim()) { showToast("Upload a scope or fill in the template fields.", "warning"); return; }
   if (!file) {
     state.scopeDatabase.unshift({
       id: `scope-${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -9202,7 +9202,7 @@ function showContractorDetail(name, editMode = false) {
         ${
           supportContacts.length
             ? supportContacts.map((contact, index) => supportContactCard(profile.companyName, contact, index)).join("")
-            : `<p class="empty-state">No support contacts yet.</p>`
+            : `<p class="empty-state" data-icon="👤">No support contacts yet.</p>`
         }
       </div>
       <button class="secondary-button support-add-button" data-add-support-contact="${escapeHtml(profile.companyName)}" type="button">Add support contact</button>
@@ -10894,7 +10894,7 @@ function bindEvents() {
       event.stopPropagation();
       const proposal = findRecord("proposal", requestProposal.dataset.proposalRequestId);
       const contractor = requestProposal.dataset.proposalRequestContractor || "";
-      if (!proposal) showToast("I could not find that proposal.", "error"); return;
+      if (!proposal) { showToast("I could not find that proposal.", "error") return; }
       const draft = proposalRequestDraft(proposal, contractor);
       if (!draft.to) {
         copyProposalRequestDraft(draft.text, "Contractor email is missing, so the draft was copied instead.");
@@ -10909,7 +10909,7 @@ function bindEvents() {
       event.stopPropagation();
       const proposal = findRecord("proposal", copyProposalRequest.dataset.proposalRequestId);
       const contractor = copyProposalRequest.dataset.proposalRequestContractor || "";
-      if (!proposal) showToast("I could not find that proposal.", "error"); return;
+      if (!proposal) { showToast("I could not find that proposal.", "error") return; }
       copyProposalRequestDraft(proposalRequestDraft(proposal, contractor).text);
       return;
     }

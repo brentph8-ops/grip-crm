@@ -5660,11 +5660,13 @@ button.grip-sync-status.sync-local {
   align-items: center;
   gap: 8px;
 }
-.empty-state::before {
+/* Only show icon when data-icon attribute is present */
+.empty-state[data-icon]::before {
   content: attr(data-icon);
   font-size: 2rem;
-  opacity: 0.4;
+  opacity: 0.35;
   display: block;
+  line-height: 1;
 }
 
 /* ── 6. Animated sync badge pulse ────────────────────────────── */
@@ -5826,6 +5828,7 @@ button.grip-sync-status.sync-local {
     border-color: var(--line);
     color: var(--ink);
   }
+  input::placeholder, textarea::placeholder { color: var(--muted); }
 
   .search { background: #1a2c3f; border-color: var(--line); }
   .search input { color: var(--ink); }
@@ -5858,6 +5861,19 @@ button.grip-sync-status.sync-local {
   .drawer-close { background: #152233; border-color: var(--line); }
 
   .toast-container .toast { box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+}
+
+/* ── Call weekly preview — mobile (≤ 560px) ─────────────────────── */
+@media (max-width: 560px) {
+  .call-weekly-preview {
+    grid-template-columns: repeat(5, minmax(80px, 1fr));
+    overflow-x: auto;
+    padding-bottom: 4px;
+    gap: 6px;
+  }
+  .call-day-tab {
+    min-width: 80px;
+  }
 }
 
 /* ── Punch list By-Project — mobile (≤ 760px) ───────────────────── */
