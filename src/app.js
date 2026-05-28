@@ -78,6 +78,50 @@ const data = {
   })),
 };
 
+// ── One-time base-data migration ─────────────────────────────────
+// Runs once, while data.js still has records.
+// Saves the fully-merged view (base + edits + custom) into
+// savedCrm as flat arrays, then blanks the edits layer.
+// After this commit the next commit can safely blank data.js.
+// grip-sync's monkey-patched setItem automatically queues a
+// Supabase push for the new localStorage value.
+(function migrateBaseData() {
+  if (localStorage.getItem("grip_base_migrated_v1")) return;
+  const hasBase = (baseData.accounts || []).length > 0
+               || (baseData.projects  || []).length > 0
+               || (baseData.proposals || []).length > 0;
+  if (!hasBase) return; // data.js already blank — nothing to do
+  try {
+    const merged = {
+      accounts:    data.accounts.map((a) => ({ ...a })),
+      projects:    data.projects.map((p) => ({ ...p })),
+      proposals:   data.proposals.map((p) => ({ ...p })),
+      contractors: (savedCrm.contractors || []).map((c) => ({ ...c })),
+      edits:       { accounts: {}, projects: {}, proposals: {} },
+      deleted:     [...(savedCrm.deleted  || [])],
+      archived:    [...(savedCrm.archived || [])],
+    };
+    // Write through the monkey-patched setItem so grip-sync
+    // automatically schedules a Supabase push.
+    localStorage.setItem("garlandCrmData", JSON.stringify(merged));
+    localStorage.setItem("grip_base_migrated_v1", "pending_push");
+    // Mutate in-memory savedCrm so any save() calls this session
+    // use the new flat structure instead of the old edits format.
+    savedCrm.accounts  = merged.accounts;
+    savedCrm.projects  = merged.projects;
+    savedCrm.proposals = merged.proposals;
+    savedCrm.edits     = merged.edits;
+    console.info(
+      "GRIP: base-data migration complete — "
+      + merged.accounts.length + " accounts, "
+      + merged.projects.length + " projects, "
+      + merged.proposals.length + " proposals saved to localStorage."
+    );
+  } catch (e) {
+    console.warn("GRIP base-data migration failed:", e);
+  }
+})();
+
 const proposalStages = [
   "Working on Ramp & SOW",
   "Sent Ramp & Budget to Client",

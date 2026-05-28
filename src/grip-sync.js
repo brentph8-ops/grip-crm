@@ -112,6 +112,15 @@
     const client = getClient();
     const user = await getUser();
     if (!client || !user) return false;
+
+    // If a base-data migration just ran this session, push the new
+    // localStorage snapshot to Supabase BEFORE pulling so the fresh
+    // merged data takes precedence over any older cloud record.
+    if (localStorage.getItem("grip_base_migrated_v1") === "pending_push") {
+      await pushAllLocalData();
+      localStorage.setItem("grip_base_migrated_v1", "1");
+    }
+
     try {
       const { data, error } = await client
         .from("grip_data")
