@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────
-// GRIP — Contractor Portal Logic
+// GRIP — Contractor Portal Logic  (Fieldwire-style)
 // ─────────────────────────────────────────────────────────────────
 
 (function () {
@@ -8,16 +8,13 @@
   let db = null;
   let tokenRecord = null;
   let punchList = null;
-  const itemPhotos = {}; // itemId -> array of base64 data URLs
+  const itemPhotos = {}; // itemId -> [{name,type,dataUrl}]
 
   function qs(id) { return document.getElementById(id); }
 
   function escHtml(str) {
     return String(str || "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
   function formatDate(str) {
@@ -29,79 +26,173 @@
 
   function severityBadge(sev) {
     const critical = ["Warranty Critical", "Leak Risk", "Safety Issue"];
-    const warning = ["Cosmetic"];
-    const cls = critical.includes(sev) ? "badge-critical" : warning.includes(sev) ? "badge-warning" : "badge-normal";
-    return `<span class="badge ${cls}">${escHtml(sev)}</span>`;
+    const warning  = ["Cosmetic"];
+    const cls = critical.includes(sev) ? "sev-critical"
+              : warning.includes(sev)  ? "sev-warning"
+              :                          "sev-normal";
+    return `<span class="severity-badge ${cls}">${escHtml(sev)}</span>`;
   }
 
-  // ── Render ──────────────────────────────────────────────────────
+  // ── Progress tracking ────────────────────────────────────────────
+
+  function updateProgress() {
+    const items = (punchList?.items || []);
+    const total = items.length;
+    const done  = items.filter((item) => qs(`done_${item.punch_item_id}`)?.checked).length;
+    const pct   = total ? Math.round((done / total) * 100) : 0;
+
+    // Progress bar
+    const fill = qs("progressFill");
+    const text = qs("progressText");
+    if (fill) fill.style.width = `${pct}%`;
+    if (text) text.textContent = `${done} of ${total} item${total === 1 ? "" : "s"} confirmed`;
+
+    // Progress ring in header
+    const circumference = 106.8;
+    const ring = qs("ringFill");
+    const label = qs("ringLabel");
+    if (ring) ring.style.strokeDashoffset = String(circumference - (pct / 100) * circumference);
+    if (label) label.textContent = `${pct}%`;
+
+    // Mark individual cards as done
+    items.forEach((item) => {
+      const checked = qs(`done_${item.punch_item_id}`)?.checked;
+      const card = document.querySelector(`[data-item-id="${item.punch_item_id}"]`);
+      if (card) card.classList.toggle("is-done", Boolean(checked));
+    });
+  }
+
+  // ── Lightbox ─────────────────────────────────────────────────────
+
+  function openLightbox(src) {
+    const lb = qs("lightbox");
+    if (!lb) return;
+    qs("lightboxImg").src = src;
+    lb.classList.add("is-open");
+  }
+
+  function closeLightbox() {
+    const lb = qs("lightbox");
+    if (lb) lb.classList.remove("is-open");
+  }
+
+  // ── Render items ─────────────────────────────────────────────────
 
   function renderItems(items) {
     const container = qs("itemsList");
-    container.innerHTML = items.map((item) => {
-      const photos = (item.original_photos || [])
+    if (!items.length) {
+      container.innerHTML = `<p style="color:var(--muted);text-align:center;padding:30px 0">No punch items found in this list.</p>`;
+      return;
+    }
+    container.innerHTML = items.map((item, idx) => {
+      const beforePhotos = (item.original_photos || [])
         .filter((f) => String(f.file_type || "").startsWith("image/"))
-        .slice(0, 4);
+        .slice(0, 6);
 
       return `
-        <div class="punch-item" data-item-id="${escHtml(item.punch_item_id)}">
-          <div class="item-header">
-            <div>
-              <div class="item-number">Item ${escHtml(String(item.item_number || ""))} — ${escHtml(item.category || "Punch Item")}</div>
-              <div style="font-size:0.8rem;color:#555;margin-top:2px">${escHtml([item.roof_area, item.section, item.location].filter(Boolean).join(" | ") || "No location")}</div>
+      <div class="punch-item" data-item-id="${escHtml(item.punch_item_id)}">
+
+        <!-- Item header -->
+        <div class="item-header">
+          <div class="item-num">${escHtml(String(item.item_number || idx + 1))}</div>
+          <div class="item-meta">
+            <div class="item-category">${escHtml(item.category || "Punch Item")}</div>
+            <div class="item-location">${escHtml([item.roof_area, item.section, item.location].filter(Boolean).join(" · ") || "No location specified")}</div>
+          </div>
+          ${severityBadge(item.severity)}
+        </div>
+
+        <!-- Item body -->
+        <div class="item-body">
+
+          ${item.description ? `
+          <div class="item-issue">
+            <strong>Issue Identified</strong>
+            ${escHtml(item.description)}
+          </div>` : ""}
+
+          ${item.required_correction ? `
+          <div class="item-correction">
+            <strong>Required Correction</strong>
+            ${escHtml(item.required_correction)}
+          </div>` : ""}
+
+          ${item.water_test_status && item.water_test_status !== "Not Required" ? `
+          <div class="item-water-test">
+            <strong>⚠ Verification Required</strong>
+            ${escHtml(item.water_test_status)}
+          </div>` : ""}
+
+          ${beforePhotos.length ? `
+          <div>
+            <div class="photo-strip-label">Before Photos</div>
+            <div class="photo-strip">
+              ${beforePhotos.map((f) => `<img class="photo-thumb" src="${escHtml(f.dataUrl || f.thumbnail_url || f.url)}" alt="Before" />`).join("")}
             </div>
-            ${severityBadge(item.severity)}
+          </div>` : ""}
+
+          <!-- Completion section -->
+          <hr class="completion-divider" />
+          <div class="completion-label-row">
+            <div class="completion-dot"></div>
+            <span>Your Completion</span>
           </div>
 
-          <div class="item-detail">
-            ${item.description ? `<p><strong>Issue:</strong> ${escHtml(item.description)}</p>` : ""}
-            ${item.required_correction ? `<p><strong>Required Correction:</strong> ${escHtml(item.required_correction)}</p>` : ""}
-            ${item.water_test_status && item.water_test_status !== "Not Required" ? `<p><strong>Verification Required:</strong> ${escHtml(item.water_test_status)}</p>` : ""}
-          </div>
+          <label class="field-label" for="notes_${escHtml(item.punch_item_id)}">
+            Completion Notes <span style="color:#dc2626">*</span>
+          </label>
+          <textarea
+            id="notes_${escHtml(item.punch_item_id)}"
+            data-item-notes="${escHtml(item.punch_item_id)}"
+            placeholder="Describe the work performed to correct this item…"
+            rows="3"
+          ></textarea>
 
-          ${photos.length ? `<div class="item-photos">${photos.map((f) => `<img src="${f.dataUrl || f.thumbnail_url}" alt="Before photo" />`).join("")}</div>` : ""}
+          <label class="field-label">After Photos</label>
+          <label class="photo-upload-zone" for="photo_${escHtml(item.punch_item_id)}">
+            <div class="upload-icon">📷</div>
+            <p>Tap to take or upload after photos</p>
+            <small>JPEG, PNG — multiple photos allowed</small>
+            <input
+              class="photo-input"
+              type="file"
+              id="photo_${escHtml(item.punch_item_id)}"
+              accept="image/*"
+              capture="environment"
+              multiple
+              data-item-photo="${escHtml(item.punch_item_id)}"
+            />
+          </label>
+          <div class="photo-thumbs" id="thumbs_${escHtml(item.punch_item_id)}"></div>
 
-          <div class="completion-section">
-            <label for="notes_${escHtml(item.punch_item_id)}">Completion Notes *</label>
-            <textarea
-              id="notes_${escHtml(item.punch_item_id)}"
-              data-item-notes="${escHtml(item.punch_item_id)}"
-              placeholder="Describe the work performed to correct this item…"
-              rows="3"
-            ></textarea>
-
-            <label style="margin-top:10px">After Photos</label>
-            <label class="photo-upload-area" for="photo_${escHtml(item.punch_item_id)}">
-              📷 Tap to take or upload after photos
-              <input
-                class="photo-input"
-                type="file"
-                id="photo_${escHtml(item.punch_item_id)}"
-                accept="image/*"
-                capture="environment"
-                multiple
-                data-item-photo="${escHtml(item.punch_item_id)}"
-              />
+          <label class="confirm-row">
+            <input
+              type="checkbox"
+              id="done_${escHtml(item.punch_item_id)}"
+              data-item-done="${escHtml(item.punch_item_id)}"
+            />
+            <label for="done_${escHtml(item.punch_item_id)}">
+              I confirm this item has been corrected per Garland specifications
             </label>
-            <div class="photo-thumbs" id="thumbs_${escHtml(item.punch_item_id)}"></div>
+          </label>
 
-            <div class="check-row">
-              <input
-                type="checkbox"
-                id="done_${escHtml(item.punch_item_id)}"
-                data-item-done="${escHtml(item.punch_item_id)}"
-              />
-              <label for="done_${escHtml(item.punch_item_id)}">
-                I confirm this item has been corrected per Garland specifications
-              </label>
-            </div>
-          </div>
-        </div>`;
+        </div>
+      </div>`;
     }).join("");
 
     // Bind photo inputs
     container.querySelectorAll("[data-item-photo]").forEach((input) => {
       input.addEventListener("change", (e) => handlePhotoInput(e.target));
+    });
+
+    // Bind checkboxes to progress
+    container.querySelectorAll("[data-item-done]").forEach((cb) => {
+      cb.addEventListener("change", updateProgress);
+    });
+
+    // Bind before-photo lightbox clicks
+    container.querySelectorAll(".photo-thumb").forEach((img) => {
+      img.addEventListener("click", () => openLightbox(img.src));
     });
   }
 
@@ -117,6 +208,7 @@
           const img = document.createElement("img");
           img.src = e.target.result;
           img.alt = "After photo";
+          img.addEventListener("click", () => openLightbox(img.src));
           thumbContainer.appendChild(img);
         }
       };
@@ -124,25 +216,22 @@
     });
   }
 
-  // ── Submit ──────────────────────────────────────────────────────
+  // ── Submit ───────────────────────────────────────────────────────
 
   async function handleSubmit() {
     const submitBtn = qs("submitButton");
-    const progress = qs("submitProgress");
+    const progress  = qs("submitProgress");
 
-    // Collect item data
     const items = (punchList.items || []).map((item) => {
-      const id = item.punch_item_id;
+      const id    = item.punch_item_id;
       const notes = qs(`notes_${id}`)?.value?.trim() || "";
-      const done = qs(`done_${id}`)?.checked || false;
+      const done  = qs(`done_${id}`)?.checked || false;
       const photos = itemPhotos[id] || [];
       return { item_id: id, item_number: item.item_number, completion_notes: notes, corrected: done, photos };
     });
 
     const overallNotes = qs("overallNotes")?.value?.trim() || "";
-
-    // Validate at least one item has notes
-    const hasAnyNotes = items.some((i) => i.completion_notes);
+    const hasAnyNotes  = items.some((i) => i.completion_notes);
     if (!hasAnyNotes) {
       alert("Please add completion notes for at least one punch item before submitting.");
       return;
@@ -152,19 +241,18 @@
     progress.style.display = "block";
 
     try {
-      const { error } = await db
-        .from("contractor_submissions")
-        .insert({
-          token: tokenRecord.token,
-          punch_list_id: punchList.punch_list_id,
-          items,
-          contractor_name: tokenRecord.contractor_name || "",
-          overall_notes: overallNotes,
-        });
+      const { error } = await db.from("contractor_submissions").insert({
+        token: tokenRecord.token,
+        punch_list_id: punchList.punch_list_id,
+        items,
+        contractor_name: tokenRecord.contractor_name || "",
+        overall_notes: overallNotes,
+      });
 
       if (error) throw error;
 
       qs("punchContent").hidden = true;
+      qs("submitArea").hidden   = true;
       qs("successState").hidden = false;
     } catch (err) {
       console.error("Submission error:", err);
@@ -174,11 +262,11 @@
     }
   }
 
-  // ── Load ────────────────────────────────────────────────────────
+  // ── Load ─────────────────────────────────────────────────────────
 
   async function loadPortal() {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get("token");
+    const token  = params.get("token");
 
     if (!token) {
       showError("No contractor token found in this URL. Contact your Garland rep.");
@@ -186,7 +274,7 @@
     }
 
     if (!window.GRIP_SUPABASE_URL || !window.GRIP_SUPABASE_URL.startsWith("https://")) {
-      showError("GRIP is not yet configured for cloud sync. Contact your Garland rep.");
+      showError("GRIP is not configured for cloud sync. Contact your Garland rep.");
       return;
     }
 
@@ -210,24 +298,34 @@
       }
 
       tokenRecord = data;
-      punchList = data.punch_list_snapshot;
+      punchList   = data.punch_list_snapshot;
 
       if (!punchList || !(punchList.items || []).length) {
         showError("No punch items found in this list. Contact your Garland rep.");
         return;
       }
 
+      const itemCount = punchList.items.length;
+
       // Populate header
-      qs("punchTitle").textContent = punchList.title || "Punch List";
-      qs("punchProject").textContent = punchList.project_name || "—";
-      qs("punchClient").textContent = punchList.client_name || "—";
+      qs("headerTitle").textContent     = punchList.title || "Punch List";
+      qs("punchTitle").textContent      = punchList.title || "Punch List";
+      qs("punchStatusBadge").textContent = punchList.status || "Sent to Contractor";
+      qs("punchProject").textContent    = punchList.project_name || "—";
+      qs("punchClient").textContent     = punchList.client_name  || "—";
       qs("punchContractor").textContent = punchList.assigned_contractor || "—";
-      qs("punchDue").textContent = formatDate(punchList.due_date);
+      qs("punchDue").textContent        = formatDate(punchList.due_date);
+      qs("itemsCountLabel").textContent = `${itemCount} Punch Item${itemCount === 1 ? "" : "s"}`;
+
+      // Show progress ring
+      qs("progressRingWrap").hidden = false;
 
       renderItems(punchList.items);
+      updateProgress();
 
       qs("loadingState").hidden = true;
       qs("punchContent").hidden = false;
+      qs("submitArea").hidden   = false;
 
       qs("submitButton").addEventListener("click", handleSubmit);
 
@@ -238,11 +336,21 @@
   }
 
   function showError(msg) {
-    qs("loadingState").hidden = true;
+    qs("loadingState").hidden   = true;
     qs("errorMessage").textContent = msg;
-    qs("errorState").hidden = false;
+    qs("errorState").hidden     = false;
   }
 
-  document.addEventListener("DOMContentLoaded", loadPortal);
+  // ── Init ─────────────────────────────────────────────────────────
+
+  document.addEventListener("DOMContentLoaded", () => {
+    loadPortal();
+
+    // Lightbox close
+    qs("lightboxClose")?.addEventListener("click", closeLightbox);
+    qs("lightbox")?.addEventListener("click", (e) => {
+      if (e.target === qs("lightbox")) closeLightbox();
+    });
+  });
 
 })();

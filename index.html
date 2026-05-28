@@ -442,6 +442,7 @@
               <select id="punchStatusFilter" aria-label="Filter punch lists by status"></select>
               <select id="punchSeverityFilter" aria-label="Filter punch lists by severity"></select>
               <select id="punchCategoryFilter" aria-label="Filter punch lists by category"></select>
+              <select id="punchDueFilter" aria-label="Filter punch lists by due date"></select>
             </div>
             <div class="toolbar-group">
               <select id="punchSortFilter" aria-label="Sort punch lists">
@@ -452,6 +453,7 @@
                 <option value="contractor">Contractor</option>
               </select>
               <button class="sort-direction-button" id="punchSortDirection" data-direction="desc" type="button" aria-label="Toggle punch list sort direction">↓</button>
+              <button class="mini-button" id="punchActiveOnlyBtn" type="button" hidden>Active Only</button>
               <button class="mini-button" id="punchCollapseClosedBtn" type="button" hidden>Collapse Closed ↑</button>
               <div class="view-toggle" data-view-toggle="punchLists" aria-label="Punch list layout">
                 <button class="sort-tab" data-layout="project" type="button">By Project</button>

@@ -1,16 +1,24 @@
 :root {
-  --ink: #182b45;
+  --ink: #0f1f33;
   --muted: #64748b;
-  --line: #d7e0ea;
-  --paper: #f5f8fc;
+  --line: #dde5f0;
+  --line-subtle: #eef2f8;
+  --paper: #f3f6fb;
   --panel: #ffffff;
   --green: #0057a8;
-  --green-2: #d8ebff;
+  --green-2: #dbeafe;
   --gold: #f58220;
   --blue: #0057a8;
+  --blue-hover: #004a90;
   --orange: #f58220;
   --red: #9c3f3a;
-  --shadow: 0 18px 40px rgba(20, 60, 110, 0.1);
+  --shadow-sm: 0 1px 3px rgba(15, 31, 51, 0.07), 0 2px 8px rgba(15, 31, 51, 0.04);
+  --shadow: 0 4px 16px rgba(15, 31, 51, 0.08), 0 1px 4px rgba(15, 31, 51, 0.05);
+  --shadow-lg: 0 8px 32px rgba(15, 31, 51, 0.13), 0 2px 8px rgba(15, 31, 51, 0.07);
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --transition: 0.15s ease;
 }
 
 * {
@@ -168,12 +176,13 @@ textarea {
 }
 
 .sidebar {
-  background: var(--blue);
+  background: linear-gradient(170deg, #0d2540 0%, #0a1e36 100%);
   color: #ffffff;
   padding: 24px 16px;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 26px;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .brand {
@@ -212,15 +221,17 @@ textarea {
 }
 
 .brand-mark {
-  width: 46px;
-  height: 46px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
-  border-radius: 6px;
-  background: var(--orange);
+  border-radius: 10px;
+  background: linear-gradient(135deg, #f58220 0%, #e06b10 100%);
   color: #ffffff;
-  font-weight: 800;
-  flex: 0 0 46px;
+  font-weight: 900;
+  font-size: 1.15rem;
+  flex: 0 0 44px;
+  box-shadow: 0 2px 8px rgba(245, 130, 32, 0.4);
 }
 
 .brand h1,
@@ -251,15 +262,18 @@ textarea {
 .nav-button {
   width: 100%;
   border: 0;
-  border-radius: 6px;
-  padding: 12px;
+  border-radius: 8px;
+  padding: 10px 12px;
   background: transparent;
-  color: #e8f2ff;
+  color: rgba(220, 235, 255, 0.88);
   text-align: left;
   cursor: pointer;
   display: flex;
   gap: 10px;
   align-items: center;
+  font-size: 0.88rem;
+  font-weight: 550;
+  transition: background var(--transition), color var(--transition);
 }
 
 .nav-icon {
@@ -288,10 +302,15 @@ textarea {
   font-size: 0.5rem;
 }
 
-.nav-button:hover,
-.nav-button.is-active {
-  background: var(--orange);
+.nav-button:hover {
+  background: rgba(255, 255, 255, 0.09);
   color: #fff;
+}
+.nav-button.is-active {
+  background: linear-gradient(135deg, #f58220 0%, #e06b10 100%);
+  color: #fff;
+  font-weight: 650;
+  box-shadow: 0 2px 8px rgba(245, 130, 32, 0.35);
 }
 
 .nav-projects-group {
@@ -401,8 +420,9 @@ textarea {
 }
 
 .workspace {
-  padding: 26px;
+  padding: 28px 30px;
   min-width: 0;
+  background: var(--paper);
 }
 
 .mobile-quick-add {
@@ -431,8 +451,11 @@ textarea {
 }
 
 .topbar h2 {
-  font-size: 1.9rem;
+  font-size: 1.75rem;
   margin: 0;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: var(--ink);
 }
 
 .eyebrow {
@@ -440,6 +463,8 @@ textarea {
   margin: 0;
   text-transform: uppercase;
   font-weight: 750;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
 }
 
 .search {
@@ -498,8 +523,9 @@ textarea {
 .record-card {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  box-shadow: var(--shadow);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition), border-color var(--transition), transform var(--transition);
 }
 
 .kpi {
@@ -758,31 +784,37 @@ textarea {
 
 .task-summary-card {
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: #fff;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-sm);
   color: #000;
   cursor: pointer;
   display: grid;
-  gap: 5px;
-  min-height: 70px;
-  padding: 10px;
+  gap: 4px;
+  min-height: 66px;
+  padding: 10px 12px;
   text-align: left;
+  transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
 }
 
 .task-summary-card:hover {
   border-color: var(--orange);
+  box-shadow: var(--shadow);
+  transform: translateY(-1px);
 }
 
 .task-summary-card span {
-  font-size: 0.72rem;
-  font-weight: 850;
+  font-size: 0.68rem;
+  font-weight: 700;
   text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
 }
 
 .task-summary-card strong {
   color: var(--blue);
-  font-size: 1.35rem;
+  font-size: 1.4rem;
+  font-weight: 750;
   line-height: 1;
 }
 
@@ -1338,6 +1370,17 @@ textarea {
 .pill.pill-all-clear {
   background: #d4edda;
   color: #155724;
+}
+.pill.pill-stale {
+  background: #fef3c7;
+  color: #78350f;
+  font-weight: 600;
+}
+/* Active-filter state for toolbar toggle buttons */
+.mini-button.is-active-filter {
+  background: #0057a8;
+  color: #fff;
+  border-color: #0057a8;
 }
 
 
@@ -1922,9 +1965,14 @@ textarea {
   cursor: pointer;
 }
 
-.stack-item:hover,
+.stack-item:hover {
+  border-color: #a0b2c6;
+  box-shadow: var(--shadow);
+}
 .record-card:hover {
-  border-color: #aebbb5;
+  border-color: #b0c2d8;
+  box-shadow: var(--shadow);
+  transform: translateY(-1px);
 }
 
 .toolbar {
@@ -1961,12 +2009,22 @@ textarea {
 .add-contractor input,
 .inline-form input,
 .inline-form select {
-  height: 40px;
+  height: 38px;
   min-width: 190px;
-  border-radius: 6px;
+  border-radius: 8px;
   border: 1px solid var(--line);
   background: var(--panel);
   padding: 0 10px;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.toolbar select:focus,
+.toolbar-input:focus,
+.form-grid input:focus,
+.form-grid select:focus,
+.form-grid textarea:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(0, 87, 168, 0.12);
 }
 
 .form-grid textarea {
@@ -2327,27 +2385,38 @@ textarea {
 .sort-tabs {
   display: inline-flex;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 8px;
   overflow: hidden;
-  background: var(--panel);
+  background: var(--paper);
+  gap: 0;
 }
 
 .sort-tab {
-  height: 38px;
+  height: 36px;
   border: 0;
   border-right: 1px solid var(--line);
   background: transparent;
   padding: 0 12px;
   cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 550;
+  color: var(--muted);
+  transition: background var(--transition), color var(--transition);
 }
 
 .sort-tab:last-child {
   border-right: 0;
 }
 
+.sort-tab:hover {
+  background: var(--line-subtle);
+  color: var(--ink);
+}
+
 .sort-tab.is-active {
-  background: var(--green);
+  background: var(--blue);
   color: #fff;
+  font-weight: 650;
 }
 
 .primary-button,
@@ -2359,35 +2428,53 @@ textarea {
 }
 
 .primary-button {
-  min-height: 40px;
+  min-height: 38px;
   border: 1px solid var(--blue);
-  background: var(--blue);
+  background: linear-gradient(135deg, var(--blue) 0%, var(--blue-hover) 100%);
   color: #fff;
-  padding: 0 14px;
-  font-weight: 750;
+  padding: 0 16px;
+  font-weight: 650;
+  transition: background var(--transition), box-shadow var(--transition), transform var(--transition);
+}
+.primary-button:hover {
+  background: linear-gradient(135deg, var(--blue-hover) 0%, #003d7a 100%);
+  box-shadow: 0 3px 10px rgba(0, 87, 168, 0.3);
+  transform: translateY(-1px);
 }
 
 .secondary-button {
-  min-height: 40px;
+  min-height: 38px;
   border: 1px solid var(--line);
   background: var(--panel);
   color: var(--ink);
   padding: 0 14px;
+  transition: border-color var(--transition), background var(--transition);
+}
+.secondary-button:hover {
+  border-color: #aac4de;
+  background: #f8fbff;
 }
 
 .mini-button {
   min-height: 28px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 7px;
   background: var(--panel);
   color: var(--ink);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0 9px;
+  padding: 0 10px;
   text-decoration: none;
   font-size: 0.78rem;
+  font-weight: 550;
+  transition: border-color var(--transition), background var(--transition), color var(--transition);
+}
+.mini-button:hover {
+  border-color: #aac4de;
+  background: #f4f8ff;
+  color: var(--blue);
 }
 
 .utility-mini {
@@ -2978,12 +3065,13 @@ textarea {
 
 .detail-drawer {
   border-left: 1px solid var(--line);
-  background: #fbfcfa;
-  padding: 18px;
+  background: #ffffff;
+  padding: 20px;
   position: sticky;
   top: 0;
   height: 100vh;
   overflow: auto;
+  box-shadow: -2px 0 16px rgba(15, 31, 51, 0.04);
 }
 
 .drawer-close {

@@ -900,10 +900,12 @@ const state = {
     punchStatus: "All statuses",
     punchSeverity: "All severities",
     punchCategory: "All categories",
+    punchDue: "All dates",
     punchSort: "updatedAt",
     punchDirection: "desc",
     punchSearch: "",
   },
+  punchActiveOnly: false,
   proposalSort: "stage",
   notes: readStorageJson("garlandCrmNotes", {}),
   activities: readStorageJson("garlandAccountActivities", {}),
@@ -2235,9 +2237,16 @@ function punchStats(lists = state.punchLists) {
   const items = lists.flatMap((list) => list.items || []);
   const contractorItems = items.filter((item) => ["Pending Contractor Response", "Submitted for Review", "Approved", "Rejected", "Needs Additional Correction", "Closed"].includes(item.status));
   const approvedOrClosed = contractorItems.filter((item) => ["Approved", "Closed"].includes(item.status)).length;
+  const todayKey = toLocalDateKey(new Date());
+  const weekDate = new Date(); weekDate.setDate(weekDate.getDate() + 7);
+  const weekKey = toLocalDateKey(weekDate);
   return {
     open: items.filter((item) => !["Approved", "Closed"].includes(item.status)).length,
     overdue: lists.filter((list) => punchDueLevel(list) === "overdue").length,
+    dueThisWeek: lists.filter((list) => {
+      const key = dateKeyFromValue(list.due_date);
+      return key && key >= todayKey && key <= weekKey && !["Approved", "Closed"].includes(list.status);
+    }).length,
     review: items.filter((item) => item.status === "Submitted for Review").length,
     completion: contractorItems.length ? Math.round((approvedOrClosed / contractorItems.length) * 100) : 0,
     closeout: lists.filter((list) => list.status === "Approved" || list.status === "Closed").length,
@@ -2247,7 +2256,23 @@ function punchStats(lists = state.punchLists) {
 function punchFilterMatch(list) {
   const search = normalize([state.search, state.filters.punchSearch].filter(Boolean).join(" "));
   const items = list.items || [];
+  // D: Active-only mode hides Closed/Approved lists entirely
+  if (state.punchActiveOnly && ["Closed", "Approved"].includes(list.status)) return false;
+  // A: Due-date filter
+  const todayKey = toLocalDateKey(new Date());
+  const weekDate = new Date(); weekDate.setDate(weekDate.getDate() + 7);
+  const weekKey = toLocalDateKey(weekDate);
+  const monthDate = new Date(); monthDate.setDate(monthDate.getDate() + 30);
+  const monthKey = toLocalDateKey(monthDate);
+  const dueKey = dateKeyFromValue(list.due_date);
+  const dueFine = (() => {
+    if (state.filters.punchDue === "Overdue")       return dueKey && dueKey < todayKey && !["Approved","Closed"].includes(list.status);
+    if (state.filters.punchDue === "Due this week")  return dueKey && dueKey >= todayKey && dueKey <= weekKey && !["Approved","Closed"].includes(list.status);
+    if (state.filters.punchDue === "Due this month") return dueKey && dueKey >= todayKey && dueKey <= monthKey && !["Approved","Closed"].includes(list.status);
+    return true; // "All dates"
+  })();
   return (
+    dueFine &&
     (!search || normalize(punchSearchText(list)).includes(search)) &&
     (state.filters.punchProject === "All projects" || list.project_name === state.filters.punchProject) &&
     (state.filters.punchContractor === "All contractors" || list.assigned_contractor === state.filters.punchContractor || items.some((item) => item.assigned_contractor === state.filters.punchContractor)) &&
@@ -2298,6 +2323,12 @@ function punchListCard(list, hideProject = false) {
   const items = list.items || [];
   const dueLevel = punchDueLevel(list);
   const approved = items.filter((item) => ["Approved", "Closed"].includes(item.status)).length;
+  // B: Stale badge — active list not touched in 7+ days
+  const isActive = !["Approved", "Closed"].includes(list.status);
+  const daysSinceUpdate = list.updated_at
+    ? Math.floor((Date.now() - new Date(list.updated_at).getTime()) / 86400000)
+    : 999;
+  const isStale = isActive && daysSinceUpdate > 7;
   // In By-Project view the project name is already in the group header — suppress it
   const subtitle = hideProject
     ? escapeHtml(list.client_name || "")
@@ -2306,6 +2337,7 @@ function punchListCard(list, hideProject = false) {
     <div class="record-topline">
       <span class="pill ${punchItemStatusClass(list.status)}">${escapeHtml(list.status)}</span>
       <span class="pill">${items.length} item${items.length === 1 ? "" : "s"}</span>
+      ${isStale ? `<span class="pill pill-stale" title="No updates in ${daysSinceUpdate} days">⏳ ${daysSinceUpdate}d stale</span>` : ""}
     </div>
     <h3>${escapeHtml(list.title)}</h3>
     ${subtitle ? `<p>${subtitle}</p>` : ""}
@@ -2354,10 +2386,15 @@ function renderPunchListsByProject(lists) {
     const activeList = sortedLists.find((l) => !["Closed", "Approved"].includes(l.status));
     const isAllClosed = !activeList;
     const dueLevel = activeList ? punchDueLevel(activeList) : "none";
+    // openItems spans all project lists for the summary bar
     const openItems = projectLists.reduce(
       (sum, l) => sum + (l.items || []).filter((i) => !["Approved", "Closed"].includes(i.status) && !i.resolved).length,
       0
     );
+    // activeOpenItems is scoped to the active list — used for the bulk-close button
+    const activeOpenItems = activeList
+      ? (activeList.items || []).filter((i) => !["Approved", "Closed"].includes(i.status) && !i.resolved).length
+      : 0;
     const groupKey = escapeHtml(projectId || projectName);
 
     // C: Status-advance button — only shown when rep has an action to take
@@ -2367,8 +2404,8 @@ function renderPunchListsByProject(lists) {
       : "";
 
     // Bulk-close all open items on the active punch list
-    const bulkCloseBtn = (activeList && openItems > 0)
-      ? `<button class="punch-bulk-close-btn" data-punch-bulk-close="${escapeHtml(activeList.punch_list_id)}" data-punch-bulk-close-count="${openItems}" type="button">&#10005; Close ${openItems} Item${openItems === 1 ? "" : "s"}</button>`
+    const bulkCloseBtn = (activeList && activeOpenItems > 0)
+      ? `<button class="punch-bulk-close-btn" data-punch-bulk-close="${escapeHtml(activeList.punch_list_id)}" data-punch-bulk-close-count="${activeOpenItems}" type="button">&#10005; Close ${activeOpenItems} Item${activeOpenItems === 1 ? "" : "s"}</button>`
       : "";
 
     // D: Compact active-list summary bar — clickable, opens detail
@@ -2430,15 +2467,22 @@ function renderPunchLists() {
   const stats = punchStats();
   byId("punchSummaryStrip").innerHTML = [
     punchSummaryButton("Open Punch Items", stats.open, "punchStatus", "All statuses"),
-    punchSummaryButton("Overdue Items", stats.overdue, "punchSort", "dueDate"),
+    punchSummaryButton("Overdue", stats.overdue, "punchDue", "Overdue"),
+    punchSummaryButton("Due This Week", stats.dueThisWeek, "punchDue", "Due this week"),
     punchSummaryButton("Pending Review", stats.review, "punchStatus", "Submitted for Review"),
     punchSummaryButton("Contractor Completion", `${stats.completion}%`, "punchStatus", "All statuses"),
-    punchSummaryButton("Final Approval Queue", stats.closeout, "punchStatus", "Approved"),
   ].join("");
   const lists = filteredPunchLists();
-  // Show the "Collapse Closed" button only in By-Project view
+  // Show the "Collapse Closed" and "Active Only" buttons only in By-Project view
+  const isProject = state.layouts.punchLists === "project";
   const collapseClosedBtn = byId("punchCollapseClosedBtn");
-  if (collapseClosedBtn) collapseClosedBtn.hidden = state.layouts.punchLists !== "project";
+  if (collapseClosedBtn) collapseClosedBtn.hidden = !isProject;
+  const activeOnlyBtn = byId("punchActiveOnlyBtn");
+  if (activeOnlyBtn) {
+    activeOnlyBtn.hidden = !isProject;
+    activeOnlyBtn.textContent = state.punchActiveOnly ? "Show Closed" : "Active Only";
+    activeOnlyBtn.classList.toggle("is-active-filter", state.punchActiveOnly);
+  }
   if (state.layouts.punchLists === "project") {
     byId("punchListBoard").innerHTML = renderPunchListsByProject(lists);
   } else {
@@ -5624,6 +5668,7 @@ function renderFilters() {
   fillSelect("punchStatusFilter", ["All statuses", ...punchListStatuses, ...punchItemStatuses.filter((status) => !punchListStatuses.includes(status))], state.filters.punchStatus);
   fillSelect("punchSeverityFilter", ["All severities", ...punchSeverities], state.filters.punchSeverity);
   fillSelect("punchCategoryFilter", ["All categories", ...punchCategories], state.filters.punchCategory);
+  fillSelect("punchDueFilter", ["All dates", "Overdue", "Due this week", "Due this month"], state.filters.punchDue);
   byId("punchSortFilter").value = state.filters.punchSort;
   byId("punchSearchInput").value = state.filters.punchSearch;
   syncDirectionButton("punchSortDirection", state.filters.punchDirection);
@@ -6022,10 +6067,13 @@ function persistRecordEdit(type, id, key, value, refresh = true) {
     savedCrm.edits[collection][id] = { ...(savedCrm.edits[collection][id] || {}), [key]: cleanedValue };
   }
   saveCrm();
-  // Propagate renamed project name to all punch lists that reference this project
-  if (collection === "projects" && key === "projectName") {
+  // Propagate renamed project display name to all punch lists that reference this project.
+  // punch lists store project_name = project.projectName || project.client, so both fields matter.
+  if (collection === "projects" && ["projectName", "client"].includes(key)) {
+    const proj = data.projects.find((p) => p.id === id);
+    const newName = proj ? (proj.projectName || proj.client || "") : cleanedValue;
     state.punchLists.forEach((list) => {
-      if (list.project_id === id) list.project_name = cleanedValue;
+      if (list.project_id === id) list.project_name = newName;
     });
     savePunchLists();
   }
@@ -6039,9 +6087,11 @@ function persistRecordEdit(type, id, key, value, refresh = true) {
 
 function cleanupPunchGroupCollapsed() {
   // Remove any stale keys from punchGroupCollapsed that no longer correspond
-  // to an existing punch-list group (keyed by project_id || project_name).
+  // to an existing punch-list group.
+  // Must use the same key logic as renderPunchListsByProject:
+  //   rawKey = (project_id || "") || (project_name || "No Project")
   const validKeys = new Set(
-    state.punchLists.map((l) => l.project_id || l.project_name || "__no_project__")
+    state.punchLists.map((l) => l.project_id || l.project_name || "No Project")
   );
   let changed = false;
   Object.keys(state.punchGroupCollapsed).forEach((k) => {
@@ -10350,10 +10400,21 @@ function bindEvents() {
     state.filters.punchSearch = event.target.value;
     renderPunchLists();
   });
+  byId("punchDueFilter").addEventListener("change", (event) => {
+    state.filters.punchDue = event.target.value;
+    renderPunchLists();
+  });
+  byId("punchActiveOnlyBtn").addEventListener("click", () => {
+    state.punchActiveOnly = !state.punchActiveOnly;
+    renderPunchLists();
+  });
   byId("punchSummaryStrip").addEventListener("click", (event) => {
     const button = event.target.closest("[data-punch-summary-key]");
     if (!button) return;
-    state.filters[button.dataset.punchSummaryKey] = button.dataset.punchSummaryValue;
+    // Toggle off if already active
+    const key = button.dataset.punchSummaryKey;
+    const val = button.dataset.punchSummaryValue;
+    state.filters[key] = (state.filters[key] === val) ? (key === "punchDue" ? "All dates" : "All statuses") : val;
     renderFilters();
     renderPunchLists();
   });
@@ -11032,15 +11093,25 @@ function bindEvents() {
       if (!confirm(
         `Close all ${count} open item${count === 1 ? "" : "s"} on "${list.title}"?\n\nProject: ${list.project_name || "—"}\n\nThis marks every unresolved item as Closed.`
       )) return;
+      const bulkNow = new Date().toISOString();
       (list.items || []).forEach((item) => {
         if (!["Approved", "Closed"].includes(item.status) && !item.resolved) {
           item.status = "Closed";
           item.resolved = true;
-          item.resolved_at = item.resolved_at || new Date().toISOString();
+          item.resolved_at = item.resolved_at || bulkNow;
+          item.updated_at = bulkNow;
         }
       });
-      list.updated_at = new Date().toISOString();
-      punchAudit(list, `Bulk-closed ${count} open item${count === 1 ? "" : "s"}`);
+      list.updated_at = bulkNow;
+      // C: If all items are now resolved, auto-advance the list status to Closed
+      const allResolved = (list.items || []).every((i) => ["Approved", "Closed"].includes(i.status) || i.resolved);
+      if (allResolved && (list.items || []).length) {
+        list.status = "Closed";
+        list.closed_at = list.closed_at || bulkNow;
+        punchAudit(list, `Bulk-closed ${count} item${count === 1 ? "" : "s"} — list auto-closed`);
+      } else {
+        punchAudit(list, `Bulk-closed ${count} open item${count === 1 ? "" : "s"}`);
+      }
       savePunchLists();
       renderPunchLists();
       return;

@@ -2,304 +2,682 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Contractor Punch List — GRIP</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --blue:   #0057a8;
-      --orange: #f58220;
-      --line:   #d5dfec;
-      --panel:  #f4f8ff;
+      --blue:    #0057a8;
+      --blue-dk: #003e7a;
+      --orange:  #f58220;
+      --green:   #16a34a;
+      --red:     #dc2626;
+      --amber:   #d97706;
+      --ink:     #0f1f33;
+      --muted:   #5b6e85;
+      --line:    #dde5f0;
+      --paper:   #f2f5fa;
+      --card:    #ffffff;
+      --radius:  10px;
+      --shadow:  0 2px 10px rgba(15,31,51,0.08), 0 1px 3px rgba(15,31,51,0.05);
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: var(--panel);
-      color: #111;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+      background: var(--paper);
+      color: var(--ink);
       font-size: 15px;
       line-height: 1.5;
-      padding-bottom: env(safe-area-inset-bottom);
+      padding-bottom: calc(80px + env(safe-area-inset-bottom));
     }
 
-    header {
-      background: var(--blue);
+    /* ── Top bar ───────────────────────────────────────────── */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: linear-gradient(135deg, #0d2540 0%, #0a1e36 100%);
       color: #fff;
-      padding: 14px 20px;
+      padding: 12px 16px;
       display: flex;
       align-items: center;
       gap: 12px;
+      box-shadow: 0 2px 12px rgba(10,20,40,0.25);
     }
-
-    header h1 { font-size: 1rem; font-weight: 700; }
-    header p  { font-size: 0.78rem; opacity: 0.8; }
 
     .logo-mark {
-      width: 36px; height: 36px;
-      border-radius: 8px;
-      background: var(--orange);
+      width: 38px; height: 38px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, #f58220, #e06b10);
       display: grid; place-items: center;
-      font-weight: 900; font-size: 1rem; color: #fff;
+      font-weight: 900; font-size: 1.1rem; color: #fff;
       flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(245,130,32,0.4);
     }
 
-    main { max-width: 680px; margin: 0 auto; padding: 20px 16px; }
+    .topbar-info { flex: 1; min-width: 0; }
+    .topbar-info h1 { font-size: 0.95rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .topbar-info p  { font-size: 0.72rem; opacity: 0.65; margin-top: 1px; }
 
-    #loadingState, #errorState, #successState { text-align: center; padding: 60px 20px; }
-    #errorState { color: #b00; }
+    .progress-ring {
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+    .progress-ring span { font-size: 0.64rem; opacity: 0.7; letter-spacing: 0.02em; white-space: nowrap; }
+    .ring-wrap { position: relative; width: 42px; height: 42px; }
+    .ring-bg, .ring-fill {
+      fill: none;
+      stroke-width: 4;
+      stroke-linecap: round;
+    }
+    .ring-bg   { stroke: rgba(255,255,255,0.15); }
+    .ring-fill { stroke: #f58220; transition: stroke-dashoffset 0.5s ease; }
+    .ring-label {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    /* ── Meta card ─────────────────────────────────────────── */
+    main { max-width: 720px; margin: 0 auto; padding: 16px 14px; }
 
     .meta-card {
-      background: #fff;
+      background: var(--card);
       border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 16px;
-      margin-bottom: 20px;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      margin-bottom: 14px;
     }
 
-    .meta-card h2 { color: var(--blue); font-size: 1.1rem; margin-bottom: 8px; }
+    .meta-card-header {
+      background: linear-gradient(135deg, var(--blue) 0%, var(--blue-dk) 100%);
+      color: #fff;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .meta-card-header h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .status-badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.2);
+      white-space: nowrap;
+    }
 
     .meta-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 6px 16px;
-      font-size: 0.85rem;
+      gap: 0;
     }
 
-    .meta-grid span { font-weight: 600; }
+    .meta-cell {
+      padding: 10px 16px;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+    .meta-cell:nth-child(even) { border-right: none; }
+    .meta-cell:nth-last-child(-n+2) { border-bottom: none; }
 
+    .meta-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 2px;
+    }
+    .meta-value { font-size: 0.88rem; font-weight: 600; color: var(--ink); }
+
+    /* ── Instructions ──────────────────────────────────────── */
     .instructions {
-      background: #fffbe8;
-      border: 1px solid #e5d98a;
-      border-radius: 8px;
-      padding: 12px 16px;
-      font-size: 0.85rem;
-      margin-bottom: 20px;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: var(--radius);
+      padding: 11px 14px;
+      font-size: 0.84rem;
+      line-height: 1.5;
+      margin-bottom: 16px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .instructions-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+
+    /* ── Punch items ───────────────────────────────────────── */
+    .items-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .items-header h3 {
+      font-size: 0.88rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
     }
 
     .punch-item {
-      background: #fff;
+      background: var(--card);
       border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 16px;
-      margin-bottom: 16px;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      margin-bottom: 12px;
+      overflow: hidden;
+      transition: border-color 0.15s ease;
     }
 
+    .punch-item.is-done {
+      border-left: 4px solid var(--green);
+      opacity: 0.8;
+    }
+
+    /* Item header row */
     .item-header {
       display: flex;
-      justify-content: space-between;
       align-items: flex-start;
-      margin-bottom: 10px;
+      gap: 10px;
+      padding: 12px 14px 10px;
+      border-bottom: 1px solid var(--line);
+      background: #fafbfd;
     }
 
-    .item-number {
+    .item-num {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      background: var(--blue);
+      color: #fff;
       font-weight: 800;
-      color: var(--blue);
-      font-size: 0.85rem;
+      font-size: 0.9rem;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
     }
 
-    .badge {
-      font-size: 0.72rem;
+    .item-meta { flex: 1; min-width: 0; }
+    .item-category {
+      font-weight: 700;
+      font-size: 0.92rem;
+      color: var(--ink);
+    }
+    .item-location {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .severity-badge {
+      flex-shrink: 0;
+      font-size: 0.68rem;
       font-weight: 700;
       padding: 3px 8px;
-      border-radius: 4px;
+      border-radius: 5px;
+      white-space: nowrap;
     }
+    .sev-critical { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+    .sev-warning  { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+    .sev-normal   { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
 
-    .badge-critical { background: #bd0808; color: #fff; }
-    .badge-warning  { background: #fff0df; color: #8a3f00; }
-    .badge-normal   { background: #e3f1ff; color: #0057a8; }
+    /* Item body */
+    .item-body { padding: 12px 14px; }
 
-    .item-detail p { font-size: 0.87rem; margin: 4px 0; }
-    .item-detail strong { color: #333; }
-
-    .item-photos {
-      display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0;
+    .item-issue, .item-correction, .item-water-test {
+      font-size: 0.87rem;
+      line-height: 1.5;
+      margin-bottom: 10px;
     }
+    .item-issue strong, .item-correction strong, .item-water-test strong {
+      display: block;
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 3px;
+    }
+    .item-water-test strong { color: var(--amber); }
 
-    .item-photos img {
-      width: 80px; height: 60px;
+    /* Before photos */
+    .photo-strip {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .photo-strip-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .photo-thumb {
+      width: 80px; height: 64px;
       object-fit: cover;
       border-radius: 6px;
       border: 1px solid var(--line);
+      cursor: pointer;
     }
 
-    .completion-section {
-      border-top: 1px solid var(--line);
-      margin-top: 12px;
-      padding-top: 12px;
+    /* Completion section */
+    .completion-divider {
+      border: none;
+      border-top: 1px dashed var(--line);
+      margin: 4px 0 12px;
     }
 
-    .completion-section label {
+    .completion-label-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .completion-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: background 0.2s;
+    }
+    .is-done .completion-dot { background: var(--green); }
+    .completion-label-row span {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+    }
+
+    .field-label {
       display: block;
-      font-size: 0.8rem;
-      font-weight: 600;
+      font-size: 0.75rem;
+      font-weight: 650;
+      color: var(--muted);
       margin-bottom: 4px;
-      color: #333;
+      margin-top: 10px;
     }
 
     textarea, input[type="text"] {
       width: 100%;
       border: 1px solid var(--line);
-      border-radius: 6px;
-      padding: 8px 10px;
+      border-radius: 8px;
+      padding: 9px 11px;
       font-size: 0.87rem;
       font-family: inherit;
+      line-height: 1.5;
       resize: vertical;
-      min-height: 70px;
+      background: #fff;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    textarea { min-height: 80px; }
+    input[type="text"] { min-height: unset; height: 38px; }
+    textarea:focus, input[type="text"]:focus {
+      outline: none;
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(0,87,168,0.12);
     }
 
-    input[type="text"] { min-height: unset; }
-
-    .check-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin: 8px 0;
-      font-size: 0.87rem;
-    }
-
-    .check-row input[type="checkbox"] {
-      width: 18px; height: 18px;
-      accent-color: var(--blue);
-      flex-shrink: 0;
-    }
-
-    .photo-upload-area {
+    /* Photo upload */
+    .photo-upload-zone {
       border: 2px dashed var(--line);
       border-radius: 8px;
-      padding: 12px;
+      padding: 14px 12px;
       text-align: center;
-      font-size: 0.8rem;
-      color: #666;
-      margin: 8px 0;
+      color: var(--muted);
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      margin-top: 10px;
+    }
+    .photo-upload-zone:hover { border-color: var(--orange); background: #fffbf5; }
+    .photo-upload-zone .upload-icon { font-size: 1.5rem; margin-bottom: 4px; }
+    .photo-upload-zone p { font-size: 0.8rem; font-weight: 600; margin-bottom: 2px; }
+    .photo-upload-zone small { font-size: 0.72rem; opacity: 0.75; }
+    .photo-input { display: none; }
+
+    .photo-thumbs {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+    .photo-thumbs img {
+      width: 72px; height: 58px;
+      object-fit: cover;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+    }
+
+    /* Confirm checkbox */
+    .confirm-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #f0fdf4;
+      border: 1px solid #86efac;
+    }
+    .confirm-row input[type="checkbox"] {
+      width: 18px; height: 18px;
+      accent-color: var(--green);
+      flex-shrink: 0;
+      margin-top: 2px;
+      cursor: pointer;
+    }
+    .confirm-row label {
+      font-size: 0.84rem;
+      line-height: 1.4;
+      color: #166534;
       cursor: pointer;
     }
 
-    .photo-upload-area:hover { border-color: var(--orange); }
-
-    .photo-input { display: none; }
-
-    .photo-thumbs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
-    .photo-thumbs img {
-      width: 70px; height: 55px;
-      object-fit: cover;
-      border-radius: 4px;
-      border: 1px solid var(--line);
-    }
-
+    /* ── Overall notes ─────────────────────────────────────── */
     .overall-notes {
-      background: #fff;
+      background: var(--card);
       border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 16px;
-      margin: 20px 0;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px 16px;
+      margin: 20px 0 14px;
     }
-
     .overall-notes h3 {
-      font-size: 0.95rem;
-      color: var(--blue);
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--ink);
       margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
+    /* ── Progress bar ──────────────────────────────────────── */
+    .progress-bar-wrap {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      margin-bottom: 14px;
+      box-shadow: var(--shadow);
+    }
+    .progress-bar-labels {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .progress-bar-labels span { font-size: 0.8rem; font-weight: 700; color: var(--muted); }
+    .progress-bar-labels strong { font-size: 0.88rem; color: var(--ink); }
+    .progress-track {
+      height: 8px;
+      border-radius: 999px;
+      background: var(--line);
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--blue), var(--orange));
+      transition: width 0.4s ease;
+    }
+
+    /* ── Submit area ───────────────────────────────────────── */
     .submit-area {
-      position: sticky;
+      position: fixed;
       bottom: 0;
-      background: var(--panel);
-      padding: 12px 0 20px;
+      left: 0;
+      right: 0;
+      background: #fff;
       border-top: 1px solid var(--line);
+      padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+      box-shadow: 0 -4px 20px rgba(15,31,51,0.1);
+      z-index: 50;
+    }
+
+    .submit-inner {
+      max-width: 720px;
+      margin: 0 auto;
       display: flex;
       flex-direction: column;
       gap: 8px;
     }
 
-    .btn-primary {
-      background: var(--orange);
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      padding: 14px;
+    .btn-submit {
+      width: 100%;
+      padding: 15px;
       font-size: 1rem;
       font-weight: 700;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--green) 0%, #15803d 100%);
+      color: #fff;
       cursor: pointer;
-      width: 100%;
+      transition: opacity 0.15s, transform 0.12s;
+      box-shadow: 0 3px 12px rgba(22,163,74,0.35);
     }
-
-    .btn-primary:disabled {
-      opacity: 0.5;
+    .btn-submit:disabled {
+      background: #94a3b8;
+      box-shadow: none;
       cursor: not-allowed;
+    }
+    .btn-submit:not(:disabled):hover {
+      transform: translateY(-1px);
+      box-shadow: 0 5px 16px rgba(22,163,74,0.4);
     }
 
     .submit-note {
-      font-size: 0.78rem;
-      color: #666;
+      font-size: 0.73rem;
+      color: var(--muted);
       text-align: center;
+      line-height: 1.4;
     }
 
-    #submitProgress { text-align: center; padding: 16px; color: var(--blue); display: none; }
+    /* ── State screens ─────────────────────────────────────── */
+    #loadingState, #errorState, #successState {
+      min-height: 70vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 40px 24px;
+      gap: 14px;
+    }
 
-    .success-icon { font-size: 3rem; margin-bottom: 16px; }
-    #successState h2 { color: var(--blue); margin-bottom: 8px; }
+    #errorState { color: #dc2626; }
+    #errorState h2 { color: #dc2626; font-size: 1.1rem; }
+    #errorState p { font-size: 0.9rem; color: var(--muted); max-width: 340px; }
+
+    .loading-spinner {
+      width: 40px; height: 40px;
+      border: 3px solid var(--line);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .success-icon { font-size: 3.5rem; }
+    #successState h2 { font-size: 1.35rem; color: var(--green); }
+    #successState p { font-size: 0.9rem; color: var(--muted); max-width: 360px; }
+
+    #submitProgress { display: none; text-align: center; font-size: 0.85rem; color: var(--blue); }
+
+    /* ── Lightbox ──────────────────────────────────────────── */
+    .lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      background: rgba(0,0,0,0.9);
+      align-items: center;
+      justify-content: center;
+    }
+    .lightbox.is-open { display: flex; }
+    .lightbox img { max-width: 96vw; max-height: 90vh; border-radius: 8px; object-fit: contain; }
+    .lightbox-close {
+      position: absolute;
+      top: 16px; right: 16px;
+      background: rgba(255,255,255,0.15);
+      border: none;
+      color: #fff;
+      font-size: 1.5rem;
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: grid; place-items: center;
+    }
 
     @media (max-width: 480px) {
       .meta-grid { grid-template-columns: 1fr; }
+      .meta-cell:nth-child(even) { border-right: none; }
+      .meta-cell:nth-last-child(-n+2) { border-bottom: 1px solid var(--line); }
+      .meta-cell:last-child { border-bottom: none; }
     }
   </style>
 </head>
 <body>
 
-<header>
+<!-- Top bar -->
+<header class="topbar">
   <div class="logo-mark">G</div>
-  <div>
-    <h1>GRIP Contractor Punch List</h1>
+  <div class="topbar-info">
+    <h1 id="headerTitle">GRIP Contractor Portal</h1>
     <p>Garland Relationship Intelligence Platform</p>
+  </div>
+  <div class="progress-ring" id="progressRingWrap" hidden>
+    <div class="ring-wrap">
+      <svg viewBox="0 0 42 42" width="42" height="42">
+        <circle class="ring-bg" cx="21" cy="21" r="17"/>
+        <circle class="ring-fill" id="ringFill" cx="21" cy="21" r="17"
+          stroke-dasharray="106.8" stroke-dashoffset="106.8"
+          transform="rotate(-90 21 21)"/>
+      </svg>
+      <span class="ring-label" id="ringLabel">0%</span>
+    </div>
+    <span id="ringSubLabel">complete</span>
   </div>
 </header>
 
 <main>
+  <!-- Loading -->
   <div id="loadingState">
-    <p>Loading punch list…</p>
+    <div class="loading-spinner"></div>
+    <p style="color:var(--muted);font-size:0.9rem">Loading punch list…</p>
   </div>
 
+  <!-- Error -->
   <div id="errorState" hidden>
+    <div style="font-size:2.5rem">⚠️</div>
+    <h2>Link Error</h2>
     <p id="errorMessage">This link is invalid or has expired. Contact your Garland rep.</p>
   </div>
 
+  <!-- Punch content -->
   <div id="punchContent" hidden>
-    <div class="meta-card">
-      <h2 id="punchTitle"></h2>
-      <div class="meta-grid">
-        <div><span>Project:</span> <span id="punchProject"></span></div>
-        <div><span>Client:</span> <span id="punchClient"></span></div>
-        <div><span>Contractor:</span> <span id="punchContractor"></span></div>
-        <div><span>Due Date:</span> <span id="punchDue"></span></div>
+
+    <!-- Progress bar -->
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-labels">
+        <span>Completion Progress</span>
+        <strong id="progressText">0 of 0 items done</strong>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill" style="width:0%"></div>
       </div>
     </div>
 
-    <div class="instructions">
-      <strong>Instructions:</strong> For each item below, describe the work you performed and upload an after photo. Items marked <strong>Warranty Critical</strong> or <strong>Leak Risk</strong> require water test confirmation. Tap <strong>Submit Completed Work</strong> when finished.
+    <!-- Project meta -->
+    <div class="meta-card">
+      <div class="meta-card-header">
+        <h2 id="punchTitle">Punch List</h2>
+        <span class="status-badge" id="punchStatusBadge">Sent to Contractor</span>
+      </div>
+      <div class="meta-grid">
+        <div class="meta-cell">
+          <div class="meta-label">Project</div>
+          <div class="meta-value" id="punchProject">—</div>
+        </div>
+        <div class="meta-cell">
+          <div class="meta-label">Client</div>
+          <div class="meta-value" id="punchClient">—</div>
+        </div>
+        <div class="meta-cell">
+          <div class="meta-label">Contractor</div>
+          <div class="meta-value" id="punchContractor">—</div>
+        </div>
+        <div class="meta-cell">
+          <div class="meta-label">Due Date</div>
+          <div class="meta-value" id="punchDue">—</div>
+        </div>
+      </div>
     </div>
 
+    <!-- Instructions -->
+    <div class="instructions">
+      <div class="instructions-icon">📋</div>
+      <div>
+        <strong>Instructions:</strong> For each item below, enter completion notes describing the work performed and upload an after photo. Items marked <strong>Warranty Critical</strong> or <strong>Leak Risk</strong> require water-test confirmation. Check the confirmation box on each item, then tap <strong>Submit Completed Work</strong> when finished.
+      </div>
+    </div>
+
+    <!-- Items list -->
+    <div class="items-header">
+      <h3 id="itemsCountLabel">Punch Items</h3>
+    </div>
     <div id="itemsList"></div>
 
+    <!-- Overall notes -->
     <div class="overall-notes">
-      <h3>Overall Completion Notes</h3>
-      <label for="overallNotes">Any additional notes, access information, or outstanding concerns:</label>
-      <textarea id="overallNotes" placeholder="e.g. Drain D-2 required clearing before resealing. North parapet completed first visit, south parapet scheduled for follow-up."></textarea>
+      <h3>📝 Overall Completion Notes</h3>
+      <label for="overallNotes" style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Additional context, access notes, or outstanding concerns:</label>
+      <textarea id="overallNotes" placeholder="e.g. Drain D-2 required clearing before resealing. North parapet completed first visit — south parapet scheduled for follow-up." rows="4"></textarea>
     </div>
 
-    <div class="submit-area">
-      <button class="btn-primary" id="submitButton" type="button">Submit Completed Work</button>
-      <div id="submitProgress">Submitting… please wait.</div>
-      <p class="submit-note">By submitting you confirm the listed corrections have been completed per Garland specifications.</p>
-    </div>
   </div>
 
+  <!-- Success -->
   <div id="successState" hidden>
     <div class="success-icon">✅</div>
     <h2>Submission Received</h2>
-    <p>Your completed punch list has been sent to the Garland rep for review. You will be contacted if any items require further correction.</p>
+    <p>Your completed punch list has been sent to the Garland rep for review. You will be contacted if any items require additional correction.</p>
   </div>
 </main>
+
+<!-- Submit sticky bar -->
+<div class="submit-area" id="submitArea" hidden>
+  <div class="submit-inner">
+    <button class="btn-submit" id="submitButton" type="button">Submit Completed Work</button>
+    <div id="submitProgress">Uploading… please wait.</div>
+    <p class="submit-note">By submitting you confirm the listed corrections have been completed per Garland specifications.</p>
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox">
+  <button class="lightbox-close" id="lightboxClose">✕</button>
+  <img id="lightboxImg" src="" alt="Photo" />
+</div>
 
 <script src="src/supabase-client.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
