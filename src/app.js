@@ -2277,17 +2277,21 @@ function punchFileThumbs(files = []) {
     .join("")}${files.length > 3 ? `<span>+${files.length - 3}</span>` : ""}</div>`;
 }
 
-function punchListCard(list) {
+function punchListCard(list, hideProject = false) {
   const items = list.items || [];
   const dueLevel = punchDueLevel(list);
   const approved = items.filter((item) => ["Approved", "Closed"].includes(item.status)).length;
+  // In By-Project view the project name is already in the group header — suppress it
+  const subtitle = hideProject
+    ? escapeHtml(list.client_name || "")
+    : escapeHtml([list.project_name, list.client_name].filter(Boolean).join(" | "));
   return `<article class="record-card punch-card ${dueLevel}" data-type="punchList" data-id="${escapeHtml(list.punch_list_id)}" draggable="true">
     <div class="record-topline">
       <span class="pill ${punchItemStatusClass(list.status)}">${escapeHtml(list.status)}</span>
       <span class="pill">${items.length} item${items.length === 1 ? "" : "s"}</span>
     </div>
     <h3>${escapeHtml(list.title)}</h3>
-    <p>${escapeHtml([list.project_name, list.client_name].filter(Boolean).join(" | "))}</p>
+    ${subtitle ? `<p>${subtitle}</p>` : ""}
     <div class="card-meta">
       <span class="pill">${escapeHtml(list.list_type)}</span>
       ${list.assigned_contractor ? `<span class="pill">${escapeHtml(list.assigned_contractor)}</span>` : ""}
@@ -2301,23 +2305,31 @@ function punchListCard(list) {
 function renderPunchListsByProject(lists) {
   if (!lists.length) return empty("No punch lists match this view.");
 
-  // Group by project_name
-  const groups = new Map();
+  // Bug fix: key by project_id (unique) with project_name as display label.
+  // Falling back to project_name for older lists without an id prevents
+  // two different projects with the same display name from being merged.
+  const groups = new Map(); // key → { projectName, projectId, lists[] }
   lists.forEach((list) => {
-    const key = list.project_name || "No Project";
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(list);
+    const key = list.project_id || list.project_name || "__no_project__";
+    if (!groups.has(key)) {
+      groups.set(key, {
+        projectName: list.project_name || "No Project",
+        projectId: list.project_id || "",
+        lists: [],
+      });
+    }
+    groups.get(key).lists.push(list);
   });
 
-  // Projects with active (non-closed) lists sort first, then alphabetically
-  const sorted = [...groups.entries()].sort(([aName, aLists], [bName, bLists]) => {
-    const aActive = aLists.some((l) => !["Closed", "Approved"].includes(l.status));
-    const bActive = bLists.some((l) => !["Closed", "Approved"].includes(l.status));
+  // Projects with active (non-closed/approved) lists sort first, then alphabetically
+  const sorted = [...groups.values()].sort((a, b) => {
+    const aActive = a.lists.some((l) => !["Closed", "Approved"].includes(l.status));
+    const bActive = b.lists.some((l) => !["Closed", "Approved"].includes(l.status));
     if (aActive !== bActive) return aActive ? -1 : 1;
-    return compareText(aName, bName);
+    return compareText(a.projectName, b.projectName);
   });
 
-  return sorted.map(([projectName, projectLists]) => {
+  return sorted.map(({ projectName, projectId, lists: projectLists }) => {
     // Within a project: active lists first, then most recently updated
     const sortedLists = [...projectLists].sort((a, b) => {
       const aActive = !["Closed", "Approved"].includes(a.status);
@@ -2330,7 +2342,12 @@ function renderPunchListsByProject(lists) {
       (sum, l) => sum + (l.items || []).filter((i) => !["Approved", "Closed"].includes(i.status) && !i.resolved).length,
       0
     );
-    const projectId = sortedLists[0]?.project_id || "";
+
+    // Bug fix: hide "+ Add Punch" when there is no linked project (empty id)
+    // because the form requires a project selection and would immediately alert.
+    const addButton = projectId
+      ? `<button class="mini-button" data-open-punch-project="${escapeHtml(projectId)}" type="button">+ Add Punch</button>`
+      : `<span class="muted-label" title="Assign a project to this punch list to enable this button">No linked project</span>`;
 
     return `<section class="punch-project-group">
       <div class="punch-project-header">
@@ -2346,10 +2363,10 @@ function renderPunchListsByProject(lists) {
               : `<span class="pill pill-all-clear">All Closed</span>`}
           </div>
         </div>
-        <button class="mini-button" data-open-punch-project="${escapeHtml(projectId)}" type="button">+ Add Punch</button>
+        ${addButton}
       </div>
       <div class="punch-project-cards">
-        ${sortedLists.map(punchListCard).join("")}
+        ${sortedLists.map((l) => punchListCard(l, true)).join("")}
       </div>
     </section>`;
   }).join("");
@@ -3915,6 +3932,8 @@ function applyLayout(containerId, viewName) {
   container.classList.toggle("is-list", layout === "list");
   container.classList.toggle("is-kanban", layout === "kanban");
   container.classList.toggle("is-project", layout === "project");
+  // Keep the toolbar toggle buttons in sync on every render, not just on click.
+  syncLayoutButtons(viewName);
 }
 
 function isPhoneMode() {

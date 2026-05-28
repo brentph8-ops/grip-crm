@@ -1145,7 +1145,6 @@ textarea {
 
 .punch-project-cards {
   display: grid;
-  gap: 0;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   padding: 12px;
   gap: 10px;
