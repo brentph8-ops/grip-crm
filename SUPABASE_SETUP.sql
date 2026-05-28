@@ -125,18 +125,62 @@ create policy "Reps read their submissions"
 
 
 -- ── Storage bucket ────────────────────────────────────────────────
--- Create this manually in Supabase Dashboard → Storage → New bucket:
---   Name:   grip-attachments
---   Public: false
+-- Stores punch list photos and proposal attachments as real files
+-- instead of base64 dataURLs in localStorage (much better for mobile).
+
+-- 1. Create the bucket (run this once; safe to re-run)
+insert into storage.buckets (id, name, public)
+values ('grip-attachments', 'grip-attachments', true)
+on conflict (id) do nothing;
+
+-- 2. Reps can upload files into their own user-id folder
+drop policy if exists "Reps upload own files" on storage.objects;
+create policy "Reps upload own files"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'grip-attachments'
+    and auth.uid()::text = (storage.foldername(name))[1]
+    and auth.jwt() ->> 'email' LIKE '%@garlandco.com'
+  );
+
+-- 3. Reps can read their own files (and update/delete them)
+drop policy if exists "Reps read own files" on storage.objects;
+create policy "Reps read own files"
+  on storage.objects for select
+  using (
+    bucket_id = 'grip-attachments'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+drop policy if exists "Reps delete own files" on storage.objects;
+create policy "Reps delete own files"
+  on storage.objects for delete
+  using (
+    bucket_id = 'grip-attachments'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+-- 4. Since the bucket is public, the getPublicUrl() in the app returns
+--    a URL readable by anyone (including contractor portal).
+--    No extra anon policy needed for public buckets.
+
+
+-- ── Realtime ──────────────────────────────────────────────────────
+-- Enable Realtime on grip_data so that a second device receives
+-- changes without a page reload.
+
+alter publication supabase_realtime add table grip_data;
+
+-- Row-level filter is enforced in the JS subscription (user_id=eq.<uid>).
+-- The RLS policy above already restricts what each user can see.
+
+
+-- ── Diagnostics helper (optional) ────────────────────────────────
+-- Returns the number of rows and last updated_at for a given user.
+-- Useful for debugging sync issues from the Supabase SQL editor.
 --
--- Then add these policies in the bucket's Policies tab:
---
---   1. Authenticated users can upload to their own folder:
---      USING: (auth.uid()::text = (storage.foldername(name))[1])
---
---   2. Authenticated users can read from their own folder:
---      USING: (auth.uid()::text = (storage.foldername(name))[1])
---
---   3. Anyone can read contractor submission photos (folder: contractor/):
---      USING: (storage.foldername(name))[1] = 'contractor'
+-- SELECT data_key, updated_at
+-- FROM grip_data
+-- WHERE user_id = '<paste-your-user-id-here>'
+-- ORDER BY updated_at DESC;
 -- ─────────────────────────────────────────────────────────────────

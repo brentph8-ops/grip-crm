@@ -30,9 +30,9 @@
         </button>
         <p id="gripAuthError" class="auth-error" hidden></p>
         <button class="secondary-button" id="gripContinueLocalButton" type="button">
-          Continue without sign-in (local only)
+          Use locally for now (tap sync badge to sign in later)
         </button>
-        <p class="auth-note">Authorized for @garlandco.com accounts. Each rep gets their own private data. Local mode keeps data on this device only.</p>
+        <p class="auth-note">Authorized for @garlandco.com accounts. Each rep gets their own private data. Local mode keeps data on this device only — tap the sync indicator in the toolbar any time to sign in.</p>
       </div>
     </div>
 
@@ -216,9 +216,11 @@
             <span aria-hidden="true">⌕</span>
             <input id="globalSearch" type="search" placeholder="Search clients, projects, contacts, notes" />
           </div>
-          <span id="gripSyncStatus" class="grip-sync-status sync-local" title="Cloud sync status"></span>
+          <button id="gripSyncStatus" class="grip-sync-status sync-local" title="Tap to sign in" type="button"></button>
           <span id="gripUserDisplay" class="grip-user-display" hidden></span>
+          <button class="secondary-button" id="gripSyncNowButton" type="button" hidden title="Push all local data to cloud now">↑ Sync</button>
           <button class="secondary-button" id="gripSignOutButton" type="button" hidden>Sign Out</button>
+          <button class="secondary-button grip-force-signout-btn" id="gripForceSignOutButton" type="button" hidden title="Sign out on all devices">Sign Out All</button>
           <button class="secondary-button detail-toggle" id="territorySettingsButton" type="button">My Settings</button>
           <button class="secondary-button detail-toggle" id="printSummaryButton" type="button">Print</button>
           <button class="primary-button detail-toggle" id="newTaskButton" type="button">+ Task</button>

@@ -905,7 +905,7 @@ const state = {
     punchDirection: "desc",
     punchSearch: "",
   },
-  punchActiveOnly: false,
+  punchActiveOnly: localStorage.getItem("garlandPunchActiveOnly") === "1",
   proposalSort: "stage",
   notes: readStorageJson("garlandCrmNotes", {}),
   activities: readStorageJson("garlandAccountActivities", {}),
@@ -1978,7 +1978,7 @@ function normalizedTask(task) {
     account_name: task.account_name || "",
     related_project_id: task.related_project_id || "",
     related_project_name: task.related_project_name || "",
-    due_date: task.due_date || toLocalDateKey(new Date()),
+    due_date: task.due_date || "",  // preserve blank — form sets default; normalization should not assign one
     due_time: task.due_time || "",
     priority: task.priority || "Normal",
     task_type: task.task_type || "Follow-Up",
@@ -2036,7 +2036,6 @@ function sortTasks(a, b) {
 }
 
 function filteredTasks() {
-  ensureTaskShape();
   return state.tasks.filter(taskFilterMatch).sort(sortTasks);
 }
 
@@ -2082,14 +2081,14 @@ function taskCard(task) {
 }
 
 function taskSummaryButton(label, value, filter) {
-  return `<button class="task-summary-card" data-task-summary-filter="${filter}" type="button">
+  const isActive = state.filters.taskDue === filter;
+  return `<button class="task-summary-card${isActive ? " is-active-summary" : ""}" data-task-summary-filter="${filter}" type="button">
     <span>${escapeHtml(label)}</span>
     <strong>${value}</strong>
   </button>`;
 }
 
 function taskStats(tasks = state.tasks) {
-  ensureTaskShape();
   return {
     today: tasks.filter((task) => taskDueLevel(task) === "today").length,
     upcoming: tasks.filter((task) => taskDueLevel(task) === "upcoming").length,
@@ -2131,7 +2130,7 @@ function normalizedPunchList(list) {
     list_type: list.list_type || "Roofing Project",
     status: list.status || "Running Punch List",
     assigned_contractor: list.assigned_contractor || "",
-    due_date: list.due_date || toDateInput(addDays(new Date(), 7)),
+    due_date: list.due_date || "",  // preserve blank — form sets default; normalization should not assign one
     reviewer: list.reviewer || taskDefaultAssignedUser(),
     sent_at: list.sent_at || "",
     closed_at: list.closed_at || "",
@@ -2162,6 +2161,8 @@ function normalizedPunchItem(item) {
     contractor_notes: item.contractor_notes || "",
     water_test_status: item.water_test_status || "Not Required",
     rejected_reason: item.rejected_reason || "",
+    resolved: item.resolved ?? false,   // bulk-close flag — must survive normalization
+    resolved_at: item.resolved_at || "",
     original_photos: Array.isArray(item.original_photos) ? item.original_photos : [],
     contractor_completion_photos: Array.isArray(item.contractor_completion_photos) ? item.contractor_completion_photos : [],
     annotations: Array.isArray(item.annotations) ? item.annotations : [],
@@ -2184,7 +2185,6 @@ function ensurePunchShape() {
 }
 
 function findPunchList(id) {
-  ensurePunchShape();
   return state.punchLists.find((list) => list.punch_list_id === id);
 }
 
@@ -2233,7 +2233,6 @@ function punchProjectOptions() {
 }
 
 function punchStats(lists = state.punchLists) {
-  ensurePunchShape();
   const items = lists.flatMap((list) => list.items || []);
   const contractorItems = items.filter((item) => ["Pending Contractor Response", "Submitted for Review", "Approved", "Rejected", "Needs Additional Correction", "Closed"].includes(item.status));
   const approvedOrClosed = contractorItems.filter((item) => ["Approved", "Closed"].includes(item.status)).length;
@@ -2249,7 +2248,7 @@ function punchStats(lists = state.punchLists) {
     }).length,
     review: items.filter((item) => item.status === "Submitted for Review").length,
     completion: contractorItems.length ? Math.round((approvedOrClosed / contractorItems.length) * 100) : 0,
-    closeout: lists.filter((list) => list.status === "Approved" || list.status === "Closed").length,
+    closeout: lists.filter((list) => list.status === "Closed").length,
   };
 }
 
@@ -2257,7 +2256,7 @@ function punchFilterMatch(list) {
   const search = normalize([state.search, state.filters.punchSearch].filter(Boolean).join(" "));
   const items = list.items || [];
   // D: Active-only mode hides Closed/Approved lists entirely
-  if (state.punchActiveOnly && ["Closed", "Approved"].includes(list.status)) return false;
+  if (state.punchActiveOnly && state.layouts.punchLists === "project" && ["Closed", "Approved"].includes(list.status)) return false;
   // A: Due-date filter
   const todayKey = toLocalDateKey(new Date());
   const weekDate = new Date(); weekDate.setDate(weekDate.getDate() + 7);
@@ -2292,12 +2291,14 @@ function sortPunchLists(a, b) {
 }
 
 function filteredPunchLists() {
-  ensurePunchShape();
   return state.punchLists.filter(punchFilterMatch).sort(sortPunchLists);
 }
 
 function punchSummaryButton(label, value, filterKey, filterValue) {
-  return `<button class="task-summary-card punch-summary-card" data-punch-summary-key="${filterKey}" data-punch-summary-value="${escapeHtml(filterValue)}" type="button">
+  // Highlight the card when it matches the active filter (but not for the "show all" reset cards)
+  const isDefaultVal = filterValue === "All statuses" || filterValue === "All dates";
+  const isActive = !isDefaultVal && state.filters[filterKey] === filterValue;
+  return `<button class="task-summary-card punch-summary-card${isActive ? " is-active-summary" : ""}" data-punch-summary-key="${filterKey}" data-punch-summary-value="${escapeHtml(filterValue)}" type="button">
     <span>${escapeHtml(label)}</span>
     <strong>${escapeHtml(value)}</strong>
   </button>`;
@@ -2470,7 +2471,7 @@ function renderPunchLists() {
     punchSummaryButton("Overdue", stats.overdue, "punchDue", "Overdue"),
     punchSummaryButton("Due This Week", stats.dueThisWeek, "punchDue", "Due this week"),
     punchSummaryButton("Pending Review", stats.review, "punchStatus", "Submitted for Review"),
-    punchSummaryButton("Contractor Completion", `${stats.completion}%`, "punchStatus", "All statuses"),
+    punchSummaryButton("Closed Out", stats.closeout, "punchStatus", "Closed"),
   ].join("");
   const lists = filteredPunchLists();
   // Show the "Collapse Closed" and "Active Only" buttons only in By-Project view
@@ -2631,9 +2632,16 @@ function syncPunchProjectDefaults() {
 
 async function addPunchDraftFiles(kind, files) {
   if (!files?.length) return;
-  if (!confirmLargeLocalFiles(files, `${kind} punch photos`)) return;
+  // Only warn about large files if Supabase Storage is NOT configured
+  // (if configured, photos go to cloud storage — no local size impact)
+  if (!window.gripSync?.isConfigured() && !confirmLargeLocalFiles(files, `${kind} punch photos`)) return;
   for (const file of [...files]) {
-    const dataUrl = await new Promise((resolve) => {
+    // Try Supabase Storage first (avoids localStorage bloat)
+    let cloudUrl = null;
+    if (window.gripSync?.isConfigured()) {
+      cloudUrl = await window.gripSync.uploadFile(file, `punch/${kind}`).catch(() => null);
+    }
+    let dataUrl = cloudUrl ? "" : await new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
       reader.readAsDataURL(file);
@@ -2643,7 +2651,9 @@ async function addPunchDraftFiles(kind, files) {
       file_name: file.name,
       file_type: file.type || "application/octet-stream",
       upload_date: new Date().toISOString(),
-      thumbnail_url: String(file.type || "").startsWith("image/") ? dataUrl : "",
+      // url is preferred (cloud); dataUrl is fallback (local-only mode)
+      url: cloudUrl || "",
+      thumbnail_url: cloudUrl || (String(file.type || "").startsWith("image/") ? dataUrl : ""),
       dataUrl,
       size: file.size,
     });
@@ -3243,7 +3253,7 @@ function showTaskDetail(task) {
     </section>
     <section class="detail-section">
       <h4>Attachments</h4>
-      ${task.attachments?.length ? `<div class="file-list">${task.attachments.map((file) => `<div class="file-row">${file.dataUrl ? `<a href="${file.dataUrl}" download="${escapeHtml(file.file_name)}">${escapeHtml(file.file_name)}</a>` : escapeHtml(file.file_name)}</div>`).join("")}</div>` : `<p class="empty-state">No attachments.</p>`}
+      ${task.attachments?.length ? `<div class="file-list">${task.attachments.map((file) => { const href = file.url || file.dataUrl; return `<div class="file-row">${href ? `<a href="${escapeHtml(href)}" ${file.url ? 'target="_blank" rel="noopener"' : `download="${escapeHtml(file.file_name || "attachment")}"`}>${escapeHtml(file.file_name)}</a>` : escapeHtml(file.file_name)}</div>`; }).join("")}</div>` : `<p class="empty-state">No attachments.</p>`}
     </section>
     <section class="danger-zone"><button class="delete-button" data-delete-task="${escapeHtml(task.task_id)}" type="button">Delete Task</button></section>
   `;
@@ -3827,17 +3837,20 @@ function renderDashboard() {
 }
 
 function punchListDashboardRows() {
-  const lists = readStorageJson("garlandPunchLists", []);
+  const lists = state.punchLists; // use in-memory state, not stale localStorage read
   if (!lists.length) return [metricRow("No punch lists yet", "", "punchList")];
-  const open = lists.filter((l) => l.status !== "Closed" && l.status !== "Complete");
-  const closed = lists.filter((l) => l.status === "Closed" || l.status === "Complete");
-  const withItems = lists.filter((l) => Array.isArray(l.items) && l.items.length > 0);
-  const openItems = withItems.reduce((sum, l) => sum + (l.items || []).filter((i) => !i.resolved).length, 0);
+  const terminal = ["Approved", "Closed"];
+  const open   = lists.filter((l) => !terminal.includes(l.status));
+  const closed = lists.filter((l) =>  terminal.includes(l.status));
+  const openItems = lists.reduce(
+    (sum, l) => sum + (l.items || []).filter((i) => !terminal.includes(i.status) && !i.resolved).length,
+    0
+  );
   return [
-    metricRow("Total Lists", lists.length, "punchList"),
-    metricRow("Open Lists", open.length, "punchList"),
+    metricRow("Total Lists",  lists.length, "punchList"),
+    metricRow("Open Lists",   open.length,  "punchList"),
     metricRow("Closed Lists", closed.length, "punchList"),
-    metricRow("Open Items", openItems, "punchList"),
+    metricRow("Open Items",   openItems,    "punchList"),
   ];
 }
 
@@ -6599,11 +6612,13 @@ function activityFileLinks(files = []) {
   if (!files.length) return "";
   return `<div class="activity-files">
     ${files
-      .map((file) =>
-        file.dataUrl
-          ? `<a href="${file.dataUrl}" download="${escapeHtml(file.name || "activity-file")}">${escapeHtml(file.name || "Activity file")}</a>`
-          : ""
-      )
+      .map((file) => {
+        const href = file.url || file.dataUrl;
+        if (!href) return "";
+        return file.url
+          ? `<a href="${escapeHtml(file.url)}" target="_blank" rel="noopener">${escapeHtml(file.name || "Activity file")}</a>`
+          : `<a href="${file.dataUrl}" download="${escapeHtml(file.name || "activity-file")}">${escapeHtml(file.name || "Activity file")}</a>`;
+      })
       .join("")}
   </div>`;
 }
@@ -7468,8 +7483,10 @@ function exportBackup() {
       garlandTerritorySettings: localStorage.getItem("garlandTerritorySettings"),
       garlandPriceBooks: localStorage.getItem("garlandPriceBooks"),
       garlandPriceBookProducts: localStorage.getItem("garlandPriceBookProducts"),
+      garlandTakeoffEstimates: localStorage.getItem("garlandTakeoffEstimates"),
       garlandTakeoffManualProducts: localStorage.getItem("garlandTakeoffManualProducts"),
       garlandFavoriteSystems: localStorage.getItem("garlandFavoriteSystems"),
+      garlandProjectChecklists: localStorage.getItem("garlandProjectChecklists"),
       garlandLastBackupAt: localStorage.getItem("garlandLastBackupAt"),
     },
   };
@@ -7793,6 +7810,9 @@ function importBackup(file) {
       Object.entries(storage).forEach(([key, value]) => {
         if (key.startsWith("garland") && value !== null && value !== undefined) localStorage.setItem(key, value);
       });
+      // Clear local timestamps so pullAll() doesn't mistake imported data timestamps for offline edits.
+      // The imported data should be treated as fresh and pushed to cloud on next sync.
+      localStorage.removeItem("grip_local_timestamps");
       window.location.reload();
     } catch (error) {
       alert("That backup file could not be imported.");
@@ -9009,27 +9029,37 @@ function saveStandaloneScope(formEl) {
   reader.readAsDataURL(file);
 }
 
-function addProposalFiles(proposalId, category, files) {
+async function addProposalFiles(proposalId, category, files) {
   if (!files || !files.length) return;
-  if (!confirmLargeLocalFiles(files, "proposal or project attachments")) return;
+  if (!window.gripSync?.isConfigured() && !confirmLargeLocalFiles(files, "proposal or project attachments")) return;
   if (!state.attachments[proposalId]) state.attachments[proposalId] = {};
   if (!state.attachments[proposalId][category]) state.attachments[proposalId][category] = [];
-  [...files].forEach((file) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      state.attachments[proposalId][category].push({
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        dataUrl: reader.result,
-        uploadedAt: new Date().toISOString(),
+  for (const file of [...files]) {
+    // Try Supabase Storage first (avoids localStorage bloat)
+    let cloudUrl = null;
+    if (window.gripSync?.isConfigured()) {
+      cloudUrl = await window.gripSync.uploadFile(file, `attachments/${category}`).catch(() => null);
+    }
+    let dataUrl = "";
+    if (!cloudUrl) {
+      dataUrl = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(file);
       });
-      saveProposalAttachments();
-      const type = findRecord("project", proposalId) ? "project" : "proposal";
-      showDetail(type, proposalId);
-    };
-    reader.readAsDataURL(file);
-  });
+    }
+    state.attachments[proposalId][category].push({
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      url: cloudUrl || "",
+      dataUrl,
+      uploadedAt: new Date().toISOString(),
+    });
+  }
+  saveProposalAttachments();
+  const type = findRecord("project", proposalId) ? "project" : "proposal";
+  showDetail(type, proposalId);
 }
 
 function handleDroppedFiles(dropZone, files) {
@@ -10281,6 +10311,18 @@ function bindEvents() {
   byId("gripSignOutButton")?.addEventListener("click", () => {
     if (confirm("Sign out of GRIP cloud sync? Your local data stays on this device.")) window.gripSync?.signOut();
   });
+  byId("gripSyncNowButton")?.addEventListener("click", async () => {
+    const btn = byId("gripSyncNowButton");
+    const original = btn.textContent;
+    btn.textContent = "Syncing…";
+    btn.disabled = true;
+    await window.gripSync?.syncNow();
+    const info = window.gripSync?.lastSyncInfo() || "";
+    btn.textContent = original;
+    btn.disabled = false;
+    alert(`Sync complete.\n\n${info}`);
+  });
+  byId("gripForceSignOutButton")?.addEventListener("click", () => window.gripSync?.signOutAllDevices());
   byId("cancelReleaseNotesButton").addEventListener("click", () => byId("releaseNotesDialog").close());
   byId("cancelProposalDueTodayButton").addEventListener("click", () => {
     byId("proposalDueTodayDialog").close();
@@ -10344,7 +10386,9 @@ function bindEvents() {
   byId("taskSummaryStrip").addEventListener("click", (event) => {
     const button = event.target.closest("[data-task-summary-filter]");
     if (!button) return;
-    state.filters.taskDue = button.dataset.taskSummaryFilter;
+    const filter = button.dataset.taskSummaryFilter;
+    // Toggle off if already active
+    state.filters.taskDue = (state.filters.taskDue === filter) ? "all" : filter;
     byId("taskDueFilter").value = state.filters.taskDue;
     renderTasks();
   });
@@ -10406,6 +10450,7 @@ function bindEvents() {
   });
   byId("punchActiveOnlyBtn").addEventListener("click", () => {
     state.punchActiveOnly = !state.punchActiveOnly;
+    localStorage.setItem("garlandPunchActiveOnly", state.punchActiveOnly ? "1" : "0");
     renderPunchLists();
   });
   byId("punchSummaryStrip").addEventListener("click", (event) => {
@@ -11010,11 +11055,14 @@ function bindEvents() {
         generateContractorLinkButton.textContent = "🔗 Contractor Portal Link";
         generateContractorLinkButton.disabled = false;
         if (!url) return;
+        const expiresDate = new Date();
+        expiresDate.setDate(expiresDate.getDate() + 30);
+        const expiresStr = expiresDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
         navigator.clipboard.writeText(url).then(() => {
-          generateContractorLinkButton.textContent = "✓ Link Copied!";
-          setTimeout(() => { generateContractorLinkButton.textContent = "🔗 Contractor Portal Link"; }, 3000);
+          generateContractorLinkButton.textContent = `✓ Copied — expires ${expiresStr}`;
+          setTimeout(() => { generateContractorLinkButton.textContent = "🔗 Contractor Portal Link"; }, 5000);
         }).catch(() => {
-          prompt("Copy this contractor portal link:", url);
+          prompt(`Contractor portal link (expires ${expiresStr}):`, url);
         });
       });
       return;
@@ -11574,6 +11622,8 @@ standardizeProjectTypeLabels();
 standardizeAbcScoreLabels();
 applyRequestedDataCleanup();
 migrateSheetNotesToActivities();
+ensurePunchShape(); // normalize once at startup — not on every render
+ensureTaskShape();  // normalize once at startup — not on every render
 renderFilters();
 renderInchFractionOptions();
 resetProjectForm();
@@ -11584,3 +11634,37 @@ setDetailsHidden(false);
 showDueTodayProposalDialog();
 showTaskDailyAlertDialog();
 showFridayWeeklyReviewDialog();
+
+// ── Realtime remote-update handler ──────────────────────────────
+// grip-sync.js fires "grip:remote-update" when another device pushes
+// a change. Re-read the affected key from localStorage (already updated
+// by grip-sync) and re-render the relevant section.
+window._gripHandleRemoteUpdate = function (key) {
+  if (key === "garlandTasks") {
+    state.tasks = readStorageJson("garlandTasks", []);
+    ensureTaskShape();
+    renderTasks();
+  } else if (key === "garlandPunchLists") {
+    state.punchLists = readStorageJson("garlandPunchLists", []);
+    ensurePunchShape();
+    renderPunchLists();
+  } else if (key === "garlandCrmData") {
+    // Full CRM data changed — full render required
+    window.location.reload();
+  } else if (key === "garlandAccountActivities") {
+    state.activities = readStorageJson("garlandAccountActivities", {});
+    renderDashboard();
+  } else if (key === "garlandCrmNotes") {
+    state.notes = readStorageJson("garlandCrmNotes", {});
+  } else if (key === "garlandProposalAttachments") {
+    state.attachments = readStorageJson("garlandProposalAttachments", {});
+  } else if (key === "garlandProjectChecklists") {
+    state.projectChecklists = readStorageJson("garlandProjectChecklists", {});
+  } else if (key === "garlandScopeDatabase") {
+    state.scopeDatabase = readStorageJson("garlandScopeDatabase", []);
+    renderScopeDatabase();
+  } else if (key === "garlandCallLists") {
+    state.callLists = readStorageJson("garlandCallLists", { rules: [], completed: {} });
+    renderCallList();
+  }
+};

@@ -119,12 +119,23 @@ textarea {
   border-radius: 4px;
   white-space: nowrap;
   align-self: center;
+  border: none;
+  cursor: default;
+  background: transparent;
+}
+
+/* Make the badge feel tappable only when there's an action (local = sign-in prompt) */
+button.grip-sync-status.sync-local {
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .sync-local   { background: #f0f0f0; color: #666; }
 .sync-syncing { background: #e3f1ff; color: #0057a8; }
 .sync-saved   { background: #d8f1df; color: #147b48; }
 .sync-error   { background: #fde8e8; color: #9c3f3a; }
+.sync-ready   { background: transparent; color: transparent; padding: 0; } /* idle — hidden after sync */
 
 .grip-user-display {
   font-size: 0.75rem;
@@ -134,6 +145,22 @@ textarea {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Sync Now — compact action button in toolbar */
+#gripSyncNowButton {
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  align-self: center;
+}
+
+/* Force sign-out all devices — subtle danger styling */
+.grip-force-signout-btn {
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  align-self: center;
+  color: var(--red, #dc2626);
+  border-color: var(--red, #dc2626);
 }
 
 /* ── Contractor submissions in detail drawer ─────────────────── */
@@ -802,6 +829,15 @@ textarea {
   box-shadow: var(--shadow);
   transform: translateY(-1px);
 }
+
+.task-summary-card.is-active-summary {
+  border-color: var(--blue);
+  background: #e8f0fa;
+  box-shadow: var(--shadow);
+}
+
+.task-summary-card.is-active-summary span { color: var(--blue); }
+.task-summary-card.is-active-summary strong { color: var(--blue-dk, #003e7a); }
 
 .task-summary-card span {
   font-size: 0.68rem;
