@@ -879,10 +879,7 @@
               <button class="sort-tab" data-layout="kanban" type="button">Kanban</button>
             </span>
           </div>
-          <div class="weekday-ribbon" id="callListWeekdayRibbon">
-            <span>Day</span>
-            <span class="weekday-tabs" id="callListWeekdays" aria-label="Choose call list day"></span>
-          </div>
+          <div id="callListWeeklyPreview" class="call-weekly-preview" aria-label="Weekly call overview"></div>
           <div class="call-list-layout">
             <section class="panel call-list-setup" id="callListSetupPanel">
               <div class="panel-header">
@@ -2111,5 +2108,6 @@
         });
       }
     </script>
+    <div id="gripToastContainer" class="toast-container" role="status" aria-live="polite"></div>
   </body>
 </html>

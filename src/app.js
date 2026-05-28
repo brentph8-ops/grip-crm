@@ -14,6 +14,24 @@ function readStorageJson(key, fallback) {
   }
 }
 
+// ── Toast notifications ────────────────────────────────────────
+// type: "success" | "error" | "warning" | "info"
+function showToast(message, type = "info") {
+  const container = document.getElementById("gripToastContainer");
+  if (!container) { alert(message); return; }
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  const dismiss = () => {
+    toast.classList.add("toast-out");
+    toast.addEventListener("animationend", () => toast.remove(), { once: true });
+  };
+  toast.addEventListener("click", dismiss);
+  container.appendChild(toast);
+  setTimeout(dismiss, 4200);
+}
+window.showToast = showToast;
+
 function openDialog(dialogOrId) {
   const dialog = typeof dialogOrId === "string" ? byId(dialogOrId) : dialogOrId;
   if (!dialog) return;
@@ -1686,7 +1704,7 @@ async function copyTextToClipboard(text) {
 async function copyProposalRequestDraft(text, message = "Proposal request draft copied. Paste it into your email if the mail window did not open.") {
   try {
     const copied = await copyTextToClipboard(text);
-    if (copied) alert(message);
+    if (copied) showToast(message, "success");
     else window.prompt("Copy this draft", text);
   } catch (_error) {
     window.prompt("Copy this draft", text);
@@ -1736,7 +1754,7 @@ function savePriceBooks() {
     localStorage.setItem("garlandPriceBookProducts", JSON.stringify(state.priceBookProducts));
     return true;
   } catch (_error) {
-    alert("That price book set is too large for this local browser storage. Use fewer PDFs at once or store the files in Google Drive and keep links in GRIP.");
+    showToast("That price book set is too large for local storage. Use fewer PDFs at once.", "warning");
     return false;
   }
 }
@@ -2673,7 +2691,7 @@ function renderPunchDraftPreview(kind, existing = []) {
 function savePunchListFromForm(formEl) {
   const form = new FormData(formEl);
   const project = findRecord("project", form.get("project_id"));
-  if (!project) return alert("Choose a project first.");
+  if (!project) showToast("Choose a project first.", "warning"); return;
   const id = form.get("punch_list_id") || `punch-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const existing = findPunchList(id);
   const now = new Date().toISOString();
@@ -2727,7 +2745,7 @@ function savePunchListFromForm(formEl) {
     created_at: existing?.created_at || now,
     updated_at: now,
   });
-  if (!item.description && !item.required_correction) return alert("Add a punch item issue or required correction first.");
+  if (!item.description && !item.required_correction) showToast("Add a punch item issue or required correction first.", "warning"); return;
   if (existing) state.punchLists = state.punchLists.map((existingList) => (existingList.punch_list_id === id ? list : existingList));
   else state.punchLists.unshift(list);
   state.punchDraftFiles = { before: [], after: [] };
@@ -2751,7 +2769,7 @@ function updatePunchItemStatus(listId, itemId, status, note = "") {
   const list = findPunchList(listId);
   const item = list?.items?.find((entry) => entry.punch_item_id === itemId);
   if (!list || !item) return;
-  if (status === "Submitted for Review" && !(item.contractor_completion_photos || []).length) return alert("Completion photo required before submitting this punch item for review.");
+  if (status === "Submitted for Review" && !(item.contractor_completion_photos || []).length) showToast("Completion photo required before submitting this punch item for review.", "warning"); return;
   if (status === "Rejected" || status === "Needs Additional Correction") {
     const reason = prompt("Rejection reason or correction note:", note || punchRejectionReasons[0]);
     if (reason === null) return;
@@ -2893,7 +2911,7 @@ function exportPunchListPdf(list, ownerMode = false) {
     </div>`;
   }).join("");
   const win = window.open("", "_blank");
-  if (!win) return alert("Allow pop-ups to export the punch list report.");
+  if (!win) showToast("Allow pop-ups to export the punch list report.", "warning"); return;
   const title = ownerMode ? `Final Closeout — ${list.title}` : `Contractor Punch List — ${list.title}`;
   win.document.write(`<html><head><title>${escapeHtml(title)}</title><style>${style}</style></head><body>
     <h1>${escapeHtml(title)}</h1>
@@ -3090,7 +3108,7 @@ function saveTaskFromForm(formEl) {
     updated_at: now,
     completed_at: status === "Completed" ? existing?.completed_at || now : "",
   });
-  if (!task.title) return alert("Add a task title first.");
+  if (!task.title) showToast("Add a task title first.", "warning"); return;
   if (existing) state.tasks = state.tasks.map((item) => (item.task_id === id ? task : item));
   else state.tasks.unshift(task);
   state.taskDraftFiles = [];
@@ -6678,7 +6696,7 @@ function accountForRecordActivity(type, id) {
 
 function logRecordActivity(type, id) {
   const account = accountForRecordActivity(type, id);
-  if (!account) return alert("I could not find a linked account for this record. Open the account and log the activity there.");
+  if (!account) showToast("I could not find a linked account for this record. Open the account and log the activity there.", "error"); return;
   const note = prompt("Log activity", "");
   if (!String(note || "").trim()) return;
   addAccountActivity(account.id, note, false, { source: type === "account" ? "Account" : type === "project" ? "Project" : "Proposal" });
@@ -6812,9 +6830,22 @@ function renderCallList() {
     button.classList.toggle("is-active", button.dataset.callListMode === state.callListMode);
   });
   byId("callListView").dataset.mode = state.callListMode;
-  byId("callListWeekdays").innerHTML = callListDays()
-    .map((weekday) => `<button class="sort-tab ${weekday === day ? "is-active" : ""}" data-call-day="${weekday}" type="button">${weekday.slice(0, 3)}</button>`)
-    .join("");
+  // Weekly preview — shows each day with account count + entity names
+  const weeklyPreview = byId("callListWeeklyPreview");
+  if (weeklyPreview) {
+    weeklyPreview.innerHTML = callListDays().map((weekday) => {
+      const dayAccounts = accountsForCallDay(weekday);
+      const isActive = weekday === day;
+      const entities = [...new Set(dayAccounts.map((a) => a.entity || a.client).filter(Boolean))];
+      const preview = entities.slice(0, 3).map((e) => escapeHtml(e)).join(", ");
+      const overflow = entities.length > 3 ? ` +${entities.length - 3}` : "";
+      return `<button class="call-day-tab${isActive ? " is-active" : ""}" data-call-day="${weekday}" type="button">
+        <span class="call-day-tab-name">${weekday.slice(0, 3)}</span>
+        <strong class="call-day-tab-count">${dayAccounts.length}</strong>
+        <span class="call-day-tab-entities">${preview ? escapeHtml(preview) + overflow : "<em>None</em>"}</span>
+      </button>`;
+    }).join("");
+  }
   byId("callListView").querySelector(".call-list-layout").dataset.mode = state.callListMode;
   byId("dailyCallList").classList.remove("is-list", "is-kanban");
   byId("dailyCallList").classList.toggle("is-list", state.layouts.callList === "list");
@@ -7316,7 +7347,7 @@ function saveAccountFromDialog(form) {
 
 function renameAccount(accountId) {
   const account = findRecord("account", accountId);
-  if (!account) return alert("I could not find that account.");
+  if (!account) showToast("I could not find that account.", "error"); return;
   const oldName = account.client || "";
   const nextName = prompt("Rename account", oldName);
   const cleaned = String(nextName || "").trim();
@@ -7589,7 +7620,7 @@ function exportReportExcel(type) {
 function exportReportPdf(type) {
   const printWindow = window.open("", "_blank");
   if (!printWindow) {
-    alert("Your browser blocked the export window. Allow pop-ups for GRIP, then try Export PDF again.");
+    showToast("Your browser blocked the export window. Allow pop-ups for GRIP, then try Export PDF again.", "warning");
     return;
   }
   printWindow.document.open();
@@ -7651,10 +7682,10 @@ function accountProfileHtml(account) {
 
 function exportAccountProfilePdf(accountId) {
   const account = findRecord("account", accountId);
-  if (!account) return alert("I could not find that account.");
+  if (!account) showToast("I could not find that account.", "error"); return;
   const printWindow = window.open("", "_blank");
   if (!printWindow) {
-    alert("Your browser blocked the export window. Allow pop-ups for GRIP, then try again.");
+    showToast("Your browser blocked the export window. Allow pop-ups for GRIP, then try again.", "warning");
     return;
   }
   printWindow.document.open();
@@ -7756,7 +7787,7 @@ function importAccountContactsCsv(file) {
   const reader = new FileReader();
   reader.onload = () => {
     const rows = parseCsv(String(reader.result || ""));
-    if (rows.length < 2) return alert("No contacts found in that CSV.");
+    if (rows.length < 2) showToast("No contacts found in that CSV.", "warning"); return;
     const headers = rows[0].map((header) => normalize(header));
     const indexOf = (...names) => headers.findIndex((header) => names.some((name) => header.includes(name)));
     const idx = {
@@ -7795,7 +7826,7 @@ function importAccountContactsCsv(file) {
     saveCrm();
     renderFilters();
     render();
-    alert(`${imported} account contacts imported.`);
+    showToast(`${imported} account contacts imported.`, "success");
   };
   reader.readAsText(file);
 }
@@ -7815,7 +7846,7 @@ function importBackup(file) {
       localStorage.removeItem("grip_local_timestamps");
       window.location.reload();
     } catch (error) {
-      alert("That backup file could not be imported.");
+      showToast("That backup file could not be imported.", "error");
     }
   };
   reader.readAsText(file);
@@ -8009,7 +8040,7 @@ function saveDriveLink(recordId, category, formEl) {
   const form = new FormData(formEl);
   const url = String(form.get("driveUrl") || "").trim();
   if (!url) return;
-  if (!/^https?:\/\//i.test(url)) return alert("Paste a full Google Drive link that starts with https://");
+  if (!/^https?:\/\//i.test(url)) showToast("Paste a full Google Drive link that starts with https://", "warning"); return;
   if (!state.attachments[recordId]) state.attachments[recordId] = {};
   if (!state.attachments[recordId][category]) state.attachments[recordId][category] = [];
   state.attachments[recordId][category].push({
@@ -8327,7 +8358,7 @@ function saveUploadedScopeToDatabase(recordId, fileIndex, scopeCategory) {
   const type = findRecord("project", recordId) ? "project" : "proposal";
   const uploadCategory = scopeUploadCategory(type);
   const file = state.attachments[recordId]?.[uploadCategory]?.[Number(fileIndex)];
-  if (!file) return alert("Choose an uploaded scope first.");
+  if (!file) showToast("Choose an uploaded scope first.", "warning"); return;
   const entry = {
     id: `scope-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     name: file.name,
@@ -8350,7 +8381,7 @@ function saveUploadedScopeToDatabase(recordId, fileIndex, scopeCategory) {
 
 function attachScopeFromDatabase(recordId, scopeId) {
   const item = scopeDatabaseRecords().find((entry) => entry.id === scopeId);
-  if (!item) return alert("Choose a saved scope first.");
+  if (!item) showToast("Choose a saved scope first.", "warning"); return;
   const type = findRecord("project", recordId) ? "project" : "proposal";
   const uploadCategory = scopeUploadCategory(type);
   if (!state.attachments[recordId]) state.attachments[recordId] = {};
@@ -8979,7 +9010,7 @@ function saveStandaloneScope(formEl) {
   const form = new FormData(formEl);
   const file = formEl.elements.file.files?.[0];
   const generatedText = scopeTemplateText(form);
-  if (!file && !String(form.get("scopeType") || form.get("project") || form.get("overview") || scopeManualWorkItems(form).join(" ")).trim()) return alert("Upload a scope or fill in the template fields.");
+  if (!file && !String(form.get("scopeType") || form.get("project") || form.get("overview") || scopeManualWorkItems(form).join(" ")).trim()) showToast("Upload a scope or fill in the template fields.", "warning"); return;
   if (!file) {
     state.scopeDatabase.unshift({
       id: `scope-${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -9913,7 +9944,7 @@ function missingRequiredFields(fields) {
 function stopForMissingFields(recordType, fields) {
   const missing = missingRequiredFields(fields);
   if (!missing.length) return false;
-  alert(`Please fill in these required ${recordType} fields before saving:\n\n${missing.join("\n")}`);
+  showToast(`Missing required ${recordType} fields: ${missing.join(", ")}`, "warning");
   return true;
 }
 
@@ -10320,7 +10351,7 @@ function bindEvents() {
     const info = window.gripSync?.lastSyncInfo() || "";
     btn.textContent = original;
     btn.disabled = false;
-    alert(`Sync complete.\n\n${info}`);
+    showToast(`Sync complete. ${info}`, "success");
   });
   byId("gripForceSignOutButton")?.addEventListener("click", () => window.gripSync?.signOutAllDevices());
   byId("cancelReleaseNotesButton").addEventListener("click", () => byId("releaseNotesDialog").close());
@@ -10853,7 +10884,7 @@ function bindEvents() {
       try {
         downloadCalendarIcs(JSON.parse(calendarIcs.dataset.calendarIcs || "{}"));
       } catch (_error) {
-        alert("Could not build that calendar file.");
+        showToast("Could not build that calendar file.", "error");
       }
       return;
     }
@@ -10863,7 +10894,7 @@ function bindEvents() {
       event.stopPropagation();
       const proposal = findRecord("proposal", requestProposal.dataset.proposalRequestId);
       const contractor = requestProposal.dataset.proposalRequestContractor || "";
-      if (!proposal) return alert("I could not find that proposal.");
+      if (!proposal) showToast("I could not find that proposal.", "error"); return;
       const draft = proposalRequestDraft(proposal, contractor);
       if (!draft.to) {
         copyProposalRequestDraft(draft.text, "Contractor email is missing, so the draft was copied instead.");
@@ -10878,7 +10909,7 @@ function bindEvents() {
       event.stopPropagation();
       const proposal = findRecord("proposal", copyProposalRequest.dataset.proposalRequestId);
       const contractor = copyProposalRequest.dataset.proposalRequestContractor || "";
-      if (!proposal) return alert("I could not find that proposal.");
+      if (!proposal) showToast("I could not find that proposal.", "error"); return;
       copyProposalRequestDraft(proposalRequestDraft(proposal, contractor).text);
       return;
     }
@@ -11046,7 +11077,7 @@ function bindEvents() {
       const list = findPunchList(generateContractorLinkButton.dataset.generateContractorLink);
       if (!list) return;
       if (!window.gripSync?.isConfigured()) {
-        alert("Configure Supabase in src/supabase-client.js and sign in to generate contractor portal links.");
+        showToast("Configure Supabase and sign in to generate contractor portal links.", "warning");
         return;
       }
       generateContractorLinkButton.textContent = "Generating…";

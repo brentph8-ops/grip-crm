@@ -216,7 +216,7 @@
   async function syncNow() {
     const user = await getUser();
     if (!user) {
-      alert("Sign in first to sync with the cloud.");
+      (window.showToast || alert)("Sign in first to sync with the cloud.", "warning");
       return;
     }
     updateSyncIndicator("syncing");
@@ -279,7 +279,7 @@
     const client = getClient();
     const user = await getUser();
     if (!client || !user) {
-      alert("Sign in to GRIP to generate contractor links.");
+      (window.showToast || alert)("Sign in to GRIP to generate contractor links.", "warning");
       return null;
     }
     try {
@@ -336,7 +336,7 @@
       return `${base}contractor.html?token=${data.token}`;
     } catch (err) {
       console.warn("Could not generate contractor link:", err);
-      alert("Could not create contractor link. Check Supabase config.\n\nMake sure SUPABASE_SETUP.sql has been run in your Supabase project.");
+      (window.showToast || alert)("Could not create contractor link. Make sure SUPABASE_SETUP.sql has been run in your Supabase project.", "error");
       return null;
     }
   }
