@@ -301,10 +301,11 @@
 
       if (existingToken && !isExpired) {
         // Unexpired token exists — offer to renew or create fresh
-        const renew = confirm(
+        const renew = await (window.gripConfirm || window.confirm)(
           `A contractor link was already generated for this punch list.\n\n` +
           `Expires: ${new Date(existingToken.expires_at).toLocaleDateString()}\n\n` +
-          `Click OK to extend it 30 more days from today.\nClick Cancel to create a brand-new link.`
+          `Click OK to extend it 30 more days from today.\nClick Cancel to create a brand-new link.`,
+          "Renew Contractor Link"
         );
         if (renew) {
           await client
@@ -436,8 +437,9 @@
         if (!hadCloud) {
           // First time — offer to push local data up
           if (Object.keys(localStorage).some((k) => SYNC_KEYS.has(k))) {
-            const upload = confirm(
-              "You have existing GRIP data on this device.\n\nUpload it to your cloud account now?\n\n(Click Cancel to start fresh — your local data stays safe.)"
+            const upload = await (window.gripConfirm || window.confirm)(
+              "You have existing GRIP data on this device.\n\nUpload it to your cloud account now?\n\n(Click Cancel to start fresh — your local data stays safe.)",
+              "Upload Local Data"
             );
             if (upload) {
               await pushAllLocalData();
@@ -500,10 +502,11 @@
         /iPad|iPhone|iPod/.test(window.navigator.userAgent)
       );
       if (isIosPwa) {
-        if (confirm(
+        if (await (window.gripConfirm || window.confirm)(
           "iOS home-screen apps can't complete Google sign-in in-app.\n\n" +
           "Tap OK to open GRIP in Safari — sign in there, then come back to this app and pull down to refresh.\n\n" +
-          "Your data will sync automatically after signing in."
+          "Your data will sync automatically after signing in.",
+          "Sign In via Safari"
         )) {
           window.open("https://brentph8-ops.github.io/grip-crm/", "_blank");
         }
@@ -535,10 +538,13 @@
 
     // Signs out of ALL sessions on all devices (global scope).
     // Use this if a device is lost or shared access needs to be revoked.
-    signOutAllDevices() {
+    async signOutAllDevices() {
       const client = getClient();
       if (!client) return;
-      if (!confirm("Sign out of GRIP on ALL devices? You'll need to sign in again on each one.")) return;
+      if (!await (window.gripConfirm || window.confirm)(
+        "Sign out of GRIP on ALL devices? You'll need to sign in again on each one.",
+        "Sign Out All Devices"
+      )) return;
       client.auth.signOut({ scope: "global" });
     },
 

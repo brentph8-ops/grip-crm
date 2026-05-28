@@ -32,6 +32,30 @@ function showToast(message, type = "info") {
 }
 window.showToast = showToast;
 
+// ── In-app confirm modal (replaces native confirm()) ───────────
+// Returns Promise<boolean> — true = OK, false = Cancel.
+function gripConfirm(message, title = "Confirm") {
+  return new Promise((resolve) => {
+    const dialog = document.getElementById("gripConfirmDialog");
+    if (!dialog) { resolve(window.confirm(message)); return; }
+    document.getElementById("gripConfirmTitle").textContent = title;
+    document.getElementById("gripConfirmMessage").textContent = message;
+    const onOk     = () => { cleanup(); resolve(true); };
+    const onCancel = () => { cleanup(); resolve(false); };
+    const onClose  = () => { cleanup(); resolve(false); };
+    function cleanup() {
+      document.getElementById("gripConfirmOkButton").removeEventListener("click", onOk);
+      document.getElementById("gripConfirmCancelButton").removeEventListener("click", onCancel);
+      dialog.removeEventListener("close", onClose);
+    }
+    document.getElementById("gripConfirmOkButton").addEventListener("click", onOk, { once: true });
+    document.getElementById("gripConfirmCancelButton").addEventListener("click", onCancel, { once: true });
+    dialog.addEventListener("close", onClose, { once: true });
+    dialog.showModal();
+  });
+}
+window.gripConfirm = gripConfirm;
+
 function openDialog(dialogOrId) {
   const dialog = typeof dialogOrId === "string" ? byId(dialogOrId) : dialogOrId;
   if (!dialog) return;
@@ -6721,8 +6745,8 @@ function editActivity(accountId, activityId) {
   if (account && byId("detailContent").textContent.includes(account.client || "")) showAccountDetail(account);
 }
 
-function deleteActivity(accountId, activityId) {
-  if (!confirm("Delete this activity?")) return;
+async function deleteActivity(accountId, activityId) {
+  if (!await gripConfirm("Delete this activity?", "Delete Activity")) return;
   state.activities[accountId] = (state.activities[accountId] || []).filter((entry) => entry.id !== activityId);
   saveActivities();
   renderAccounts();
@@ -6842,7 +6866,7 @@ function renderCallList() {
       return `<button class="call-day-tab${isActive ? " is-active" : ""}" data-call-day="${weekday}" type="button">
         <span class="call-day-tab-name">${weekday.slice(0, 3)}</span>
         <strong class="call-day-tab-count">${dayAccounts.length}</strong>
-        <span class="call-day-tab-entities">${preview ? escapeHtml(preview) + overflow : "<em>None</em>"}</span>
+        <span class="call-day-tab-entities">${preview ? escapeHtml(preview) + overflow : "<em>No rules assigned</em>"}</span>
       </button>`;
     }).join("");
   }
@@ -7304,7 +7328,7 @@ function openAccountDialog(accountId = "") {
   openDialog("accountDialog");
 }
 
-function saveAccountFromDialog(form) {
+async function saveAccountFromDialog(form) {
   const id = form.get("id");
   const payload = {
     client: form.get("client") || "",
@@ -7323,7 +7347,7 @@ function saveAccountFromDialog(form) {
   if (id) {
     Object.entries(payload).forEach(([key, value]) => persistRecordEdit("account", id, key, value, false));
   } else {
-    if (shouldStopForDuplicate("account", payload.client, cleanAccounts().map((account) => account.client))) return;
+    if (await shouldStopForDuplicate("account", payload.client, cleanAccounts().map((account) => account.client))) return;
     const account = {
       id: `local-account-${Date.now()}`,
       sourceRow: "Local",
@@ -8315,8 +8339,8 @@ function saveProjectChecklistDraft() {
   return projectId;
 }
 
-function clearProjectChecklist(projectId) {
-  if (!projectId || !confirm("Clear this project checklist?")) return;
+async function clearProjectChecklist(projectId) {
+  if (!projectId || !await gripConfirm("Clear this project checklist? All progress will be lost.", "Clear Checklist")) return;
   delete state.projectChecklists[projectId];
   saveProjectChecklists();
   renderProjectChecklist(projectId);
@@ -8400,8 +8424,8 @@ function attachScopeFromDatabase(recordId, scopeId) {
   showDetail(type, recordId);
 }
 
-function deleteScopeDatabaseEntry(id) {
-  if (!confirm("Delete this saved scope of work from the database?")) return;
+async function deleteScopeDatabaseEntry(id) {
+  if (!await gripConfirm("Delete this saved scope of work from the database?", "Delete Scope")) return;
   state.scopeDatabase = state.scopeDatabase.filter((entry) => entry.id !== id);
   saveScopeDatabase();
   renderScopeDatabase();
@@ -9941,10 +9965,19 @@ function missingRequiredFields(fields) {
   return fields.filter((field) => !normalize(field.value)).map((field) => field.label);
 }
 
-function stopForMissingFields(recordType, fields) {
-  const missing = missingRequiredFields(fields);
-  if (!missing.length) return false;
-  showToast(`Missing required ${recordType} fields: ${missing.join(", ")}`, "warning");
+function stopForMissingFields(recordType, fields, formEl) {
+  const failing = fields.filter((field) => !normalize(field.value));
+  if (!failing.length) return false;
+  showToast(`Missing required ${recordType} fields: ${failing.map((f) => f.label).join(", ")}`, "warning");
+  // B: Highlight each failing field red
+  if (formEl) {
+    formEl.querySelectorAll(".field-error").forEach((el) => el.classList.remove("field-error"));
+    failing.forEach((field) => {
+      if (!field.name) return;
+      const input = formEl.elements[field.name] || formEl.querySelector(`[name="${CSS.escape(field.name)}"]`);
+      if (input) input.classList.add("field-error");
+    });
+  }
   return true;
 }
 
@@ -9970,29 +10003,34 @@ function closestDuplicateName(name, candidates, ignored = []) {
     .sort((a, b) => b.score - a.score || compareText(a.candidate, b.candidate))[0]?.candidate || "";
 }
 
-function shouldStopForDuplicate(type, name, candidates, ignored = []) {
+async function shouldStopForDuplicate(type, name, candidates, ignored = []) {
   const match = closestDuplicateName(name, candidates, ignored);
   if (!match) return false;
-  return !confirm(`This ${type} looks similar to an existing ${type}:\n\n${match}\n\nContinue creating "${name}" anyway?`);
+  const proceed = await gripConfirm(
+    `This ${type} looks similar to an existing ${type}:\n\n${match}\n\nContinue creating "${name}" anyway?`,
+    "Possible Duplicate"
+  );
+  return !proceed;
 }
 
-function handleProjectSubmit(event) {
+async function handleProjectSubmit(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
+  const formEl = event.currentTarget;
   if (
     stopForMissingFields("project", [
-      { label: "Client", value: form.get("client") },
-      { label: "ABC Score", value: form.get("abcList") },
-      { label: "Project Name", value: form.get("projectName") },
-      { label: "Project Address", value: form.get("address") },
-      { label: "Project Stage", value: form.get("stage") },
-      { label: "Project Type", value: form.get("projectType") },
-    ])
+      { label: "Client", name: "client", value: form.get("client") },
+      { label: "ABC Score", name: "abcList", value: form.get("abcList") },
+      { label: "Project Name", name: "projectName", value: form.get("projectName") },
+      { label: "Project Address", name: "address", value: form.get("address") },
+      { label: "Project Stage", name: "stage", value: form.get("stage") },
+      { label: "Project Type", name: "projectType", value: form.get("projectType") },
+    ], formEl)
   ) {
     return;
   }
   if (
-    shouldStopForDuplicate(
+    await shouldStopForDuplicate(
       "project",
       form.get("projectName"),
       cleanProjects().map((project) => project.projectName || project.client)
@@ -10046,24 +10084,25 @@ function handleProjectSubmit(event) {
   showDetail("project", project.id);
 }
 
-function handleProposalSubmit(event) {
+async function handleProposalSubmit(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
+  const formEl = event.currentTarget;
   const client = String(form.get("client") || "").trim();
   if (
     stopForMissingFields("proposal", [
-      { label: "Client", value: client },
-      { label: "Project Name", value: form.get("project") },
-      { label: "Due Date", value: form.get("bidDueDate") },
-      { label: "Stage", value: form.get("stage") },
-      { label: "Entity", value: form.get("entity") },
-      { label: "County", value: form.get("county") },
-    ])
+      { label: "Client", name: "client", value: client },
+      { label: "Project Name", name: "project", value: form.get("project") },
+      { label: "Due Date", name: "bidDueDate", value: form.get("bidDueDate") },
+      { label: "Stage", name: "stage", value: form.get("stage") },
+      { label: "Entity", name: "entity", value: form.get("entity") },
+      { label: "County", name: "county", value: form.get("county") },
+    ], formEl)
   ) {
     return;
   }
   if (
-    shouldStopForDuplicate(
+    await shouldStopForDuplicate(
       "proposal",
       form.get("project"),
       cleanProposals().map((proposal) => proposal.project || proposal.client)
@@ -10339,8 +10378,8 @@ function bindEvents() {
   // ── Supabase auth bindings ──────────────────────────────────────
   byId("gripGoogleSignInButton")?.addEventListener("click", () => window.gripSync?.signInWithGoogle());
   byId("gripContinueLocalButton")?.addEventListener("click", () => window.gripSync?.continueLocal());
-  byId("gripSignOutButton")?.addEventListener("click", () => {
-    if (confirm("Sign out of GRIP cloud sync? Your local data stays on this device.")) window.gripSync?.signOut();
+  byId("gripSignOutButton")?.addEventListener("click", async () => {
+    if (await gripConfirm("Sign out of GRIP cloud sync? Your local data stays on this device.", "Sign Out")) window.gripSync?.signOut();
   });
   byId("gripSyncNowButton")?.addEventListener("click", async () => {
     const btn = byId("gripSyncNowButton");
@@ -10704,16 +10743,16 @@ function bindEvents() {
     if (id) openAccountDialog(id);
     else byId("accountForm").reset();
   });
-  byId("deleteAccountDialogButton").addEventListener("click", () => {
+  byId("deleteAccountDialogButton").addEventListener("click", async () => {
     const id = byId("accountIdInput").value;
-    if (id && confirm("Delete this account from the CRM?")) {
+    if (id && await gripConfirm("Delete this account from the CRM? This cannot be undone.", "Delete Account")) {
       deleteRecord("account", id);
       byId("accountDialog").close();
     }
   });
-  byId("accountForm").addEventListener("submit", (event) => {
+  byId("accountForm").addEventListener("submit", async (event) => {
     event.preventDefault();
-    saveAccountFromDialog(new FormData(event.currentTarget));
+    await saveAccountFromDialog(new FormData(event.currentTarget));
   });
   byId("cancelProjectButton").addEventListener("click", () => byId("projectDialog").close());
   byId("clearProjectButton").addEventListener("click", resetProjectForm);
@@ -10840,7 +10879,7 @@ function bindEvents() {
     event.preventDefault();
     saveNoteTakerEntry(event.currentTarget);
   });
-  document.body.addEventListener("click", (event) => {
+  document.body.addEventListener("click", async (event) => {
     const toggleChecklistNa = event.target.closest("[data-toggle-checklist-na]");
     if (toggleChecklistNa) {
       event.preventDefault();
@@ -10969,7 +11008,7 @@ function bindEvents() {
     }
     const deleteFavorite = event.target.closest("[data-delete-favorite-system]");
     if (deleteFavorite) {
-      if (confirm("Delete this saved system?")) deleteFavoriteSystem(deleteFavorite.dataset.deleteFavoriteSystem);
+      if (await gripConfirm("Delete this saved system?", "Delete System")) deleteFavoriteSystem(deleteFavorite.dataset.deleteFavoriteSystem);
       return;
     }
     const dashboardRow = event.target.closest("[data-dashboard-view]");
@@ -11069,7 +11108,7 @@ function bindEvents() {
     }
     const deleteTaskButton = event.target.closest("[data-delete-task]");
     if (deleteTaskButton) {
-      if (confirm("Delete this task?")) deleteRecord("task", deleteTaskButton.dataset.deleteTask);
+      if (await gripConfirm("Delete this task?", "Delete Task")) deleteRecord("task", deleteTaskButton.dataset.deleteTask);
       return;
     }
     const generateContractorLinkButton = event.target.closest("[data-generate-contractor-link]");
@@ -11152,7 +11191,7 @@ function bindEvents() {
         list.due_date ? `Due: ${compactDate(list.due_date)}` : null,
         _openCount > 0 ? `Open items: ${_openCount}` : "✓ All items resolved",
       ].filter(Boolean).join("\n");
-      if (!confirm(_confirmLines)) return;
+      if (!await gripConfirm(_confirmLines, `Advance to: ${nextStatus}`)) return;
       list.status = nextStatus;
       list.updated_at = new Date().toISOString();
       if (nextStatus === "Sent to Contractor") list.sent_at = list.sent_at || new Date().toISOString();
@@ -11169,8 +11208,9 @@ function bindEvents() {
       const list = findPunchList(bulkCloseBtn.dataset.punchBulkClose);
       const count = Number(bulkCloseBtn.dataset.punchBulkCloseCount) || 0;
       if (!list || !count) return;
-      if (!confirm(
-        `Close all ${count} open item${count === 1 ? "" : "s"} on "${list.title}"?\n\nProject: ${list.project_name || "—"}\n\nThis marks every unresolved item as Closed.`
+      if (!await gripConfirm(
+        `Close all ${count} open item${count === 1 ? "" : "s"} on "${list.title}"?\n\nProject: ${list.project_name || "—"}\n\nThis marks every unresolved item as Closed.`,
+        "Bulk Close Items"
       )) return;
       const bulkNow = new Date().toISOString();
       (list.items || []).forEach((item) => {
@@ -11204,8 +11244,9 @@ function bindEvents() {
         const existingActive = state.punchLists.find(
           (l) => l.project_id === projectId && !["Closed", "Approved"].includes(l.status)
         );
-        if (existingActive && !confirm(
-          `"${existingActive.title}" is already open for this project.\n\nCreate another punch list anyway?`
+        if (existingActive && !await gripConfirm(
+          `"${existingActive.title}" is already open for this project.\n\nCreate another punch list anyway?`,
+          "Duplicate Punch List"
         )) return;
       }
       openPunchListDialog("", projectId);
@@ -11265,21 +11306,21 @@ function bindEvents() {
     }
     const deletePunchButton = event.target.closest("[data-delete-punch-list]");
     if (deletePunchButton) {
-      if (confirm("Delete this punch list?")) deleteRecord("punchList", deletePunchButton.dataset.deletePunchList);
+      if (await gripConfirm("Delete this punch list? This cannot be undone.", "Delete Punch List")) deleteRecord("punchList", deletePunchButton.dataset.deletePunchList);
       return;
     }
     const deleteRecordButton = event.target.closest("[data-delete-record]");
     if (deleteRecordButton) {
       const type = deleteRecordButton.dataset.deleteRecord;
       const id = deleteRecordButton.dataset.deleteId;
-      if (confirm(`Delete this ${type} from the CRM?`)) deleteRecord(type, id);
+      if (await gripConfirm(`Delete this ${type} from the CRM? This cannot be undone.`, `Delete ${type[0].toUpperCase() + type.slice(1)}`)) deleteRecord(type, id);
       return;
     }
     const archiveRecordButton = event.target.closest("[data-archive-record]");
     if (archiveRecordButton) {
       const type = archiveRecordButton.dataset.archiveRecord;
       const id = archiveRecordButton.dataset.archiveId;
-      if (confirm(`Archive this ${type} from active views?`)) archiveRecord(type, id);
+      if (await gripConfirm(`Archive this ${type} from active views?`, "Archive Record")) archiveRecord(type, id);
       return;
     }
     const editActivityButton = event.target.closest("[data-edit-activity]");
@@ -11294,6 +11335,7 @@ function bindEvents() {
     }
     const removeFile = event.target.closest("[data-remove-file]");
     if (removeFile) {
+      if (!await gripConfirm("Remove this attachment?", "Remove File")) return;
       const proposalId = removeFile.dataset.fileRecord || removeFile.dataset.fileProposal;
       const category = removeFile.dataset.fileCategory;
       state.attachments[proposalId]?.[category]?.splice(Number(removeFile.dataset.removeFile), 1);
@@ -11382,12 +11424,12 @@ function bindEvents() {
     }
     const deleteTakeoff = event.target.closest("[data-delete-takeoff-estimate]");
     if (deleteTakeoff) {
-      if (confirm("Delete this saved takeoff estimate?")) deleteTakeoffEstimate(deleteTakeoff.dataset.deleteTakeoffEstimate);
+      if (await gripConfirm("Delete this saved takeoff estimate?", "Delete Takeoff")) deleteTakeoffEstimate(deleteTakeoff.dataset.deleteTakeoffEstimate);
       return;
     }
     const deletePriceBookButton = event.target.closest("[data-delete-price-book]");
     if (deletePriceBookButton) {
-      if (confirm("Delete this price book reference?")) deletePriceBook(deletePriceBookButton.dataset.deletePriceBook);
+      if (await gripConfirm("Delete this price book reference?", "Delete Price Book")) deletePriceBook(deletePriceBookButton.dataset.deletePriceBook);
       return;
     }
     const record = event.target.closest("[data-type][data-id]");
@@ -11665,6 +11707,27 @@ setDetailsHidden(false);
 showDueTodayProposalDialog();
 showTaskDailyAlertDialog();
 showFridayWeeklyReviewDialog();
+
+// ── D: Topbar scroll-shadow — only elevate once workspace scrolls ──
+(function setupTopbarScrollShadow() {
+  const workspace = document.querySelector(".workspace");
+  if (!workspace) return;
+  let ticking = false;
+  workspace.addEventListener("scroll", () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => {
+      const scrolled = workspace.scrollTop > 8;
+      document.querySelectorAll(".topbar").forEach((tb) => tb.classList.toggle("topbar--scrolled", scrolled));
+      ticking = false;
+    });
+  }, { passive: true });
+})();
+
+// ── B: Clear field-error highlight when user starts correcting a field ──
+document.body.addEventListener("input", (event) => {
+  if (event.target.classList.contains("field-error")) event.target.classList.remove("field-error");
+}, true);
 
 // ── Realtime remote-update handler ──────────────────────────────
 // grip-sync.js fires "grip:remote-update" when another device pushes
