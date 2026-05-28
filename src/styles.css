@@ -1108,6 +1108,59 @@ textarea {
   background: linear-gradient(135deg, #ffffff, #eef7ff);
 }
 
+/* ── By-Project layout ──────────────────────────────────────────── */
+#punchListBoard.is-project {
+  display: block;
+}
+
+.punch-project-group {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin-bottom: 18px;
+  overflow: hidden;
+}
+
+.punch-project-header {
+  align-items: center;
+  background: linear-gradient(135deg, #f4f8ff, #eef3ff);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 12px 16px;
+}
+
+.punch-project-title h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+
+.punch-project-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.punch-project-cards {
+  display: grid;
+  gap: 0;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  padding: 12px;
+  gap: 10px;
+}
+
+.pill.pill-open-items {
+  background: #fff3cd;
+  color: #7a5200;
+}
+
+.pill.pill-all-clear {
+  background: #d4edda;
+  color: #155724;
+}
+
 .punch-card {
   display: grid;
   gap: 10px;

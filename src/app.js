@@ -938,7 +938,7 @@ const state = {
     callList: "tile",
     takeoffEstimates: "tile",
     tasks: "tile",
-    punchLists: "tile",
+    punchLists: "project",
   },
   phoneMode: false,
   mobilePreview: false,
@@ -2298,6 +2298,63 @@ function punchListCard(list) {
   </article>`;
 }
 
+function renderPunchListsByProject(lists) {
+  if (!lists.length) return empty("No punch lists match this view.");
+
+  // Group by project_name
+  const groups = new Map();
+  lists.forEach((list) => {
+    const key = list.project_name || "No Project";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(list);
+  });
+
+  // Projects with active (non-closed) lists sort first, then alphabetically
+  const sorted = [...groups.entries()].sort(([aName, aLists], [bName, bLists]) => {
+    const aActive = aLists.some((l) => !["Closed", "Approved"].includes(l.status));
+    const bActive = bLists.some((l) => !["Closed", "Approved"].includes(l.status));
+    if (aActive !== bActive) return aActive ? -1 : 1;
+    return compareText(aName, bName);
+  });
+
+  return sorted.map(([projectName, projectLists]) => {
+    // Within a project: active lists first, then most recently updated
+    const sortedLists = [...projectLists].sort((a, b) => {
+      const aActive = !["Closed", "Approved"].includes(a.status);
+      const bActive = !["Closed", "Approved"].includes(b.status);
+      if (aActive !== bActive) return aActive ? -1 : 1;
+      return compareDateValue(a.updated_at, b.updated_at, "desc");
+    });
+    const activeList = sortedLists.find((l) => !["Closed", "Approved"].includes(l.status));
+    const openItems = projectLists.reduce(
+      (sum, l) => sum + (l.items || []).filter((i) => !["Approved", "Closed"].includes(i.status) && !i.resolved).length,
+      0
+    );
+    const projectId = sortedLists[0]?.project_id || "";
+
+    return `<section class="punch-project-group">
+      <div class="punch-project-header">
+        <div class="punch-project-title">
+          <h3>${escapeHtml(projectName)}</h3>
+          <div class="punch-project-meta">
+            <span class="pill">${projectLists.length} list${projectLists.length === 1 ? "" : "s"}</span>
+            ${openItems > 0
+              ? `<span class="pill pill-open-items">${openItems} open item${openItems === 1 ? "" : "s"}</span>`
+              : `<span class="pill pill-all-clear">No open items</span>`}
+            ${activeList
+              ? `<span class="pill ${punchItemStatusClass(activeList.status)}">${escapeHtml(activeList.status)}</span>`
+              : `<span class="pill pill-all-clear">All Closed</span>`}
+          </div>
+        </div>
+        <button class="mini-button" data-open-punch-project="${escapeHtml(projectId)}" type="button">+ Add Punch</button>
+      </div>
+      <div class="punch-project-cards">
+        ${sortedLists.map(punchListCard).join("")}
+      </div>
+    </section>`;
+  }).join("");
+}
+
 function renderPunchLists() {
   applyLayout("punchListBoard", "punchLists");
   const stats = punchStats();
@@ -2309,13 +2366,17 @@ function renderPunchLists() {
     punchSummaryButton("Final Approval Queue", stats.closeout, "punchStatus", "Approved"),
   ].join("");
   const lists = filteredPunchLists();
-  byId("punchListBoard").innerHTML = listWrap(
-    lists,
-    punchListCard,
-    "No punch lists match this view.",
-    state.layouts.punchLists === "kanban" ? (list) => list.status : null,
-    punchListStatuses
-  );
+  if (state.layouts.punchLists === "project") {
+    byId("punchListBoard").innerHTML = renderPunchListsByProject(lists);
+  } else {
+    byId("punchListBoard").innerHTML = listWrap(
+      lists,
+      punchListCard,
+      "No punch lists match this view.",
+      state.layouts.punchLists === "kanban" ? (list) => list.status : null,
+      punchListStatuses
+    );
+  }
 }
 
 function renderPunchCloseoutChecks(closeout = {}) {
@@ -3850,9 +3911,10 @@ function listWrap(records, renderer, emptyMessage, groupKey = null, groupOrder =
 function applyLayout(containerId, viewName) {
   const container = byId(containerId);
   const layout = state.layouts[viewName] || "tile";
-  container.classList.remove("is-list", "is-kanban");
+  container.classList.remove("is-list", "is-kanban", "is-project");
   container.classList.toggle("is-list", layout === "list");
   container.classList.toggle("is-kanban", layout === "kanban");
+  container.classList.toggle("is-project", layout === "project");
 }
 
 function isPhoneMode() {
