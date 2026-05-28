@@ -22,6 +22,7 @@
     "garlandActivities",
     "garlandCallLists",
     "garlandTakeoffManualProducts",
+    "garlandPunchGroupCollapsed",
   ]);
 
   // ── Helpers ──────────────────────────────────────────────────────

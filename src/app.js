@@ -943,7 +943,7 @@ const state = {
   phoneMode: false,
   mobilePreview: false,
   desktopLayoutsBeforePhone: null,
-  punchGroupCollapsed: {},
+  punchGroupCollapsed: readStorageJson("garlandPunchGroupCollapsed", {}),
 };
 if (!Array.isArray(state.scopeDatabase)) state.scopeDatabase = [];
 if (!Array.isArray(state.takeoffEstimates)) state.takeoffEstimates = [];
@@ -2430,6 +2430,9 @@ function renderPunchLists() {
     punchSummaryButton("Final Approval Queue", stats.closeout, "punchStatus", "Approved"),
   ].join("");
   const lists = filteredPunchLists();
+  // Show the "Collapse Closed" button only in By-Project view
+  const collapseClosedBtn = byId("punchCollapseClosedBtn");
+  if (collapseClosedBtn) collapseClosedBtn.hidden = state.layouts.punchLists !== "project";
   if (state.layouts.punchLists === "project") {
     byId("punchListBoard").innerHTML = renderPunchListsByProject(lists);
   } else {
@@ -10943,7 +10946,25 @@ function bindEvents() {
       if (group) {
         const nowCollapsed = group.classList.toggle("is-collapsed");
         state.punchGroupCollapsed[rawKey] = nowCollapsed;
+        localStorage.setItem("garlandPunchGroupCollapsed", JSON.stringify(state.punchGroupCollapsed));
       }
+      return;
+    }
+
+    // "Collapse All Closed" toolbar button
+    if (event.target.closest("#punchCollapseClosedBtn")) {
+      const closedGroups = document.querySelectorAll(".punch-project-group.is-closed-group");
+      const anyOpen = [...closedGroups].some((g) => !g.classList.contains("is-collapsed"));
+      closedGroups.forEach((group) => {
+        const key = group.dataset.punchGroupKey;
+        const shouldCollapse = anyOpen; // collapse if any open; otherwise expand all
+        group.classList.toggle("is-collapsed", shouldCollapse);
+        state.punchGroupCollapsed[key] = shouldCollapse;
+      });
+      // Update button label to reflect new state
+      const btn = event.target.closest("#punchCollapseClosedBtn");
+      btn.textContent = anyOpen ? "Expand Closed ↓" : "Collapse Closed ↑";
+      localStorage.setItem("garlandPunchGroupCollapsed", JSON.stringify(state.punchGroupCollapsed));
       return;
     }
 
@@ -10953,7 +10974,15 @@ function bindEvents() {
       const list = findPunchList(punchAdvanceBtn.dataset.punchAdvance);
       const nextStatus = punchAdvanceBtn.dataset.punchNextStatus;
       if (!list || !nextStatus) return;
-      if (!confirm(`Mark "${list.title}" as "${nextStatus}"?`)) return;
+      const _openCount = (list.items || []).filter((i) => !["Approved", "Closed"].includes(i.status)).length;
+      const _confirmLines = [
+        `Advance to: ${nextStatus}`,
+        `Project: ${list.project_name || "—"}`,
+        list.assigned_contractor ? `Contractor: ${list.assigned_contractor}` : null,
+        list.due_date ? `Due: ${compactDate(list.due_date)}` : null,
+        _openCount > 0 ? `Open items: ${_openCount}` : "✓ All items resolved",
+      ].filter(Boolean).join("\n");
+      if (!confirm(_confirmLines)) return;
       list.status = nextStatus;
       list.updated_at = new Date().toISOString();
       if (nextStatus === "Sent to Contractor") list.sent_at = list.sent_at || new Date().toISOString();
