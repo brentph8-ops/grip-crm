@@ -2366,6 +2366,11 @@ function renderPunchListsByProject(lists) {
       ? `<button class="punch-advance-btn punch-advance-${dueLevel}" data-punch-advance="${escapeHtml(activeList.punch_list_id)}" data-punch-next-status="${escapeHtml(advance.next)}" type="button">${escapeHtml(advance.label)} &#8594;</button>`
       : "";
 
+    // Bulk-close all open items on the active punch list
+    const bulkCloseBtn = (activeList && openItems > 0)
+      ? `<button class="punch-bulk-close-btn" data-punch-bulk-close="${escapeHtml(activeList.punch_list_id)}" data-punch-bulk-close-count="${openItems}" type="button">&#10005; Close ${openItems} Item${openItems === 1 ? "" : "s"}</button>`
+      : "";
+
     // D: Compact active-list summary bar — clickable, opens detail
     const activeSummary = activeList
       ? `<div class="punch-active-bar" data-open-punch-detail="${escapeHtml(activeList.punch_list_id)}">
@@ -2405,6 +2410,7 @@ function renderPunchListsByProject(lists) {
           </div>
         </div>
         <div class="punch-project-actions">
+          ${bulkCloseBtn}
           ${advanceBtn}
           ${addButton}
         </div>
@@ -6016,6 +6022,13 @@ function persistRecordEdit(type, id, key, value, refresh = true) {
     savedCrm.edits[collection][id] = { ...(savedCrm.edits[collection][id] || {}), [key]: cleanedValue };
   }
   saveCrm();
+  // Propagate renamed project name to all punch lists that reference this project
+  if (collection === "projects" && key === "projectName") {
+    state.punchLists.forEach((list) => {
+      if (list.project_id === id) list.project_name = cleanedValue;
+    });
+    savePunchLists();
+  }
   if (key === "nextFollowUp" && record) promptFollowUpActivity(type, record, oldValue, cleanedValue);
   if (refresh) {
     renderFilters();
@@ -6024,10 +6037,27 @@ function persistRecordEdit(type, id, key, value, refresh = true) {
   }
 }
 
+function cleanupPunchGroupCollapsed() {
+  // Remove any stale keys from punchGroupCollapsed that no longer correspond
+  // to an existing punch-list group (keyed by project_id || project_name).
+  const validKeys = new Set(
+    state.punchLists.map((l) => l.project_id || l.project_name || "__no_project__")
+  );
+  let changed = false;
+  Object.keys(state.punchGroupCollapsed).forEach((k) => {
+    if (!validKeys.has(k)) {
+      delete state.punchGroupCollapsed[k];
+      changed = true;
+    }
+  });
+  if (changed) localStorage.setItem("garlandPunchGroupCollapsed", JSON.stringify(state.punchGroupCollapsed));
+}
+
 function deleteRecord(type, id) {
   if (type === "punchList") {
     state.punchLists = state.punchLists.filter((list) => list.punch_list_id !== id);
     savePunchLists();
+    cleanupPunchGroupCollapsed();
     renderFilters();
     render();
     byId("detailContent").innerHTML = `<p class="empty-detail">Punch list deleted from this CRM view.</p>`;
@@ -10988,6 +11018,29 @@ function bindEvents() {
       if (nextStatus === "Sent to Contractor") list.sent_at = list.sent_at || new Date().toISOString();
       if (nextStatus === "Closed") list.closed_at = list.closed_at || new Date().toISOString();
       punchAudit(list, `Status advanced to ${nextStatus}`);
+      savePunchLists();
+      renderPunchLists();
+      return;
+    }
+
+    // Bulk-close all open items on a punch list
+    const bulkCloseBtn = event.target.closest("[data-punch-bulk-close]");
+    if (bulkCloseBtn) {
+      const list = findPunchList(bulkCloseBtn.dataset.punchBulkClose);
+      const count = Number(bulkCloseBtn.dataset.punchBulkCloseCount) || 0;
+      if (!list || !count) return;
+      if (!confirm(
+        `Close all ${count} open item${count === 1 ? "" : "s"} on "${list.title}"?\n\nProject: ${list.project_name || "—"}\n\nThis marks every unresolved item as Closed.`
+      )) return;
+      (list.items || []).forEach((item) => {
+        if (!["Approved", "Closed"].includes(item.status) && !item.resolved) {
+          item.status = "Closed";
+          item.resolved = true;
+          item.resolved_at = item.resolved_at || new Date().toISOString();
+        }
+      });
+      list.updated_at = new Date().toISOString();
+      punchAudit(list, `Bulk-closed ${count} open item${count === 1 ? "" : "s"}`);
       savePunchLists();
       renderPunchLists();
       return;

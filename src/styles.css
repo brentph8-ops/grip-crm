@@ -1222,6 +1222,22 @@ textarea {
 }
 
 /* ── Status-advance button (C) ──────────────────────────────────── */
+.punch-bulk-close-btn {
+  background: transparent;
+  border: 1.5px solid #6b7280;
+  border-radius: 6px;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 5px 10px;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.punch-bulk-close-btn:hover {
+  background: #6b7280;
+  color: #fff;
+}
 .punch-advance-btn {
   background: transparent;
   border: 1.5px solid #0057a8;
@@ -5426,6 +5442,7 @@ textarea {
   }
 
   .punch-advance-btn,
+  .punch-bulk-close-btn,
   .punch-add-btn {
     flex: 1 1 auto;
     text-align: center;
