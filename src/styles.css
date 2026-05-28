@@ -1111,54 +1111,219 @@ textarea {
 /* ── By-Project layout ──────────────────────────────────────────── */
 #punchListBoard.is-project {
   display: block;
+  padding-bottom: 24px;
 }
 
+/* Project group card */
 .punch-project-group {
-  background: #fff;
+  background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 10px;
-  margin-bottom: 18px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(20,60,110,0.06);
+  margin-bottom: 14px;
   overflow: hidden;
+  transition: box-shadow 0.15s ease;
+}
+.punch-project-group:hover {
+  box-shadow: 0 4px 16px rgba(20,60,110,0.1);
 }
 
+/* Urgency left-accent on active groups */
+.punch-project-group.is-active-group {
+  border-left: 4px solid #0057a8;
+}
+.punch-project-group.punch-urgency-overdue {
+  border-left-color: #bd0808;
+}
+.punch-project-group.punch-urgency-today {
+  border-left-color: #f58220;
+}
+.punch-project-group.punch-urgency-upcoming {
+  border-left-color: #0057a8;
+}
+
+/* Closed groups are dimmed */
+.punch-project-group.is-closed-group {
+  border-left: 4px solid #c8d4e0;
+  opacity: 0.72;
+}
+.punch-project-group.is-closed-group:hover {
+  opacity: 1;
+}
+
+/* ── Header row ─────────────────────────────────────────────────── */
 .punch-project-header {
   align-items: center;
-  background: linear-gradient(135deg, #f4f8ff, #eef3ff);
+  background: linear-gradient(135deg, #f8fafd 0%, #edf2fb 100%);
   border-bottom: 1px solid var(--line);
+  cursor: pointer;
   display: flex;
   gap: 12px;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: 14px 16px;
+  user-select: none;
+}
+.punch-project-group.is-closed-group .punch-project-header {
+  background: #f5f6f8;
+}
+.punch-project-header:hover {
+  background: linear-gradient(135deg, #edf2fb 0%, #e2eaf8 100%);
 }
 
-.punch-project-title h3 {
+.punch-project-title {
+  min-width: 0;
+}
+
+.punch-project-name-row {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.punch-project-name-row h3 {
+  color: var(--ink);
   font-size: 1rem;
   font-weight: 700;
-  margin: 0 0 6px;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Chevron arrow — CSS-only, no JS icon swap needed */
+.punch-collapse-chevron {
+  border: 2px solid var(--muted);
+  border-right: none;
+  border-top: none;
+  display: inline-block;
+  flex-shrink: 0;
+  height: 7px;
+  transform: rotate(-45deg) translateY(-2px);
+  transition: transform 0.2s ease;
+  width: 7px;
+}
+.punch-project-group.is-collapsed .punch-collapse-chevron {
+  transform: rotate(-135deg) translateY(2px);
 }
 
 .punch-project-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  padding-left: 15px; /* align under project name past the chevron */
 }
 
+.punch-project-actions {
+  align-items: center;
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+/* ── Status-advance button (C) ──────────────────────────────────── */
+.punch-advance-btn {
+  background: transparent;
+  border: 1.5px solid #0057a8;
+  border-radius: 6px;
+  color: #0057a8;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 5px 10px;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.punch-advance-btn:hover {
+  background: #0057a8;
+  color: #fff;
+}
+.punch-advance-overdue {
+  border-color: #bd0808;
+  color: #bd0808;
+}
+.punch-advance-overdue:hover {
+  background: #bd0808;
+  color: #fff;
+}
+.punch-advance-today {
+  border-color: #f58220;
+  color: #f58220;
+}
+.punch-advance-today:hover {
+  background: #f58220;
+  color: #fff;
+}
+
+.punch-add-btn {
+  white-space: nowrap;
+}
+
+/* ── Collapse animation (A) ─────────────────────────────────────── */
+.punch-project-body {
+  max-height: 3000px;
+  overflow: hidden;
+  transition: max-height 0.28s ease;
+}
+.punch-project-group.is-collapsed .punch-project-body {
+  max-height: 0;
+}
+
+/* ── Active-list summary bar (D) ────────────────────────────────── */
+.punch-active-bar {
+  align-items: center;
+  background: linear-gradient(135deg, #182b45, #1e3a5f);
+  color: #e8f0fc;
+  cursor: pointer;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 16px;
+}
+.punch-active-bar:hover {
+  background: linear-gradient(135deg, #1e3a5f, #245080);
+}
+.punch-active-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.punch-active-pills {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.punch-active-pills .pill {
+  font-size: 0.73rem;
+}
+.pill.pill-contractor {
+  background: rgba(255,255,255,0.15);
+  color: #e8f0fc;
+}
+
+/* ── Card grid inside a project group ───────────────────────────── */
 .punch-project-cards {
   display: grid;
+  gap: 10px;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   padding: 12px;
-  gap: 10px;
 }
 
+/* ── Status / urgency pills ─────────────────────────────────────── */
 .pill.pill-open-items {
   background: #fff3cd;
   color: #7a5200;
 }
-
 .pill.pill-all-clear {
   background: #d4edda;
   color: #155724;
 }
+
 
 .punch-card {
   display: grid;

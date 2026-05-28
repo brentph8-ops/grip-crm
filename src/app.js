@@ -2206,6 +2206,21 @@ function punchDueLevel(list) {
   return "upcoming";
 }
 
+// C: Maps a list status to the next rep-action step and its button label.
+// Returns null for statuses where the rep is waiting (Sent to Contractor)
+// or the list is already terminal (Closed).
+function nextPunchListStatus(status) {
+  const flow = {
+    "Draft":                       { label: "Start Running",     next: "Running Punch List" },
+    "Running Punch List":          { label: "Send to Contractor", next: "Sent to Contractor" },
+    "Contractor Submitted":        { label: "Begin Review",       next: "Under Review" },
+    "Under Review":                { label: "Approve",            next: "Approved" },
+    "Approved":                    { label: "Close Out",          next: "Closed" },
+    "Rejected / Needs Correction": { label: "Reopen",             next: "Running Punch List" },
+  };
+  return flow[status] || null;
+}
+
 function punchProjectOptions() {
   return [
     { value: "", label: "Choose project" },
@@ -2305,68 +2320,99 @@ function punchListCard(list, hideProject = false) {
 function renderPunchListsByProject(lists) {
   if (!lists.length) return empty("No punch lists match this view.");
 
-  // Bug fix: key by project_id (unique) with project_name as display label.
-  // Falling back to project_name for older lists without an id prevents
-  // two different projects with the same display name from being merged.
-  const groups = new Map(); // key → { projectName, projectId, lists[] }
+  // Key by project_id so same-named projects don't merge
+  const groups = new Map();
   lists.forEach((list) => {
     const key = list.project_id || list.project_name || "__no_project__";
     if (!groups.has(key)) {
-      groups.set(key, {
-        projectName: list.project_name || "No Project",
-        projectId: list.project_id || "",
-        lists: [],
-      });
+      groups.set(key, { projectName: list.project_name || "No Project", projectId: list.project_id || "", lists: [] });
     }
     groups.get(key).lists.push(list);
   });
 
-  // Projects with active (non-closed/approved) lists sort first, then alphabetically
+  // Active projects first; within active, overdue floats to top; then alphabetical
   const sorted = [...groups.values()].sort((a, b) => {
     const aActive = a.lists.some((l) => !["Closed", "Approved"].includes(l.status));
     const bActive = b.lists.some((l) => !["Closed", "Approved"].includes(l.status));
     if (aActive !== bActive) return aActive ? -1 : 1;
+    const aOverdue = a.lists.some((l) => punchDueLevel(l) === "overdue");
+    const bOverdue = b.lists.some((l) => punchDueLevel(l) === "overdue");
+    if (aActive && bActive && aOverdue !== bOverdue) return aOverdue ? -1 : 1;
     return compareText(a.projectName, b.projectName);
   });
 
   return sorted.map(({ projectName, projectId, lists: projectLists }) => {
-    // Within a project: active lists first, then most recently updated
     const sortedLists = [...projectLists].sort((a, b) => {
       const aActive = !["Closed", "Approved"].includes(a.status);
       const bActive = !["Closed", "Approved"].includes(b.status);
       if (aActive !== bActive) return aActive ? -1 : 1;
       return compareDateValue(a.updated_at, b.updated_at, "desc");
     });
+
     const activeList = sortedLists.find((l) => !["Closed", "Approved"].includes(l.status));
+    const isAllClosed = !activeList;
+    const dueLevel = activeList ? punchDueLevel(activeList) : "none";
     const openItems = projectLists.reduce(
       (sum, l) => sum + (l.items || []).filter((i) => !["Approved", "Closed"].includes(i.status) && !i.resolved).length,
       0
     );
+    const groupKey = escapeHtml(projectId || projectName);
 
-    // Bug fix: hide "+ Add Punch" when there is no linked project (empty id)
-    // because the form requires a project selection and would immediately alert.
+    // C: Status-advance button — only shown when rep has an action to take
+    const advance = activeList ? nextPunchListStatus(activeList.status) : null;
+    const advanceBtn = advance
+      ? `<button class="punch-advance-btn punch-advance-${dueLevel}" data-punch-advance="${escapeHtml(activeList.punch_list_id)}" data-punch-next-status="${escapeHtml(advance.next)}" type="button">${escapeHtml(advance.label)} &#8594;</button>`
+      : "";
+
+    // D: Compact active-list summary bar — clickable, opens detail
+    const activeSummary = activeList
+      ? `<div class="punch-active-bar" data-open-punch-detail="${escapeHtml(activeList.punch_list_id)}">
+           <span class="punch-active-label">${escapeHtml(activeList.title)}</span>
+           <div class="punch-active-pills">
+             ${activeList.assigned_contractor ? `<span class="pill pill-contractor">&#128295; ${escapeHtml(activeList.assigned_contractor)}</span>` : ""}
+             ${activeList.due_date ? `<span class="pill task-due-${dueLevel}">Due ${escapeHtml(compactDate(activeList.due_date))}</span>` : ""}
+             <span class="pill ${punchItemStatusClass(activeList.status)}">${escapeHtml(activeList.status)}</span>
+             ${openItems > 0
+               ? `<span class="pill pill-open-items">${openItems} open item${openItems === 1 ? "" : "s"}</span>`
+               : `<span class="pill pill-all-clear">&#10003; No open items</span>`}
+           </div>
+         </div>`
+      : "";
+
+    // Add button hidden when no project_id — form would alert on empty project
     const addButton = projectId
-      ? `<button class="mini-button" data-open-punch-project="${escapeHtml(projectId)}" type="button">+ Add Punch</button>`
-      : `<span class="muted-label" title="Assign a project to this punch list to enable this button">No linked project</span>`;
+      ? `<button class="mini-button punch-add-btn" data-open-punch-project="${escapeHtml(projectId)}" type="button">+ Add Punch</button>`
+      : `<span class="muted-label" title="Assign a project to enable this">No linked project</span>`;
 
-    return `<section class="punch-project-group">
-      <div class="punch-project-header">
+    // A: Closed groups collapse by default
+    const groupClass = [
+      "punch-project-group",
+      isAllClosed ? "is-closed-group is-collapsed" : `is-active-group punch-urgency-${dueLevel}`,
+    ].join(" ");
+
+    return `<section class="${groupClass}" data-punch-group-key="${groupKey}">
+      <div class="punch-project-header" data-punch-collapse-target="${groupKey}">
         <div class="punch-project-title">
-          <h3>${escapeHtml(projectName)}</h3>
+          <div class="punch-project-name-row">
+            <span class="punch-collapse-chevron"></span>
+            <h3>${escapeHtml(projectName)}</h3>
+          </div>
           <div class="punch-project-meta">
-            <span class="pill">${projectLists.length} list${projectLists.length === 1 ? "" : "s"}</span>
-            ${openItems > 0
-              ? `<span class="pill pill-open-items">${openItems} open item${openItems === 1 ? "" : "s"}</span>`
-              : `<span class="pill pill-all-clear">No open items</span>`}
-            ${activeList
-              ? `<span class="pill ${punchItemStatusClass(activeList.status)}">${escapeHtml(activeList.status)}</span>`
-              : `<span class="pill pill-all-clear">All Closed</span>`}
+            ${isAllClosed
+              ? `<span class="pill pill-all-clear">All Closed &middot; ${projectLists.length} list${projectLists.length === 1 ? "" : "s"}</span>`
+              : `<span class="pill">${projectLists.length} list${projectLists.length === 1 ? "" : "s"}</span>`}
           </div>
         </div>
-        ${addButton}
+        <div class="punch-project-actions">
+          ${advanceBtn}
+          ${addButton}
+        </div>
       </div>
-      <div class="punch-project-cards">
-        ${sortedLists.map((l) => punchListCard(l, true)).join("")}
+      <div class="punch-project-body">
+        ${activeSummary}
+        <div class="punch-project-cards">
+          ${sortedLists.map((l) => punchListCard(l, true)).join("")}
+        </div>
       </div>
     </section>`;
   }).join("");
@@ -10888,9 +10934,45 @@ function bindEvents() {
       openPunchListDialog(addPunchItemButton.dataset.addPunchItem, "", true);
       return;
     }
+    // A: Collapse/expand a project group — fires on header click, not on its buttons
+    const collapseTarget = event.target.closest("[data-punch-collapse-target]");
+    if (collapseTarget && !event.target.closest("button")) {
+      const key = CSS.escape(collapseTarget.dataset.punchCollapseTarget);
+      const group = document.querySelector(`.punch-project-group[data-punch-group-key="${key}"]`);
+      if (group) group.classList.toggle("is-collapsed");
+      return;
+    }
+
+    // C: Quick status advance from the project header button
+    const punchAdvanceBtn = event.target.closest("[data-punch-advance]");
+    if (punchAdvanceBtn) {
+      const list = findPunchList(punchAdvanceBtn.dataset.punchAdvance);
+      const nextStatus = punchAdvanceBtn.dataset.punchNextStatus;
+      if (!list || !nextStatus) return;
+      if (!confirm(`Mark "${list.title}" as "${nextStatus}"?`)) return;
+      list.status = nextStatus;
+      list.updated_at = new Date().toISOString();
+      if (nextStatus === "Sent to Contractor") list.sent_at = list.sent_at || new Date().toISOString();
+      if (nextStatus === "Closed") list.closed_at = list.closed_at || new Date().toISOString();
+      punchAudit(list, `Status advanced to ${nextStatus}`);
+      savePunchLists();
+      renderPunchLists();
+      return;
+    }
+
     const openPunchProjectButton = event.target.closest("[data-open-punch-project]");
     if (openPunchProjectButton) {
-      openPunchListDialog("", openPunchProjectButton.dataset.openPunchProject);
+      const projectId = openPunchProjectButton.dataset.openPunchProject;
+      // B: Warn before creating a second active punch list for the same project
+      if (projectId) {
+        const existingActive = state.punchLists.find(
+          (l) => l.project_id === projectId && !["Closed", "Approved"].includes(l.status)
+        );
+        if (existingActive && !confirm(
+          `"${existingActive.title}" is already open for this project.\n\nCreate another punch list anyway?`
+        )) return;
+      }
+      openPunchListDialog("", projectId);
       return;
     }
     const openPunchDetailButton = event.target.closest("[data-open-punch-detail]");
