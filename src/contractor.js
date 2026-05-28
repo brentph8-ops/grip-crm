@@ -4,7 +4,6 @@
 
 (function () {
 
-  const { createClient } = window.supabase;
   let db = null;
   let tokenRecord = null;
   let punchList = null;
@@ -33,6 +32,20 @@
     return `<span class="severity-badge ${cls}">${escHtml(sev)}</span>`;
   }
 
+  // ── Helpers ──────────────────────────────────────────────────────
+
+  function showError(msg, detail) {
+    qs("loadingState").hidden   = true;
+    qs("punchContent").hidden   = true;
+    qs("successState").hidden   = true;
+    const errEl = qs("errorMessage");
+    if (errEl) errEl.textContent = msg;
+    const detailEl = qs("errorDetail");
+    if (detailEl) detailEl.textContent = detail || "";
+    qs("errorState").hidden = false;
+    console.error("GRIP contractor portal error:", msg, detail || "");
+  }
+
   // ── Progress tracking ────────────────────────────────────────────
 
   function updateProgress() {
@@ -41,20 +54,17 @@
     const done  = items.filter((item) => qs(`done_${item.punch_item_id}`)?.checked).length;
     const pct   = total ? Math.round((done / total) * 100) : 0;
 
-    // Progress bar
     const fill = qs("progressFill");
     const text = qs("progressText");
     if (fill) fill.style.width = `${pct}%`;
     if (text) text.textContent = `${done} of ${total} item${total === 1 ? "" : "s"} confirmed`;
 
-    // Progress ring in header
     const circumference = 106.8;
-    const ring = qs("ringFill");
+    const ring  = qs("ringFill");
     const label = qs("ringLabel");
-    if (ring) ring.style.strokeDashoffset = String(circumference - (pct / 100) * circumference);
+    if (ring)  ring.style.strokeDashoffset = String(circumference - (pct / 100) * circumference);
     if (label) label.textContent = `${pct}%`;
 
-    // Mark individual cards as done
     items.forEach((item) => {
       const checked = qs(`done_${item.punch_item_id}`)?.checked;
       const card = document.querySelector(`[data-item-id="${item.punch_item_id}"]`);
@@ -65,9 +75,10 @@
   // ── Lightbox ─────────────────────────────────────────────────────
 
   function openLightbox(src) {
-    const lb = qs("lightbox");
-    if (!lb) return;
-    qs("lightboxImg").src = src;
+    const lb  = qs("lightbox");
+    const img = qs("lightboxImg");
+    if (!lb || !img) return;
+    img.src = src;
     lb.classList.add("is-open");
   }
 
@@ -84,15 +95,16 @@
       container.innerHTML = `<p style="color:var(--muted);text-align:center;padding:30px 0">No punch items found in this list.</p>`;
       return;
     }
+
     container.innerHTML = items.map((item, idx) => {
       const beforePhotos = (item.original_photos || [])
         .filter((f) => String(f.file_type || "").startsWith("image/"))
         .slice(0, 6);
+      const iid = escHtml(item.punch_item_id);
 
       return `
-      <div class="punch-item" data-item-id="${escHtml(item.punch_item_id)}">
+      <div class="punch-item" data-item-id="${iid}">
 
-        <!-- Item header -->
         <div class="item-header">
           <div class="item-num">${escHtml(String(item.item_number || idx + 1))}</div>
           <div class="item-meta">
@@ -102,7 +114,6 @@
           ${severityBadge(item.severity)}
         </div>
 
-        <!-- Item body -->
         <div class="item-body">
 
           ${item.description ? `
@@ -127,54 +138,53 @@
           <div>
             <div class="photo-strip-label">Before Photos</div>
             <div class="photo-strip">
-              ${beforePhotos.map((f) => `<img class="photo-thumb" src="${escHtml(f.dataUrl || f.thumbnail_url || f.url)}" alt="Before" />`).join("")}
+              ${beforePhotos.map((f) => `<img class="photo-thumb" src="${escHtml(f.dataUrl || f.thumbnail_url || f.url || "")}" alt="Before photo" />`).join("")}
             </div>
           </div>` : ""}
 
-          <!-- Completion section -->
           <hr class="completion-divider" />
           <div class="completion-label-row">
             <div class="completion-dot"></div>
             <span>Your Completion</span>
           </div>
 
-          <label class="field-label" for="notes_${escHtml(item.punch_item_id)}">
+          <label class="field-label" for="notes_${iid}">
             Completion Notes <span style="color:#dc2626">*</span>
           </label>
           <textarea
-            id="notes_${escHtml(item.punch_item_id)}"
-            data-item-notes="${escHtml(item.punch_item_id)}"
+            id="notes_${iid}"
+            data-item-notes="${iid}"
             placeholder="Describe the work performed to correct this item…"
             rows="3"
           ></textarea>
 
-          <label class="field-label">After Photos</label>
-          <label class="photo-upload-zone" for="photo_${escHtml(item.punch_item_id)}">
+          <span class="field-label">After Photos</span>
+          <label class="photo-upload-zone" for="photo_${iid}">
             <div class="upload-icon">📷</div>
             <p>Tap to take or upload after photos</p>
             <small>JPEG, PNG — multiple photos allowed</small>
             <input
               class="photo-input"
               type="file"
-              id="photo_${escHtml(item.punch_item_id)}"
+              id="photo_${iid}"
               accept="image/*"
               capture="environment"
               multiple
-              data-item-photo="${escHtml(item.punch_item_id)}"
+              data-item-photo="${iid}"
             />
           </label>
-          <div class="photo-thumbs" id="thumbs_${escHtml(item.punch_item_id)}"></div>
+          <div class="photo-thumbs" id="thumbs_${iid}"></div>
 
-          <label class="confirm-row">
+          <div class="confirm-row">
             <input
               type="checkbox"
-              id="done_${escHtml(item.punch_item_id)}"
-              data-item-done="${escHtml(item.punch_item_id)}"
+              id="done_${iid}"
+              data-item-done="${iid}"
             />
-            <label for="done_${escHtml(item.punch_item_id)}">
+            <label for="done_${iid}">
               I confirm this item has been corrected per Garland specifications
             </label>
-          </label>
+          </div>
 
         </div>
       </div>`;
@@ -185,12 +195,12 @@
       input.addEventListener("change", (e) => handlePhotoInput(e.target));
     });
 
-    // Bind checkboxes to progress
+    // Bind checkboxes → live progress update
     container.querySelectorAll("[data-item-done]").forEach((cb) => {
       cb.addEventListener("change", updateProgress);
     });
 
-    // Bind before-photo lightbox clicks
+    // Bind before-photo lightbox
     container.querySelectorAll(".photo-thumb").forEach((img) => {
       img.addEventListener("click", () => openLightbox(img.src));
     });
@@ -223,32 +233,30 @@
     const progress  = qs("submitProgress");
 
     const items = (punchList.items || []).map((item) => {
-      const id    = item.punch_item_id;
-      const notes = qs(`notes_${id}`)?.value?.trim() || "";
-      const done  = qs(`done_${id}`)?.checked || false;
+      const id     = item.punch_item_id;
+      const notes  = qs(`notes_${id}`)?.value?.trim() || "";
+      const done   = qs(`done_${id}`)?.checked || false;
       const photos = itemPhotos[id] || [];
       return { item_id: id, item_number: item.item_number, completion_notes: notes, corrected: done, photos };
     });
 
     const overallNotes = qs("overallNotes")?.value?.trim() || "";
-    const hasAnyNotes  = items.some((i) => i.completion_notes);
-    if (!hasAnyNotes) {
+    if (!items.some((i) => i.completion_notes)) {
       alert("Please add completion notes for at least one punch item before submitting.");
       return;
     }
 
     submitBtn.disabled = true;
-    progress.style.display = "block";
+    if (progress) progress.style.display = "block";
 
     try {
       const { error } = await db.from("contractor_submissions").insert({
-        token: tokenRecord.token,
-        punch_list_id: punchList.punch_list_id,
+        token:           tokenRecord.token,
+        punch_list_id:   punchList.punch_list_id,
         items,
         contractor_name: tokenRecord.contractor_name || "",
-        overall_notes: overallNotes,
+        overall_notes:   overallNotes,
       });
-
       if (error) throw error;
 
       qs("punchContent").hidden = true;
@@ -256,9 +264,9 @@
       qs("successState").hidden = false;
     } catch (err) {
       console.error("Submission error:", err);
-      alert("Submission failed. Please check your connection and try again.");
+      alert(`Submission failed: ${err.message || "Check your connection and try again."}`);
       submitBtn.disabled = false;
-      progress.style.display = "none";
+      if (progress) progress.style.display = "none";
     }
   }
 
@@ -269,17 +277,31 @@
     const token  = params.get("token");
 
     if (!token) {
-      showError("No contractor token found in this URL. Contact your Garland rep.");
+      showError("No contractor token found in this URL.", "Contact your Garland rep for a valid link.");
       return;
     }
 
+    // Guard: Supabase SDK must be loaded
+    if (!window.supabase?.createClient) {
+      showError(
+        "Supabase SDK failed to load.",
+        "Check your internet connection and reload the page."
+      );
+      return;
+    }
+
+    // Guard: Supabase config must be present
     if (!window.GRIP_SUPABASE_URL || !window.GRIP_SUPABASE_URL.startsWith("https://")) {
-      showError("GRIP is not configured for cloud sync. Contact your Garland rep.");
+      showError(
+        "GRIP cloud sync is not configured.",
+        "Contact your Garland rep — this contractor portal requires a Supabase connection."
+      );
       return;
     }
 
     try {
-      db = createClient(window.GRIP_SUPABASE_URL, window.GRIP_SUPABASE_ANON);
+      // Create the Supabase client here (not at module scope) so any errors are caught
+      db = window.supabase.createClient(window.GRIP_SUPABASE_URL, window.GRIP_SUPABASE_ANON);
 
       const { data, error } = await db
         .from("contractor_tokens")
@@ -287,13 +309,27 @@
         .eq("token", token)
         .single();
 
-      if (error || !data) {
-        showError("This link is invalid or has expired. Contact your Garland rep for a new link.");
+      if (error) {
+        showError(
+          "Could not load this punch list.",
+          `Database error: ${error.message || error.code || "unknown"}`
+        );
+        return;
+      }
+
+      if (!data) {
+        showError(
+          "This link is invalid or has expired.",
+          "Contact your Garland rep for a new link."
+        );
         return;
       }
 
       if (data.expires_at && new Date(data.expires_at) < new Date()) {
-        showError("This contractor link has expired. Contact your Garland rep for a new link.");
+        showError(
+          "This contractor link has expired.",
+          "Contact your Garland rep for a refreshed link."
+        );
         return;
       }
 
@@ -301,23 +337,24 @@
       punchList   = data.punch_list_snapshot;
 
       if (!punchList || !(punchList.items || []).length) {
-        showError("No punch items found in this list. Contact your Garland rep.");
+        showError(
+          "No punch items found in this list.",
+          "The rep may need to add items and re-generate the link."
+        );
         return;
       }
 
       const itemCount = punchList.items.length;
 
-      // Populate header
-      qs("headerTitle").textContent     = punchList.title || "Punch List";
-      qs("punchTitle").textContent      = punchList.title || "Punch List";
+      qs("headerTitle").textContent      = punchList.title || "Punch List";
+      qs("punchTitle").textContent       = punchList.title || "Punch List";
       qs("punchStatusBadge").textContent = punchList.status || "Sent to Contractor";
-      qs("punchProject").textContent    = punchList.project_name || "—";
-      qs("punchClient").textContent     = punchList.client_name  || "—";
-      qs("punchContractor").textContent = punchList.assigned_contractor || "—";
-      qs("punchDue").textContent        = formatDate(punchList.due_date);
-      qs("itemsCountLabel").textContent = `${itemCount} Punch Item${itemCount === 1 ? "" : "s"}`;
+      qs("punchProject").textContent     = punchList.project_name || "—";
+      qs("punchClient").textContent      = punchList.client_name  || "—";
+      qs("punchContractor").textContent  = punchList.assigned_contractor || "—";
+      qs("punchDue").textContent         = formatDate(punchList.due_date);
+      qs("itemsCountLabel").textContent  = `${itemCount} Punch Item${itemCount === 1 ? "" : "s"}`;
 
-      // Show progress ring
       qs("progressRingWrap").hidden = false;
 
       renderItems(punchList.items);
@@ -331,14 +368,11 @@
 
     } catch (err) {
       console.error("Portal load error:", err);
-      showError("Could not load the punch list. Check your connection and try again.");
+      showError(
+        "Could not load the punch list.",
+        `${err.message || "Check your connection and try again."}`
+      );
     }
-  }
-
-  function showError(msg) {
-    qs("loadingState").hidden   = true;
-    qs("errorMessage").textContent = msg;
-    qs("errorState").hidden     = false;
   }
 
   // ── Init ─────────────────────────────────────────────────────────
@@ -346,7 +380,6 @@
   document.addEventListener("DOMContentLoaded", () => {
     loadPortal();
 
-    // Lightbox close
     qs("lightboxClose")?.addEventListener("click", closeLightbox);
     qs("lightbox")?.addEventListener("click", (e) => {
       if (e.target === qs("lightbox")) closeLightbox();
