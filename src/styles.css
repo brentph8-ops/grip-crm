@@ -5408,3 +5408,52 @@ textarea {
     flex-basis: 40px;
   }
 }
+
+/* ── Punch list By-Project — mobile (≤ 760px) ───────────────────── */
+@media (max-width: 760px) {
+  .punch-project-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .punch-project-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .punch-advance-btn,
+  .punch-add-btn {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+
+  .punch-active-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .punch-active-label {
+    max-width: 100%;
+    white-space: normal;
+    font-size: 0.82rem;
+  }
+
+  .punch-active-pills {
+    width: 100%;
+  }
+
+  .punch-project-cards {
+    grid-template-columns: 1fr;
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .punch-project-name-row h3 {
+    font-size: 0.95rem;
+  }
+}

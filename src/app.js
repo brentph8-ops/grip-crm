@@ -943,6 +943,7 @@ const state = {
   phoneMode: false,
   mobilePreview: false,
   desktopLayoutsBeforePhone: null,
+  punchGroupCollapsed: {},
 };
 if (!Array.isArray(state.scopeDatabase)) state.scopeDatabase = [];
 if (!Array.isArray(state.takeoffEstimates)) state.takeoffEstimates = [];
@@ -2212,7 +2213,8 @@ function punchDueLevel(list) {
 function nextPunchListStatus(status) {
   const flow = {
     "Draft":                       { label: "Start Running",     next: "Running Punch List" },
-    "Running Punch List":          { label: "Send to Contractor", next: "Sent to Contractor" },
+    "Running Punch List":          { label: "Send to Contractor",       next: "Sent to Contractor"   },
+    "Sent to Contractor":          { label: "Mark Contractor Submitted", next: "Contractor Submitted" },
     "Contractor Submitted":        { label: "Begin Review",       next: "Under Review" },
     "Under Review":                { label: "Approve",            next: "Approved" },
     "Approved":                    { label: "Close Out",          next: "Closed" },
@@ -2384,11 +2386,10 @@ function renderPunchListsByProject(lists) {
       ? `<button class="mini-button punch-add-btn" data-open-punch-project="${escapeHtml(projectId)}" type="button">+ Add Punch</button>`
       : `<span class="muted-label" title="Assign a project to enable this">No linked project</span>`;
 
-    // A: Closed groups collapse by default
-    const groupClass = [
-      "punch-project-group",
-      isAllClosed ? "is-closed-group is-collapsed" : `is-active-group punch-urgency-${dueLevel}`,
-    ].join(" ");
+    const rawKey = projectId || projectName;
+    const defaultCollapsed = isAllClosed;
+    const isCollapsed = (rawKey in state.punchGroupCollapsed) ? state.punchGroupCollapsed[rawKey] : defaultCollapsed;
+    const groupClass = ["punch-project-group", isAllClosed ? "is-closed-group" : `is-active-group punch-urgency-${dueLevel}`, isCollapsed ? "is-collapsed" : ""].filter(Boolean).join(" ");
 
     return `<section class="${groupClass}" data-punch-group-key="${groupKey}">
       <div class="punch-project-header" data-punch-collapse-target="${groupKey}">
@@ -10937,9 +10938,12 @@ function bindEvents() {
     // A: Collapse/expand a project group — fires on header click, not on its buttons
     const collapseTarget = event.target.closest("[data-punch-collapse-target]");
     if (collapseTarget && !event.target.closest("button")) {
-      const key = CSS.escape(collapseTarget.dataset.punchCollapseTarget);
-      const group = document.querySelector(`.punch-project-group[data-punch-group-key="${key}"]`);
-      if (group) group.classList.toggle("is-collapsed");
+      const rawKey = collapseTarget.dataset.punchCollapseTarget;
+      const group = document.querySelector(`.punch-project-group[data-punch-group-key="${CSS.escape(rawKey)}"]`);
+      if (group) {
+        const nowCollapsed = group.classList.toggle("is-collapsed");
+        state.punchGroupCollapsed[rawKey] = nowCollapsed;
+      }
       return;
     }
 
