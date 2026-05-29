@@ -5,7 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>GRIP</title>
     <link rel="manifest" href="manifest.json" />
-    <meta name="theme-color" content="#e8600a" />
+    <!-- Light / dark theme-color for Safari tab tinting -->
+    <meta name="theme-color" content="#f3f6fb" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0e1c2b" media="(prefers-color-scheme: dark)" />
+    <!-- Tells the browser this app supports both colour schemes -->
+    <meta name="color-scheme" content="light dark" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="GRIP" />

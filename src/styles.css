@@ -23,6 +23,7 @@
 
 * {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent; /* Remove grey tap flash on iOS */
 }
 
 body {
@@ -3107,7 +3108,7 @@ button.grip-sync-status.sync-local {
   padding: 20px;
   position: sticky;
   top: 0;
-  height: 100vh;
+  height: 100dvh;
   overflow: auto;
   box-shadow: -2px 0 16px rgba(15, 31, 51, 0.04);
 }
@@ -3971,7 +3972,7 @@ button.grip-sync-status.sync-local {
 
 .modal {
   width: min(860px, calc(100vw - 32px));
-  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px); /* dvh excludes browser chrome — safe on iPhone */
   border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: var(--shadow);
@@ -3991,7 +3992,7 @@ button.grip-sync-status.sync-local {
 }
 
 .account-profile-shell {
-  max-height: calc(100vh - 36px);
+  max-height: calc(100dvh - 36px);
   overflow: auto;
   padding: 22px;
 }
@@ -5046,7 +5047,10 @@ button.grip-sync-status.sync-local {
     top: 0;
     z-index: 25;
     margin: -14px -12px 14px;
-    padding: 12px;
+    /* env(safe-area-inset-top) pads the topbar below the iPhone notch/Dynamic
+       Island when the app is installed to the home screen (standalone mode).
+       In regular Safari the value is 0 so this has no effect there. */
+    padding: calc(12px + env(safe-area-inset-top)) 12px 12px;
     border-bottom: 1px solid var(--line);
     background: rgba(245, 248, 252, 0.96);
     backdrop-filter: blur(12px);
