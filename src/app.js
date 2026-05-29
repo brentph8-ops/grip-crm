@@ -3289,13 +3289,17 @@ function renderTaskAttachmentPreview(files) {
     : `<p class="empty-state" data-icon="📎">No task attachments yet.</p>`;
 }
 
-async function completeTask(taskId, checked) {
+async function completeTask(taskId, checked, checkboxEl) {
   const task = findTask(taskId);
   if (!task) return;
   if (checked) {
     const outcome = await gripPrompt("Completed outcome", task.completed_outcome || "Spoke with Contact", "Complete Task");
+    if (outcome === null) {
+      if (checkboxEl) checkboxEl.checked = false; // revert checkbox — user cancelled
+      return;
+    }
     task.status = "Completed";
-    task.completed_outcome = String(outcome || task.completed_outcome || "").trim();
+    task.completed_outcome = String(outcome).trim();
     task.completed_at = new Date().toISOString();
   } else {
     task.status = "Open";
@@ -10488,9 +10492,11 @@ function bindEvents() {
     addTerritoryValue("county", byId("newCountyInput").value, byId("newCountyColorInput").value);
     byId("newCountyInput").value = "";
   });
+  let _searchDebounceTimer = null;
   byId("globalSearch").addEventListener("input", (event) => {
     state.search = event.target.value;
-    render();
+    clearTimeout(_searchDebounceTimer);
+    _searchDebounceTimer = setTimeout(() => render(), 180);
   });
   byId("taskSearchInput").addEventListener("input", (event) => {
     state.filters.taskSearch = event.target.value;
@@ -10846,7 +10852,7 @@ function bindEvents() {
   byId("projectForm").addEventListener("submit", handleProjectSubmit);
   byId("cancelProjectChecklistButton").addEventListener("click", () => byId("projectChecklistDialog").close());
   byId("printProjectChecklistButton").addEventListener("click", printProjectChecklist);
-  byId("clearProjectChecklistButton").addEventListener("click", () => clearProjectChecklist(byId("projectChecklistProjectId").value));
+  byId("clearProjectChecklistButton").addEventListener("click", async () => { await clearProjectChecklist(byId("projectChecklistProjectId").value); });
   byId("projectChecklistForm").addEventListener("submit", (event) => {
     event.preventDefault();
     saveProjectChecklistFromForm(event.currentTarget);
@@ -11146,7 +11152,7 @@ function bindEvents() {
     const completeTaskButton = event.target.closest("[data-complete-task]");
     if (completeTaskButton) {
       event.stopPropagation();
-      await completeTask(completeTaskButton.dataset.completeTask, completeTaskButton.checked);
+      await completeTask(completeTaskButton.dataset.completeTask, completeTaskButton.checked, completeTaskButton);
       return;
     }
     const deleteTaskButton = event.target.closest("[data-delete-task]");
@@ -11329,22 +11335,22 @@ function bindEvents() {
     }
     const submitPunchItemButton = event.target.closest("[data-submit-punch-item]");
     if (submitPunchItemButton) {
-      updatePunchItemStatus(submitPunchItemButton.dataset.punchList, submitPunchItemButton.dataset.submitPunchItem, "Submitted for Review");
+      await updatePunchItemStatus(submitPunchItemButton.dataset.punchList, submitPunchItemButton.dataset.submitPunchItem, "Submitted for Review");
       return;
     }
     const approvePunchItemButton = event.target.closest("[data-approve-punch-item]");
     if (approvePunchItemButton) {
-      updatePunchItemStatus(approvePunchItemButton.dataset.punchList, approvePunchItemButton.dataset.approvePunchItem, "Approved");
+      await updatePunchItemStatus(approvePunchItemButton.dataset.punchList, approvePunchItemButton.dataset.approvePunchItem, "Approved");
       return;
     }
     const rejectPunchItemButton = event.target.closest("[data-reject-punch-item]");
     if (rejectPunchItemButton) {
-      updatePunchItemStatus(rejectPunchItemButton.dataset.punchList, rejectPunchItemButton.dataset.rejectPunchItem, "Rejected");
+      await updatePunchItemStatus(rejectPunchItemButton.dataset.punchList, rejectPunchItemButton.dataset.rejectPunchItem, "Rejected");
       return;
     }
     const requestCorrectionButton = event.target.closest("[data-request-correction]");
     if (requestCorrectionButton) {
-      updatePunchItemStatus(requestCorrectionButton.dataset.punchList, requestCorrectionButton.dataset.requestCorrection, "Needs Additional Correction");
+      await updatePunchItemStatus(requestCorrectionButton.dataset.punchList, requestCorrectionButton.dataset.requestCorrection, "Needs Additional Correction");
       return;
     }
     const deletePunchButton = event.target.closest("[data-delete-punch-list]");
@@ -11373,7 +11379,7 @@ function bindEvents() {
     }
     const deleteActivityButton = event.target.closest("[data-delete-activity]");
     if (deleteActivityButton) {
-      deleteActivity(deleteActivityButton.dataset.activityAccount, deleteActivityButton.dataset.deleteActivity);
+      await deleteActivity(deleteActivityButton.dataset.activityAccount, deleteActivityButton.dataset.deleteActivity);
       return;
     }
     const removeFile = event.target.closest("[data-remove-file]");
@@ -11406,7 +11412,7 @@ function bindEvents() {
     }
     const deleteScope = event.target.closest("[data-delete-scope-db]");
     if (deleteScope) {
-      deleteScopeDatabaseEntry(deleteScope.dataset.deleteScopeDb);
+      await deleteScopeDatabaseEntry(deleteScope.dataset.deleteScopeDb);
       return;
     }
     const useScope = event.target.closest("[data-use-scope-template]");
