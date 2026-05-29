@@ -487,7 +487,7 @@
     syncNow,
     lastSyncInfo,
 
-    signInWithGoogle() {
+    async signInWithGoogle() {
       const client = getClient();
       if (!client) return;
 
