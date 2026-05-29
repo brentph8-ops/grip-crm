@@ -56,6 +56,36 @@ function gripConfirm(message, title = "Confirm") {
 }
 window.gripConfirm = gripConfirm;
 
+// ── In-app text-input prompt (replaces native prompt()) ────────
+// Returns Promise<string|null> — string on OK, null on Cancel.
+function gripPrompt(message, defaultValue = "", title = "Enter value") {
+  return new Promise((resolve) => {
+    const dialog = document.getElementById("gripPromptDialog");
+    if (!dialog) { resolve(window.prompt(message, defaultValue)); return; }
+    document.getElementById("gripPromptTitle").textContent = title;
+    document.getElementById("gripPromptLabel").textContent = message;
+    const input = document.getElementById("gripPromptInput");
+    input.value = defaultValue;
+    const onOk     = () => { cleanup(); resolve(input.value); };
+    const onCancel = () => { cleanup(); resolve(null); };
+    const onClose  = () => { cleanup(); resolve(null); };
+    const onKey    = (e) => { if (e.key === "Enter") { e.preventDefault(); onOk(); } };
+    function cleanup() {
+      document.getElementById("gripPromptOkButton").removeEventListener("click", onOk);
+      document.getElementById("gripPromptCancelButton").removeEventListener("click", onCancel);
+      input.removeEventListener("keydown", onKey);
+      dialog.removeEventListener("close", onClose);
+    }
+    document.getElementById("gripPromptOkButton").addEventListener("click", onOk, { once: true });
+    document.getElementById("gripPromptCancelButton").addEventListener("click", onCancel, { once: true });
+    input.addEventListener("keydown", onKey);
+    dialog.addEventListener("close", onClose, { once: true });
+    dialog.showModal();
+    requestAnimationFrame(() => { input.select(); input.focus(); });
+  });
+}
+window.gripPrompt = gripPrompt;
+
 function openDialog(dialogOrId) {
   const dialog = typeof dialogOrId === "string" ? byId(dialogOrId) : dialogOrId;
   if (!dialog) return;
@@ -1081,7 +1111,7 @@ function standardizeStageLabels() {
     if (normalizeRecord(record)) proposalUpdatesChanged = true;
   });
   if (crmChanged) saveCrm();
-  if (proposalUpdatesChanged) localStorage.setItem("garlandProposalUpdates", JSON.stringify(proposalUpdates));
+  if (proposalUpdatesChanged) safeSetItem("garlandProposalUpdates", JSON.stringify(proposalUpdates));
 }
 
 function standardizeProjectTypeLabels() {
@@ -1396,15 +1426,15 @@ function allActivityRecords() {
 }
 
 function saveActivities() {
-  localStorage.setItem("garlandAccountActivities", JSON.stringify(state.activities));
+  safeSetItem("garlandAccountActivities", JSON.stringify(state.activities));
 }
 
 function saveTasks() {
-  localStorage.setItem("garlandTasks", JSON.stringify(state.tasks));
+  safeSetItem("garlandTasks", JSON.stringify(state.tasks));
 }
 
 function savePunchLists() {
-  localStorage.setItem("garlandPunchLists", JSON.stringify(state.punchLists));
+  safeSetItem("garlandPunchLists", JSON.stringify(state.punchLists));
 }
 
 function accountActivityStatus(account) {
@@ -1735,12 +1765,26 @@ async function copyProposalRequestDraft(text, message = "Proposal request draft 
   }
 }
 
+// ── Safe localStorage write — catches QuotaExceededError ──────
+function safeSetItem(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (_error) {
+    showToast(
+      "Device storage is full. Remove large attachments or export a backup to free space.",
+      "error"
+    );
+    return false;
+  }
+}
+
 function saveCrm() {
-  localStorage.setItem("garlandCrmData", JSON.stringify(savedCrm));
+  safeSetItem("garlandCrmData", JSON.stringify(savedCrm));
 }
 
 function saveTerritorySettings() {
-  localStorage.setItem("garlandTerritorySettings", JSON.stringify(territorySettings));
+  safeSetItem("garlandTerritorySettings", JSON.stringify(territorySettings));
 }
 
 function repInitials(name) {
@@ -1757,19 +1801,19 @@ function renderBrand() {
 }
 
 function saveScopeDatabase() {
-  localStorage.setItem("garlandScopeDatabase", JSON.stringify(state.scopeDatabase));
+  safeSetItem("garlandScopeDatabase", JSON.stringify(state.scopeDatabase));
 }
 
 function saveTakeoffEstimates() {
-  localStorage.setItem("garlandTakeoffEstimates", JSON.stringify(state.takeoffEstimates));
+  safeSetItem("garlandTakeoffEstimates", JSON.stringify(state.takeoffEstimates));
 }
 
 function saveTakeoffManualProducts() {
-  localStorage.setItem("garlandTakeoffManualProducts", JSON.stringify(state.takeoffManualProducts));
+  safeSetItem("garlandTakeoffManualProducts", JSON.stringify(state.takeoffManualProducts));
 }
 
 function saveFavoriteSystems() {
-  localStorage.setItem("garlandFavoriteSystems", JSON.stringify(state.favoriteSystems));
+  safeSetItem("garlandFavoriteSystems", JSON.stringify(state.favoriteSystems));
 }
 
 function savePriceBooks() {
@@ -1784,7 +1828,7 @@ function savePriceBooks() {
 }
 
 function savePriceBookProducts() {
-  localStorage.setItem("garlandPriceBookProducts", JSON.stringify(state.priceBookProducts));
+  safeSetItem("garlandPriceBookProducts", JSON.stringify(state.priceBookProducts));
 }
 
 function visibleTerritoryValues(values, hidden) {
@@ -1823,7 +1867,7 @@ function saveProposalUpdate(id, patch) {
   proposalUpdates[id] = { ...(proposalUpdates[id] || {}), ...patch };
   const proposal = data.proposals.find((item) => item.id === id);
   if (proposal) Object.assign(proposal, patch);
-  localStorage.setItem("garlandProposalUpdates", JSON.stringify(proposalUpdates));
+  safeSetItem("garlandProposalUpdates", JSON.stringify(proposalUpdates));
 }
 
 function valueIsZeroMoney(value) {
@@ -1874,7 +1918,7 @@ function applyRequestedDataCleanup() {
   });
 
   if (crmChanged) saveCrm();
-  if (proposalUpdatesChanged) localStorage.setItem("garlandProposalUpdates", JSON.stringify(proposalUpdates));
+  if (proposalUpdatesChanged) safeSetItem("garlandProposalUpdates", JSON.stringify(proposalUpdates));
   localStorage.setItem(cleanupKey, "done");
 }
 
@@ -2715,7 +2759,7 @@ function renderPunchDraftPreview(kind, existing = []) {
 function savePunchListFromForm(formEl) {
   const form = new FormData(formEl);
   const project = findRecord("project", form.get("project_id"));
-  if (!project) { showToast("Choose a project first.", "warning") return; }
+  if (!project) { showToast("Choose a project first.", "warning"); return; }
   const id = form.get("punch_list_id") || `punch-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const existing = findPunchList(id);
   const now = new Date().toISOString();
@@ -2769,7 +2813,7 @@ function savePunchListFromForm(formEl) {
     created_at: existing?.created_at || now,
     updated_at: now,
   });
-  if (!item.description && !item.required_correction) { showToast("Add a punch item issue or required correction first.", "warning") return; }
+  if (!item.description && !item.required_correction) { showToast("Add a punch item issue or required correction first.", "warning"); return; }
   if (existing) state.punchLists = state.punchLists.map((existingList) => (existingList.punch_list_id === id ? list : existingList));
   else state.punchLists.unshift(list);
   state.punchDraftFiles = { before: [], after: [] };
@@ -2789,13 +2833,13 @@ function punchAudit(list, action, note = "") {
   list.audit_log = [...(list.audit_log || []), { action, note, user: taskDefaultAssignedUser(), created_at: new Date().toISOString() }];
 }
 
-function updatePunchItemStatus(listId, itemId, status, note = "") {
+async function updatePunchItemStatus(listId, itemId, status, note = "") {
   const list = findPunchList(listId);
   const item = list?.items?.find((entry) => entry.punch_item_id === itemId);
   if (!list || !item) return;
-  if (status === "Submitted for Review" && !(item.contractor_completion_photos || []).length) { showToast("Completion photo required before submitting this punch item for review.", "warning") return; }
+  if (status === "Submitted for Review" && !(item.contractor_completion_photos || []).length) { showToast("Completion photo required before submitting this punch item for review.", "warning"); return; }
   if (status === "Rejected" || status === "Needs Additional Correction") {
-    const reason = prompt("Rejection reason or correction note:", note || punchRejectionReasons[0]);
+    const reason = await gripPrompt("Rejection reason or correction note:", note || punchRejectionReasons[0], "Rejection Reason");
     if (reason === null) return;
     item.rejected_reason = reason;
     item.reviewer_notes = [item.reviewer_notes, reason].filter(Boolean).join("\n");
@@ -2935,7 +2979,7 @@ function exportPunchListPdf(list, ownerMode = false) {
     </div>`;
   }).join("");
   const win = window.open("", "_blank");
-  if (!win) { showToast("Allow pop-ups to export the punch list report.", "warning") return; }
+  if (!win) { showToast("Allow pop-ups to export the punch list report.", "warning"); return; }
   const title = ownerMode ? `Final Closeout — ${list.title}` : `Contractor Punch List — ${list.title}`;
   win.document.write(`<html><head><title>${escapeHtml(title)}</title><style>${style}</style></head><body>
     <h1>${escapeHtml(title)}</h1>
@@ -3132,7 +3176,7 @@ function saveTaskFromForm(formEl) {
     updated_at: now,
     completed_at: status === "Completed" ? existing?.completed_at || now : "",
   });
-  if (!task.title) { showToast("Add a task title first.", "warning") return; }
+  if (!task.title) { showToast("Add a task title first.", "warning"); return; }
   if (existing) state.tasks = state.tasks.map((item) => (item.task_id === id ? task : item));
   else state.tasks.unshift(task);
   state.taskDraftFiles = [];
@@ -3245,11 +3289,11 @@ function renderTaskAttachmentPreview(files) {
     : `<p class="empty-state" data-icon="📎">No task attachments yet.</p>`;
 }
 
-function completeTask(taskId, checked) {
+async function completeTask(taskId, checked) {
   const task = findTask(taskId);
   if (!task) return;
   if (checked) {
-    const outcome = prompt("Completed outcome", task.completed_outcome || "Spoke with Contact");
+    const outcome = await gripPrompt("Completed outcome", task.completed_outcome || "Spoke with Contact", "Complete Task");
     task.status = "Completed";
     task.completed_outcome = String(outcome || task.completed_outcome || "").trim();
     task.completed_at = new Date().toISOString();
@@ -4974,9 +5018,9 @@ function removeManualTakeoffProduct(id) {
   renderTakeoffEstimator();
 }
 
-function currentFavoriteSystemSnapshot() {
+async function currentFavoriteSystemSnapshot() {
   const defaultName = defaultFavoriteSystemName();
-  const name = prompt("Name this system", defaultName) || "";
+  const name = (await gripPrompt("Name this system", defaultName, "Save System")) || "";
   return {
     id: `favorite-system-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     name,
@@ -5004,8 +5048,8 @@ function defaultFavoriteSystemName() {
     .join(" | ") || "Favorite system";
 }
 
-function saveCurrentFavoriteSystem() {
-  const favorite = currentFavoriteSystemSnapshot();
+async function saveCurrentFavoriteSystem() {
+  const favorite = await currentFavoriteSystemSnapshot();
   if (!favorite.name.trim()) return;
   state.favoriteSystems.unshift(favorite);
   saveFavoriteSystems();
@@ -6099,7 +6143,7 @@ function persistRecordEdit(type, id, key, value, refresh = true) {
           .join(", ");
         if (normalize(project.awardedContractor) === oldKey) project.awardedContractor = value;
       });
-      localStorage.setItem("garlandProposalUpdates", JSON.stringify(proposalUpdates));
+      safeSetItem("garlandProposalUpdates", JSON.stringify(proposalUpdates));
     }
     saveCrm();
     if (refresh) {
@@ -6696,12 +6740,12 @@ function addAccountActivity(accountId, note, showDetailAfter = true, extra = {})
   if (showDetailAfter && account) showAccountDetail(account);
 }
 
-function promptFollowUpActivity(type, record, oldDate = "", newDate = "") {
+async function promptFollowUpActivity(type, record, oldDate = "", newDate = "") {
   if (!record || !newDate || dateKeyFromValue(oldDate) === dateKeyFromValue(newDate)) return;
   const account = type === "account" ? record : findAccountByName(record.client || record.clientName || "");
   if (!account) return;
   const title = type === "account" ? record.client : type === "project" ? record.projectName || record.client : record.project || record.client;
-  const note = prompt(`Add next step for follow-up on ${compactDate(newDate)}?`, "");
+  const note = await gripPrompt(`Next step for follow-up on ${compactDate(newDate)}?`, "", "Log Follow-Up");
   if (!String(note || "").trim()) return;
   const lines = [
     `Follow-up set for ${compactDate(newDate)}${oldDate ? ` (previously ${compactDate(oldDate)})` : ""}.`,
@@ -6718,21 +6762,21 @@ function accountForRecordActivity(type, id) {
   return findAccountByName(record.client || record.clientName || record.project || "");
 }
 
-function logRecordActivity(type, id) {
+async function logRecordActivity(type, id) {
   const account = accountForRecordActivity(type, id);
-  if (!account) { showToast("I could not find a linked account for this record. Open the account and log the activity there.", "error") return; }
-  const note = prompt("Log activity", "");
+  if (!account) { showToast("I could not find a linked account for this record. Open the account and log the activity there.", "error"); return; }
+  const note = await gripPrompt("Log activity note:", "", "Log Activity");
   if (!String(note || "").trim()) return;
   addAccountActivity(account.id, note, false, { source: type === "account" ? "Account" : type === "project" ? "Project" : "Proposal" });
   render();
   showDetail("account", account.id);
 }
 
-function editActivity(accountId, activityId) {
+async function editActivity(accountId, activityId) {
   const entries = state.activities[accountId] || [];
   const entry = entries.find((item) => item.id === activityId);
   if (!entry) return;
-  const updated = prompt("Edit activity", entry.note || "");
+  const updated = await gripPrompt("Edit activity note:", entry.note || "", "Edit Activity");
   if (updated === null) return;
   const cleaned = String(updated).trim();
   if (!cleaned) return;
@@ -6773,7 +6817,7 @@ function todayCallDay() {
 }
 
 function saveCallLists() {
-  localStorage.setItem("garlandCallLists", JSON.stringify(state.callLists));
+  safeSetItem("garlandCallLists", JSON.stringify(state.callLists));
 }
 
 function callRuleOptions(type) {
@@ -6866,7 +6910,7 @@ function renderCallList() {
       return `<button class="call-day-tab${isActive ? " is-active" : ""}" data-call-day="${weekday}" type="button">
         <span class="call-day-tab-name">${weekday.slice(0, 3)}</span>
         <strong class="call-day-tab-count">${dayAccounts.length}</strong>
-        <span class="call-day-tab-entities">${preview ? escapeHtml(preview) + overflow : "<em>No rules assigned</em>"}</span>
+        <span class="call-day-tab-entities">${preview ? preview + overflow : "<em>No rules assigned</em>"}</span>
       </button>`;
     }).join("");
   }
@@ -7360,7 +7404,7 @@ async function saveAccountFromDialog(form) {
     data.accounts.push(account);
     accountId = account.id;
     saveCrm();
-    promptFollowUpActivity("account", account, "", account.nextFollowUp);
+    await promptFollowUpActivity("account", account, "", account.nextFollowUp);
   }
   if (String(form.get("activity") || "").trim()) addAccountActivity(accountId, form.get("activity"), false);
   renderFilters();
@@ -7369,11 +7413,11 @@ async function saveAccountFromDialog(form) {
   if (state.view === "accounts" && state.accountMode === "browse") showDetail("account", accountId);
 }
 
-function renameAccount(accountId) {
+async function renameAccount(accountId) {
   const account = findRecord("account", accountId);
-  if (!account) { showToast("I could not find that account.", "error") return; }
+  if (!account) { showToast("I could not find that account.", "error"); return; }
   const oldName = account.client || "";
-  const nextName = prompt("Rename account", oldName);
+  const nextName = await gripPrompt("Rename account:", oldName, "Rename Account");
   const cleaned = String(nextName || "").trim();
   if (!cleaned || cleaned === oldName) return;
   const oldKey = normalize(oldName);
@@ -7490,8 +7534,8 @@ function updateTerritoryColor(type, value, color) {
   render();
 }
 
-function editTerritoryValue(type, oldValue) {
-  const nextValue = prompt(`Edit ${type}`, oldValue);
+async function editTerritoryValue(type, oldValue) {
+  const nextValue = await gripPrompt(`Rename this ${type}:`, oldValue, `Edit ${type[0].toUpperCase() + type.slice(1)}`);
   if (!nextValue || !String(nextValue).trim()) return;
   const cleaned = String(nextValue).trim();
   const listKey = type === "entity" ? "entities" : "counties";
@@ -7706,7 +7750,7 @@ function accountProfileHtml(account) {
 
 function exportAccountProfilePdf(accountId) {
   const account = findRecord("account", accountId);
-  if (!account) { showToast("I could not find that account.", "error") return; }
+  if (!account) { showToast("I could not find that account.", "error"); return; }
   const printWindow = window.open("", "_blank");
   if (!printWindow) {
     showToast("Your browser blocked the export window. Allow pop-ups for GRIP, then try again.", "warning");
@@ -7811,7 +7855,7 @@ function importAccountContactsCsv(file) {
   const reader = new FileReader();
   reader.onload = () => {
     const rows = parseCsv(String(reader.result || ""));
-    if (rows.length < 2) { showToast("No contacts found in that CSV.", "warning") return; }
+    if (rows.length < 2) { showToast("No contacts found in that CSV.", "warning"); return; }
     const headers = rows[0].map((header) => normalize(header));
     const indexOf = (...names) => headers.findIndex((header) => names.some((name) => header.includes(name)));
     const idx = {
@@ -8064,7 +8108,7 @@ function saveDriveLink(recordId, category, formEl) {
   const form = new FormData(formEl);
   const url = String(form.get("driveUrl") || "").trim();
   if (!url) return;
-  if (!/^https?:\/\//i.test(url)) { showToast("Paste a full Google Drive link that starts with https://", "warning") return; }
+  if (!/^https?:\/\//i.test(url)) { showToast("Paste a full Google Drive link that starts with https://", "warning"); return; }
   if (!state.attachments[recordId]) state.attachments[recordId] = {};
   if (!state.attachments[recordId][category]) state.attachments[recordId][category] = [];
   state.attachments[recordId][category].push({
@@ -8080,11 +8124,11 @@ function saveDriveLink(recordId, category, formEl) {
 }
 
 function saveProposalAttachments() {
-  localStorage.setItem("garlandProposalAttachments", JSON.stringify(state.attachments));
+  safeSetItem("garlandProposalAttachments", JSON.stringify(state.attachments));
 }
 
 function saveProjectChecklists() {
-  localStorage.setItem("garlandProjectChecklists", JSON.stringify(state.projectChecklists));
+  safeSetItem("garlandProjectChecklists", JSON.stringify(state.projectChecklists));
 }
 
 function projectChecklistProgress(projectId) {
@@ -8382,7 +8426,7 @@ function saveUploadedScopeToDatabase(recordId, fileIndex, scopeCategory) {
   const type = findRecord("project", recordId) ? "project" : "proposal";
   const uploadCategory = scopeUploadCategory(type);
   const file = state.attachments[recordId]?.[uploadCategory]?.[Number(fileIndex)];
-  if (!file) { showToast("Choose an uploaded scope first.", "warning") return; }
+  if (!file) { showToast("Choose an uploaded scope first.", "warning"); return; }
   const entry = {
     id: `scope-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     name: file.name,
@@ -8405,7 +8449,7 @@ function saveUploadedScopeToDatabase(recordId, fileIndex, scopeCategory) {
 
 function attachScopeFromDatabase(recordId, scopeId) {
   const item = scopeDatabaseRecords().find((entry) => entry.id === scopeId);
-  if (!item) { showToast("Choose a saved scope first.", "warning") return; }
+  if (!item) { showToast("Choose a saved scope first.", "warning"); return; }
   const type = findRecord("project", recordId) ? "project" : "proposal";
   const uploadCategory = scopeUploadCategory(type);
   if (!state.attachments[recordId]) state.attachments[recordId] = {};
@@ -9344,7 +9388,7 @@ function saveContractorProfile(oldName, form) {
         .join(", ");
       if (normalize(project.awardedContractor) === oldKey) project.awardedContractor = profile.companyName;
     });
-    localStorage.setItem("garlandProposalUpdates", JSON.stringify(proposalUpdates));
+    safeSetItem("garlandProposalUpdates", JSON.stringify(proposalUpdates));
   }
   saveCrm();
   renderFilters();
@@ -9961,9 +10005,6 @@ function handleProjectCommissionInput() {
   if (!Number.isNaN(commission)) byId("projectWiseTrophyInput").value = (commission * 4).toFixed(2);
 }
 
-function missingRequiredFields(fields) {
-  return fields.filter((field) => !normalize(field.value)).map((field) => field.label);
-}
 
 function stopForMissingFields(recordType, fields, formEl) {
   const failing = fields.filter((field) => !normalize(field.value));
@@ -10075,7 +10116,7 @@ async function handleProjectSubmit(event) {
   savedCrm.projects.push(project);
   data.projects.push(project);
   saveCrm();
-  promptFollowUpActivity("project", project, "", project.nextFollowUp);
+  await promptFollowUpActivity("project", project, "", project.nextFollowUp);
   renderFilters();
   render();
   byId("projectDialog").close();
@@ -10138,7 +10179,7 @@ async function handleProposalSubmit(event) {
   savedCrm.proposals.push(proposal);
   data.proposals.push(proposal);
   saveCrm();
-  promptFollowUpActivity("proposal", proposal, "", proposal.nextFollowUp);
+  await promptFollowUpActivity("proposal", proposal, "", proposal.nextFollowUp);
   renderFilters();
   render();
   byId("proposalDialog").close();
@@ -10280,6 +10321,8 @@ function setView(view) {
     showDueTodayProposalDialog();
     showTaskDailyAlertDialog();
   }
+  // Reset scroll so the user always lands at the top of the new view
+  document.querySelector(".workspace")?.scrollTo({ top: 0, behavior: "instant" });
 }
 
 function closeMobileMoreMenu() {
@@ -10933,7 +10976,7 @@ function bindEvents() {
       event.stopPropagation();
       const proposal = findRecord("proposal", requestProposal.dataset.proposalRequestId);
       const contractor = requestProposal.dataset.proposalRequestContractor || "";
-      if (!proposal) { showToast("I could not find that proposal.", "error") return; }
+      if (!proposal) { showToast("I could not find that proposal.", "error"); return; }
       const draft = proposalRequestDraft(proposal, contractor);
       if (!draft.to) {
         copyProposalRequestDraft(draft.text, "Contractor email is missing, so the draft was copied instead.");
@@ -10948,7 +10991,7 @@ function bindEvents() {
       event.stopPropagation();
       const proposal = findRecord("proposal", copyProposalRequest.dataset.proposalRequestId);
       const contractor = copyProposalRequest.dataset.proposalRequestContractor || "";
-      if (!proposal) { showToast("I could not find that proposal.", "error") return; }
+      if (!proposal) { showToast("I could not find that proposal.", "error"); return; }
       copyProposalRequestDraft(proposalRequestDraft(proposal, contractor).text);
       return;
     }
@@ -10956,7 +10999,7 @@ function bindEvents() {
     if (logRecordActivityButton) {
       event.preventDefault();
       event.stopPropagation();
-      logRecordActivity(logRecordActivityButton.dataset.logRecordActivity, logRecordActivityButton.dataset.logRecordId);
+      await logRecordActivity(logRecordActivityButton.dataset.logRecordActivity, logRecordActivityButton.dataset.logRecordId);
       return;
     }
     const exportAccountProfileButton = event.target.closest("[data-export-account-profile]");
@@ -11067,7 +11110,7 @@ function bindEvents() {
     }
     const editTerritory = event.target.closest("[data-edit-territory]");
     if (editTerritory) {
-      editTerritoryValue(editTerritory.dataset.editTerritory, editTerritory.dataset.territoryValue);
+      await editTerritoryValue(editTerritory.dataset.editTerritory, editTerritory.dataset.territoryValue);
       return;
     }
     const editRecord = event.target.closest("[data-edit-record]");
@@ -11103,7 +11146,7 @@ function bindEvents() {
     const completeTaskButton = event.target.closest("[data-complete-task]");
     if (completeTaskButton) {
       event.stopPropagation();
-      completeTask(completeTaskButton.dataset.completeTask, completeTaskButton.checked);
+      await completeTask(completeTaskButton.dataset.completeTask, completeTaskButton.checked);
       return;
     }
     const deleteTaskButton = event.target.closest("[data-delete-task]");
@@ -11132,7 +11175,7 @@ function bindEvents() {
           generateContractorLinkButton.textContent = `✓ Copied — expires ${expiresStr}`;
           setTimeout(() => { generateContractorLinkButton.textContent = "🔗 Contractor Portal Link"; }, 5000);
         }).catch(() => {
-          prompt(`Contractor portal link (expires ${expiresStr}):`, url);
+          await gripPrompt("Copy this contractor portal link:", url, `Contractor Link — expires ${expiresStr}`);
         });
       });
       return;
@@ -11325,7 +11368,7 @@ function bindEvents() {
     }
     const editActivityButton = event.target.closest("[data-edit-activity]");
     if (editActivityButton) {
-      editActivity(editActivityButton.dataset.activityAccount, editActivityButton.dataset.editActivity);
+      await editActivity(editActivityButton.dataset.activityAccount, editActivityButton.dataset.editActivity);
       return;
     }
     const deleteActivityButton = event.target.closest("[data-delete-activity]");
@@ -11385,7 +11428,7 @@ function bindEvents() {
     }
     const renameAccountButton = event.target.closest("[data-rename-account]");
     if (renameAccountButton) {
-      renameAccount(renameAccountButton.dataset.renameAccount);
+      await renameAccount(renameAccountButton.dataset.renameAccount);
       return;
     }
     const openCallAccount = event.target.closest("[data-open-call-account]");
@@ -11489,7 +11532,7 @@ function bindEvents() {
     const noteId = event.target.dataset.noteId;
     if (!noteId) return;
     state.notes[noteId] = event.target.value;
-    localStorage.setItem("garlandCrmNotes", JSON.stringify(state.notes));
+    safeSetItem("garlandCrmNotes", JSON.stringify(state.notes));
   });
   document.body.addEventListener("dragstart", (event) => {
     const card = event.target.closest(".record-grid.is-kanban .record-card[data-type][data-id]");

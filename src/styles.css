@@ -2051,6 +2051,8 @@ button.grip-sync-status.sync-local {
   border: 1px solid var(--line);
   background: var(--panel);
   padding: 0 10px;
+  /* Explicit 16px prevents iOS from zooming in on input focus */
+  font-size: 1rem;
   transition: border-color var(--transition), box-shadow var(--transition);
 }
 .toolbar select:focus,
@@ -5808,6 +5810,11 @@ button.grip-sync-status.sync-local {
   .full-field > span, .full-field > label,
   .modal-header h3, .modal-header p {
     color: var(--ink);
+  }
+
+  /* Dark mode modal backdrop */
+  .modal::backdrop {
+    background: rgba(0, 8, 18, 0.65);
   }
 
   /* Cards */

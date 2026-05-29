@@ -2110,7 +2110,8 @@
     </script>
     <div id="gripToastContainer" class="toast-container" role="status" aria-live="polite"></div>
 
-    <dialog id="gripConfirmDialog" class="modal small-modal">
+    <dialog id="gripConfirmDialog" class="modal small-modal"
+            aria-modal="true" aria-labelledby="gripConfirmTitle" aria-describedby="gripConfirmMessage">
       <div class="modal-header">
         <h3 id="gripConfirmTitle">Confirm</h3>
       </div>
@@ -2118,6 +2119,23 @@
       <div class="modal-actions">
         <button class="secondary-button" id="gripConfirmCancelButton" type="button">Cancel</button>
         <button class="primary-button" id="gripConfirmOkButton" type="button">OK</button>
+      </div>
+    </dialog>
+
+    <dialog id="gripPromptDialog" class="modal small-modal"
+            aria-modal="true" aria-labelledby="gripPromptTitle" aria-describedby="gripPromptLabel">
+      <div class="modal-header">
+        <h3 id="gripPromptTitle">Enter value</h3>
+      </div>
+      <div class="form-grid" style="margin-bottom:20px">
+        <label class="full-field">
+          <span id="gripPromptLabel"></span>
+          <input id="gripPromptInput" type="text" autocomplete="off" />
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button class="secondary-button" id="gripPromptCancelButton" type="button">Cancel</button>
+        <button class="primary-button" id="gripPromptOkButton" type="button">OK</button>
       </div>
     </dialog>
   </body>
