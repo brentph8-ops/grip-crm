@@ -44,6 +44,7 @@
 
   function getClient() {
     if (!isConfigured()) return null;
+    if (!window.supabase) return null;          // CDN failed to load — degrade gracefully
     if (window._gripSupabaseClient) return window._gripSupabaseClient;
     const { createClient } = window.supabase;
     window._gripSupabaseClient = createClient(
@@ -404,6 +405,13 @@
     }
 
     const client = getClient();
+    if (!client) {
+      // Supabase SDK unavailable (CDN outage, offline install, etc.)
+      // Fall through to local-only mode so the app still opens.
+      updateSyncIndicator("local");
+      showAuthOverlay(false);
+      return;
+    }
 
     // Listen for auth state changes
     client.auth.onAuthStateChange(async (event, session) => {

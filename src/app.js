@@ -10424,7 +10424,15 @@ function bindEvents() {
 
   // ── Supabase auth bindings ──────────────────────────────────────
   byId("gripGoogleSignInButton")?.addEventListener("click", () => window.gripSync?.signInWithGoogle());
-  byId("gripContinueLocalButton")?.addEventListener("click", () => window.gripSync?.continueLocal());
+  byId("gripContinueLocalButton")?.addEventListener("click", () => {
+    // Always dismiss the auth overlay — even if gripSync failed to initialise.
+    if (window.gripSync) {
+      window.gripSync.continueLocal();
+    } else {
+      const overlay = document.getElementById("gripAuthOverlay");
+      if (overlay) overlay.hidden = true;
+    }
+  });
   byId("gripSignOutButton")?.addEventListener("click", async () => {
     if (await gripConfirm("Sign out of GRIP cloud sync? Your local data stays on this device.", "Sign Out")) window.gripSync?.signOut();
   });
