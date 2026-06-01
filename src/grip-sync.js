@@ -456,15 +456,18 @@
           }
         } else {
           updateSyncIndicator("saved");
-          // Reload once to render fresh Supabase data.
-          // Use a sessionStorage flag so we never loop — sessionStorage
-          // survives location.reload() in the same tab but is cleared on
-          // a fresh open, so every new session gets one sync-driven reload.
-          if (!sessionStorage.getItem("grip_synced_this_session")) {
-            sessionStorage.setItem("grip_synced_this_session", "1");
+          // Reload once so the page re-reads fresh Supabase data from
+          // localStorage.  Guard against looping with a localStorage
+          // timestamp — if we reloaded less than 15 seconds ago, skip
+          // and just re-render in place.  localStorage is reliable on
+          // iOS Safari (unlike sessionStorage which can be cleared by
+          // location.reload() in standalone/PWA mode).
+          const _lastReload = parseInt(localStorage.getItem("grip_last_sync_reload") || "0", 10);
+          if (Date.now() - _lastReload > 15000) {
+            _origSetItem("grip_last_sync_reload", String(Date.now()));
             window.location.reload();
           } else {
-            // Already reloaded once this session — just re-render in place
+            // Already reloaded recently — re-render in place with fresh data
             if (typeof window.render === "function") window.render();
           }
         }
