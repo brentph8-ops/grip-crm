@@ -11188,7 +11188,7 @@ function bindEvents() {
         navigator.clipboard.writeText(url).then(() => {
           generateContractorLinkButton.textContent = `✓ Copied — expires ${expiresStr}`;
           setTimeout(() => { generateContractorLinkButton.textContent = "🔗 Contractor Portal Link"; }, 5000);
-        }).catch(() => {
+        }).catch(async () => {
           await gripPrompt("Copy this contractor portal link:", url, `Contractor Link — expires ${expiresStr}`);
         });
       });
