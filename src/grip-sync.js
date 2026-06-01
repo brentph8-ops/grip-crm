@@ -456,8 +456,17 @@
           }
         } else {
           updateSyncIndicator("saved");
-          // Reload the app with fresh data from Supabase
-          window.location.reload();
+          // Reload once to render fresh Supabase data.
+          // Use a sessionStorage flag so we never loop — sessionStorage
+          // survives location.reload() in the same tab but is cleared on
+          // a fresh open, so every new session gets one sync-driven reload.
+          if (!sessionStorage.getItem("grip_synced_this_session")) {
+            sessionStorage.setItem("grip_synced_this_session", "1");
+            window.location.reload();
+          } else {
+            // Already reloaded once this session — just re-render in place
+            if (typeof window.render === "function") window.render();
+          }
         }
       } else if (event === "SIGNED_OUT") {
         updateSyncIndicator("local");

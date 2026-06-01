@@ -2,7 +2,7 @@
 // GRIP Service Worker — offline caching + PWA support
 // ─────────────────────────────────────────────────────────────────
 
-const CACHE = 'grip-v5';
+const CACHE = 'grip-v6';
 
 const PRECACHE = [
   '/grip-crm/',
@@ -43,11 +43,13 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
-  // Never intercept Supabase API, Google OAuth, or non-GET requests
+  // Never intercept Supabase API, Google OAuth, non-GET requests,
+  // or non-HTTP schemes (chrome-extension://, data:, blob:, etc.)
   if (
     url.hostname.includes('supabase.co') ||
     url.hostname.includes('google') ||
-    e.request.method !== 'GET'
+    e.request.method !== 'GET' ||
+    !url.protocol.startsWith('http')
   ) return;
 
   e.respondWith(
