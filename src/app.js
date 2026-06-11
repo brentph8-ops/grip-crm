@@ -14,78 +14,6 @@ function readStorageJson(key, fallback) {
   }
 }
 
-// ── Toast notifications ────────────────────────────────────────
-// type: "success" | "error" | "warning" | "info"
-function showToast(message, type = "info") {
-  const container = document.getElementById("gripToastContainer");
-  if (!container) { alert(message); return; }
-  const toast = document.createElement("div");
-  toast.className = `toast toast-${type}`;
-  toast.textContent = message;
-  const dismiss = () => {
-    toast.classList.add("toast-out");
-    toast.addEventListener("animationend", () => toast.remove(), { once: true });
-  };
-  toast.addEventListener("click", dismiss);
-  container.appendChild(toast);
-  setTimeout(dismiss, 4200);
-}
-window.showToast = showToast;
-
-// ── In-app confirm modal (replaces native confirm()) ───────────
-// Returns Promise<boolean> — true = OK, false = Cancel.
-function gripConfirm(message, title = "Confirm") {
-  return new Promise((resolve) => {
-    const dialog = document.getElementById("gripConfirmDialog");
-    if (!dialog) { resolve(window.confirm(message)); return; }
-    document.getElementById("gripConfirmTitle").textContent = title;
-    document.getElementById("gripConfirmMessage").textContent = message;
-    const onOk     = () => { cleanup(); resolve(true); };
-    const onCancel = () => { cleanup(); resolve(false); };
-    const onClose  = () => { cleanup(); resolve(false); };
-    function cleanup() {
-      document.getElementById("gripConfirmOkButton").removeEventListener("click", onOk);
-      document.getElementById("gripConfirmCancelButton").removeEventListener("click", onCancel);
-      dialog.removeEventListener("close", onClose);
-    }
-    document.getElementById("gripConfirmOkButton").addEventListener("click", onOk, { once: true });
-    document.getElementById("gripConfirmCancelButton").addEventListener("click", onCancel, { once: true });
-    dialog.addEventListener("close", onClose, { once: true });
-    dialog.showModal();
-  });
-}
-window.gripConfirm = gripConfirm;
-
-// ── In-app text-input prompt (replaces native prompt()) ────────
-// Returns Promise<string|null> — string on OK, null on Cancel.
-function gripPrompt(message, defaultValue = "", title = "Enter value") {
-  return new Promise((resolve) => {
-    const dialog = document.getElementById("gripPromptDialog");
-    if (!dialog) { resolve(window.prompt(message, defaultValue)); return; }
-    document.getElementById("gripPromptTitle").textContent = title;
-    document.getElementById("gripPromptLabel").textContent = message;
-    const input = document.getElementById("gripPromptInput");
-    input.value = defaultValue;
-    const onOk     = () => { cleanup(); resolve(input.value); };
-    const onCancel = () => { cleanup(); resolve(null); };
-    const onClose  = () => { cleanup(); resolve(null); };
-    const onKey    = (e) => { if (e.key === "Enter") { e.preventDefault(); onOk(); } };
-    function cleanup() {
-      document.getElementById("gripPromptOkButton").removeEventListener("click", onOk);
-      document.getElementById("gripPromptCancelButton").removeEventListener("click", onCancel);
-      input.removeEventListener("keydown", onKey);
-      dialog.removeEventListener("close", onClose);
-    }
-    document.getElementById("gripPromptOkButton").addEventListener("click", onOk, { once: true });
-    document.getElementById("gripPromptCancelButton").addEventListener("click", onCancel, { once: true });
-    input.addEventListener("keydown", onKey);
-    dialog.addEventListener("close", onClose, { once: true });
-    dialog.showModal();
-    requestAnimationFrame(() => { input.select(); input.focus(); });
-  });
-}
-window.gripPrompt = gripPrompt;
-
 function openDialog(dialogOrId) {
   const dialog = typeof dialogOrId === "string" ? byId(dialogOrId) : dialogOrId;
   if (!dialog) return;
@@ -149,50 +77,6 @@ const data = {
     ...(proposalUpdates[proposal.id] || {}),
   })),
 };
-
-// ── One-time base-data migration ─────────────────────────────────
-// Runs once, while data.js still has records.
-// Saves the fully-merged view (base + edits + custom) into
-// savedCrm as flat arrays, then blanks the edits layer.
-// After this commit the next commit can safely blank data.js.
-// grip-sync's monkey-patched setItem automatically queues a
-// Supabase push for the new localStorage value.
-(function migrateBaseData() {
-  if (localStorage.getItem("grip_base_migrated_v1")) return;
-  const hasBase = (baseData.accounts || []).length > 0
-               || (baseData.projects  || []).length > 0
-               || (baseData.proposals || []).length > 0;
-  if (!hasBase) return; // data.js already blank — nothing to do
-  try {
-    const merged = {
-      accounts:    data.accounts.map((a) => ({ ...a })),
-      projects:    data.projects.map((p) => ({ ...p })),
-      proposals:   data.proposals.map((p) => ({ ...p })),
-      contractors: (savedCrm.contractors || []).map((c) => ({ ...c })),
-      edits:       { accounts: {}, projects: {}, proposals: {} },
-      deleted:     [...(savedCrm.deleted  || [])],
-      archived:    [...(savedCrm.archived || [])],
-    };
-    // Write through the monkey-patched setItem so grip-sync
-    // automatically schedules a Supabase push.
-    localStorage.setItem("garlandCrmData", JSON.stringify(merged));
-    localStorage.setItem("grip_base_migrated_v1", "pending_push");
-    // Mutate in-memory savedCrm so any save() calls this session
-    // use the new flat structure instead of the old edits format.
-    savedCrm.accounts  = merged.accounts;
-    savedCrm.projects  = merged.projects;
-    savedCrm.proposals = merged.proposals;
-    savedCrm.edits     = merged.edits;
-    console.info(
-      "GRIP: base-data migration complete — "
-      + merged.accounts.length + " accounts, "
-      + merged.projects.length + " projects, "
-      + merged.proposals.length + " proposals saved to localStorage."
-    );
-  } catch (e) {
-    console.warn("GRIP base-data migration failed:", e);
-  }
-})();
 
 const proposalStages = [
   "Working on Ramp & SOW",
@@ -972,12 +856,10 @@ const state = {
     punchStatus: "All statuses",
     punchSeverity: "All severities",
     punchCategory: "All categories",
-    punchDue: "All dates",
     punchSort: "updatedAt",
     punchDirection: "desc",
     punchSearch: "",
   },
-  punchActiveOnly: localStorage.getItem("garlandPunchActiveOnly") === "1",
   proposalSort: "stage",
   notes: readStorageJson("garlandCrmNotes", {}),
   activities: readStorageJson("garlandAccountActivities", {}),
@@ -1012,12 +894,11 @@ const state = {
     callList: "tile",
     takeoffEstimates: "tile",
     tasks: "tile",
-    punchLists: "project",
+    punchLists: "tile",
   },
   phoneMode: false,
   mobilePreview: false,
   desktopLayoutsBeforePhone: null,
-  punchGroupCollapsed: readStorageJson("garlandPunchGroupCollapsed", {}),
 };
 if (!Array.isArray(state.scopeDatabase)) state.scopeDatabase = [];
 if (!Array.isArray(state.takeoffEstimates)) state.takeoffEstimates = [];
@@ -1111,7 +992,7 @@ function standardizeStageLabels() {
     if (normalizeRecord(record)) proposalUpdatesChanged = true;
   });
   if (crmChanged) saveCrm();
-  if (proposalUpdatesChanged) safeSetItem("garlandProposalUpdates", JSON.stringify(proposalUpdates));
+  if (proposalUpdatesChanged) localStorage.setItem("garlandProposalUpdates", JSON.stringify(proposalUpdates));
 }
 
 function standardizeProjectTypeLabels() {
@@ -1426,15 +1307,15 @@ function allActivityRecords() {
 }
 
 function saveActivities() {
-  safeSetItem("garlandAccountActivities", JSON.stringify(state.activities));
+  localStorage.setItem("garlandAccountActivities", JSON.stringify(state.activities));
 }
 
 function saveTasks() {
-  safeSetItem("garlandTasks", JSON.stringify(state.tasks));
+  localStorage.setItem("garlandTasks", JSON.stringify(state.tasks));
 }
 
 function savePunchLists() {
-  safeSetItem("garlandPunchLists", JSON.stringify(state.punchLists));
+  localStorage.setItem("garlandPunchLists", JSON.stringify(state.punchLists));
 }
 
 function accountActivityStatus(account) {
@@ -1758,33 +1639,19 @@ async function copyTextToClipboard(text) {
 async function copyProposalRequestDraft(text, message = "Proposal request draft copied. Paste it into your email if the mail window did not open.") {
   try {
     const copied = await copyTextToClipboard(text);
-    if (copied) showToast(message, "success");
+    if (copied) alert(message);
     else window.prompt("Copy this draft", text);
   } catch (_error) {
     window.prompt("Copy this draft", text);
   }
 }
 
-// ── Safe localStorage write — catches QuotaExceededError ──────
-function safeSetItem(key, value) {
-  try {
-    localStorage.setItem(key, value);
-    return true;
-  } catch (_error) {
-    showToast(
-      "Device storage is full. Remove large attachments or export a backup to free space.",
-      "error"
-    );
-    return false;
-  }
-}
-
 function saveCrm() {
-  safeSetItem("garlandCrmData", JSON.stringify(savedCrm));
+  localStorage.setItem("garlandCrmData", JSON.stringify(savedCrm));
 }
 
 function saveTerritorySettings() {
-  safeSetItem("garlandTerritorySettings", JSON.stringify(territorySettings));
+  localStorage.setItem("garlandTerritorySettings", JSON.stringify(territorySettings));
 }
 
 function repInitials(name) {
@@ -1801,19 +1668,19 @@ function renderBrand() {
 }
 
 function saveScopeDatabase() {
-  safeSetItem("garlandScopeDatabase", JSON.stringify(state.scopeDatabase));
+  localStorage.setItem("garlandScopeDatabase", JSON.stringify(state.scopeDatabase));
 }
 
 function saveTakeoffEstimates() {
-  safeSetItem("garlandTakeoffEstimates", JSON.stringify(state.takeoffEstimates));
+  localStorage.setItem("garlandTakeoffEstimates", JSON.stringify(state.takeoffEstimates));
 }
 
 function saveTakeoffManualProducts() {
-  safeSetItem("garlandTakeoffManualProducts", JSON.stringify(state.takeoffManualProducts));
+  localStorage.setItem("garlandTakeoffManualProducts", JSON.stringify(state.takeoffManualProducts));
 }
 
 function saveFavoriteSystems() {
-  safeSetItem("garlandFavoriteSystems", JSON.stringify(state.favoriteSystems));
+  localStorage.setItem("garlandFavoriteSystems", JSON.stringify(state.favoriteSystems));
 }
 
 function savePriceBooks() {
@@ -1822,13 +1689,13 @@ function savePriceBooks() {
     localStorage.setItem("garlandPriceBookProducts", JSON.stringify(state.priceBookProducts));
     return true;
   } catch (_error) {
-    showToast("That price book set is too large for local storage. Use fewer PDFs at once.", "warning");
+    alert("That price book set is too large for this local browser storage. Use fewer PDFs at once or store the files in Google Drive and keep links in GRIP.");
     return false;
   }
 }
 
 function savePriceBookProducts() {
-  safeSetItem("garlandPriceBookProducts", JSON.stringify(state.priceBookProducts));
+  localStorage.setItem("garlandPriceBookProducts", JSON.stringify(state.priceBookProducts));
 }
 
 function visibleTerritoryValues(values, hidden) {
@@ -1867,7 +1734,7 @@ function saveProposalUpdate(id, patch) {
   proposalUpdates[id] = { ...(proposalUpdates[id] || {}), ...patch };
   const proposal = data.proposals.find((item) => item.id === id);
   if (proposal) Object.assign(proposal, patch);
-  safeSetItem("garlandProposalUpdates", JSON.stringify(proposalUpdates));
+  localStorage.setItem("garlandProposalUpdates", JSON.stringify(proposalUpdates));
 }
 
 function valueIsZeroMoney(value) {
@@ -1918,7 +1785,7 @@ function applyRequestedDataCleanup() {
   });
 
   if (crmChanged) saveCrm();
-  if (proposalUpdatesChanged) safeSetItem("garlandProposalUpdates", JSON.stringify(proposalUpdates));
+  if (proposalUpdatesChanged) localStorage.setItem("garlandProposalUpdates", JSON.stringify(proposalUpdates));
   localStorage.setItem(cleanupKey, "done");
 }
 
@@ -2064,7 +1931,7 @@ function normalizedTask(task) {
     account_name: task.account_name || "",
     related_project_id: task.related_project_id || "",
     related_project_name: task.related_project_name || "",
-    due_date: task.due_date || "",  // preserve blank — form sets default; normalization should not assign one
+    due_date: task.due_date || toLocalDateKey(new Date()),
     due_time: task.due_time || "",
     priority: task.priority || "Normal",
     task_type: task.task_type || "Follow-Up",
@@ -2122,6 +1989,7 @@ function sortTasks(a, b) {
 }
 
 function filteredTasks() {
+  ensureTaskShape();
   return state.tasks.filter(taskFilterMatch).sort(sortTasks);
 }
 
@@ -2167,14 +2035,14 @@ function taskCard(task) {
 }
 
 function taskSummaryButton(label, value, filter) {
-  const isActive = state.filters.taskDue === filter;
-  return `<button class="task-summary-card${isActive ? " is-active-summary" : ""}" data-task-summary-filter="${filter}" type="button">
+  return `<button class="task-summary-card" data-task-summary-filter="${filter}" type="button">
     <span>${escapeHtml(label)}</span>
     <strong>${value}</strong>
   </button>`;
 }
 
 function taskStats(tasks = state.tasks) {
+  ensureTaskShape();
   return {
     today: tasks.filter((task) => taskDueLevel(task) === "today").length,
     upcoming: tasks.filter((task) => taskDueLevel(task) === "upcoming").length,
@@ -2216,7 +2084,7 @@ function normalizedPunchList(list) {
     list_type: list.list_type || "Roofing Project",
     status: list.status || "Running Punch List",
     assigned_contractor: list.assigned_contractor || "",
-    due_date: list.due_date || "",  // preserve blank — form sets default; normalization should not assign one
+    due_date: list.due_date || toDateInput(addDays(new Date(), 7)),
     reviewer: list.reviewer || taskDefaultAssignedUser(),
     sent_at: list.sent_at || "",
     closed_at: list.closed_at || "",
@@ -2247,8 +2115,6 @@ function normalizedPunchItem(item) {
     contractor_notes: item.contractor_notes || "",
     water_test_status: item.water_test_status || "Not Required",
     rejected_reason: item.rejected_reason || "",
-    resolved: item.resolved ?? false,   // bulk-close flag — must survive normalization
-    resolved_at: item.resolved_at || "",
     original_photos: Array.isArray(item.original_photos) ? item.original_photos : [],
     contractor_completion_photos: Array.isArray(item.contractor_completion_photos) ? item.contractor_completion_photos : [],
     annotations: Array.isArray(item.annotations) ? item.annotations : [],
@@ -2271,6 +2137,7 @@ function ensurePunchShape() {
 }
 
 function findPunchList(id) {
+  ensurePunchShape();
   return state.punchLists.find((list) => list.punch_list_id === id);
 }
 
@@ -2295,22 +2162,6 @@ function punchDueLevel(list) {
   return "upcoming";
 }
 
-// C: Maps a list status to the next rep-action step and its button label.
-// Returns null for statuses where the rep is waiting (Sent to Contractor)
-// or the list is already terminal (Closed).
-function nextPunchListStatus(status) {
-  const flow = {
-    "Draft":                       { label: "Start Running",     next: "Running Punch List" },
-    "Running Punch List":          { label: "Send to Contractor",       next: "Sent to Contractor"   },
-    "Sent to Contractor":          { label: "Mark Contractor Submitted", next: "Contractor Submitted" },
-    "Contractor Submitted":        { label: "Begin Review",       next: "Under Review" },
-    "Under Review":                { label: "Approve",            next: "Approved" },
-    "Approved":                    { label: "Close Out",          next: "Closed" },
-    "Rejected / Needs Correction": { label: "Reopen",             next: "Running Punch List" },
-  };
-  return flow[status] || null;
-}
-
 function punchProjectOptions() {
   return [
     { value: "", label: "Choose project" },
@@ -2319,45 +2170,23 @@ function punchProjectOptions() {
 }
 
 function punchStats(lists = state.punchLists) {
+  ensurePunchShape();
   const items = lists.flatMap((list) => list.items || []);
   const contractorItems = items.filter((item) => ["Pending Contractor Response", "Submitted for Review", "Approved", "Rejected", "Needs Additional Correction", "Closed"].includes(item.status));
   const approvedOrClosed = contractorItems.filter((item) => ["Approved", "Closed"].includes(item.status)).length;
-  const todayKey = toLocalDateKey(new Date());
-  const weekDate = new Date(); weekDate.setDate(weekDate.getDate() + 7);
-  const weekKey = toLocalDateKey(weekDate);
   return {
     open: items.filter((item) => !["Approved", "Closed"].includes(item.status)).length,
     overdue: lists.filter((list) => punchDueLevel(list) === "overdue").length,
-    dueThisWeek: lists.filter((list) => {
-      const key = dateKeyFromValue(list.due_date);
-      return key && key >= todayKey && key <= weekKey && !["Approved", "Closed"].includes(list.status);
-    }).length,
     review: items.filter((item) => item.status === "Submitted for Review").length,
     completion: contractorItems.length ? Math.round((approvedOrClosed / contractorItems.length) * 100) : 0,
-    closeout: lists.filter((list) => list.status === "Closed").length,
+    closeout: lists.filter((list) => list.status === "Approved" || list.status === "Closed").length,
   };
 }
 
 function punchFilterMatch(list) {
   const search = normalize([state.search, state.filters.punchSearch].filter(Boolean).join(" "));
   const items = list.items || [];
-  // D: Active-only mode hides Closed/Approved lists entirely
-  if (state.punchActiveOnly && state.layouts.punchLists === "project" && ["Closed", "Approved"].includes(list.status)) return false;
-  // A: Due-date filter
-  const todayKey = toLocalDateKey(new Date());
-  const weekDate = new Date(); weekDate.setDate(weekDate.getDate() + 7);
-  const weekKey = toLocalDateKey(weekDate);
-  const monthDate = new Date(); monthDate.setDate(monthDate.getDate() + 30);
-  const monthKey = toLocalDateKey(monthDate);
-  const dueKey = dateKeyFromValue(list.due_date);
-  const dueFine = (() => {
-    if (state.filters.punchDue === "Overdue")       return dueKey && dueKey < todayKey && !["Approved","Closed"].includes(list.status);
-    if (state.filters.punchDue === "Due this week")  return dueKey && dueKey >= todayKey && dueKey <= weekKey && !["Approved","Closed"].includes(list.status);
-    if (state.filters.punchDue === "Due this month") return dueKey && dueKey >= todayKey && dueKey <= monthKey && !["Approved","Closed"].includes(list.status);
-    return true; // "All dates"
-  })();
   return (
-    dueFine &&
     (!search || normalize(punchSearchText(list)).includes(search)) &&
     (state.filters.punchProject === "All projects" || list.project_name === state.filters.punchProject) &&
     (state.filters.punchContractor === "All contractors" || list.assigned_contractor === state.filters.punchContractor || items.some((item) => item.assigned_contractor === state.filters.punchContractor)) &&
@@ -2377,14 +2206,12 @@ function sortPunchLists(a, b) {
 }
 
 function filteredPunchLists() {
+  ensurePunchShape();
   return state.punchLists.filter(punchFilterMatch).sort(sortPunchLists);
 }
 
 function punchSummaryButton(label, value, filterKey, filterValue) {
-  // Highlight the card when it matches the active filter (but not for the "show all" reset cards)
-  const isDefaultVal = filterValue === "All statuses" || filterValue === "All dates";
-  const isActive = !isDefaultVal && state.filters[filterKey] === filterValue;
-  return `<button class="task-summary-card punch-summary-card${isActive ? " is-active-summary" : ""}" data-punch-summary-key="${filterKey}" data-punch-summary-value="${escapeHtml(filterValue)}" type="button">
+  return `<button class="task-summary-card punch-summary-card" data-punch-summary-key="${filterKey}" data-punch-summary-value="${escapeHtml(filterValue)}" type="button">
     <span>${escapeHtml(label)}</span>
     <strong>${escapeHtml(value)}</strong>
   </button>`;
@@ -2406,28 +2233,17 @@ function punchFileThumbs(files = []) {
     .join("")}${files.length > 3 ? `<span>+${files.length - 3}</span>` : ""}</div>`;
 }
 
-function punchListCard(list, hideProject = false) {
+function punchListCard(list) {
   const items = list.items || [];
   const dueLevel = punchDueLevel(list);
   const approved = items.filter((item) => ["Approved", "Closed"].includes(item.status)).length;
-  // B: Stale badge — active list not touched in 7+ days
-  const isActive = !["Approved", "Closed"].includes(list.status);
-  const daysSinceUpdate = list.updated_at
-    ? Math.floor((Date.now() - new Date(list.updated_at).getTime()) / 86400000)
-    : 999;
-  const isStale = isActive && daysSinceUpdate > 7;
-  // In By-Project view the project name is already in the group header — suppress it
-  const subtitle = hideProject
-    ? escapeHtml(list.client_name || "")
-    : escapeHtml([list.project_name, list.client_name].filter(Boolean).join(" | "));
   return `<article class="record-card punch-card ${dueLevel}" data-type="punchList" data-id="${escapeHtml(list.punch_list_id)}" draggable="true">
     <div class="record-topline">
       <span class="pill ${punchItemStatusClass(list.status)}">${escapeHtml(list.status)}</span>
       <span class="pill">${items.length} item${items.length === 1 ? "" : "s"}</span>
-      ${isStale ? `<span class="pill pill-stale" title="No updates in ${daysSinceUpdate} days">⏳ ${daysSinceUpdate}d stale</span>` : ""}
     </div>
     <h3>${escapeHtml(list.title)}</h3>
-    ${subtitle ? `<p>${subtitle}</p>` : ""}
+    <p>${escapeHtml([list.project_name, list.client_name].filter(Boolean).join(" | "))}</p>
     <div class="card-meta">
       <span class="pill">${escapeHtml(list.list_type)}</span>
       ${list.assigned_contractor ? `<span class="pill">${escapeHtml(list.assigned_contractor)}</span>` : ""}
@@ -2438,149 +2254,24 @@ function punchListCard(list, hideProject = false) {
   </article>`;
 }
 
-function renderPunchListsByProject(lists) {
-  if (!lists.length) return empty("No punch lists match this view.");
-
-  // Key by project_id so same-named projects don't merge
-  const groups = new Map();
-  lists.forEach((list) => {
-    const key = list.project_id || list.project_name || "__no_project__";
-    if (!groups.has(key)) {
-      groups.set(key, { projectName: list.project_name || "No Project", projectId: list.project_id || "", lists: [] });
-    }
-    groups.get(key).lists.push(list);
-  });
-
-  // Active projects first; within active, overdue floats to top; then alphabetical
-  const sorted = [...groups.values()].sort((a, b) => {
-    const aActive = a.lists.some((l) => !["Closed", "Approved"].includes(l.status));
-    const bActive = b.lists.some((l) => !["Closed", "Approved"].includes(l.status));
-    if (aActive !== bActive) return aActive ? -1 : 1;
-    const aOverdue = a.lists.some((l) => punchDueLevel(l) === "overdue");
-    const bOverdue = b.lists.some((l) => punchDueLevel(l) === "overdue");
-    if (aActive && bActive && aOverdue !== bOverdue) return aOverdue ? -1 : 1;
-    return compareText(a.projectName, b.projectName);
-  });
-
-  return sorted.map(({ projectName, projectId, lists: projectLists }) => {
-    const sortedLists = [...projectLists].sort((a, b) => {
-      const aActive = !["Closed", "Approved"].includes(a.status);
-      const bActive = !["Closed", "Approved"].includes(b.status);
-      if (aActive !== bActive) return aActive ? -1 : 1;
-      return compareDateValue(a.updated_at, b.updated_at, "desc");
-    });
-
-    const activeList = sortedLists.find((l) => !["Closed", "Approved"].includes(l.status));
-    const isAllClosed = !activeList;
-    const dueLevel = activeList ? punchDueLevel(activeList) : "none";
-    // openItems spans all project lists for the summary bar
-    const openItems = projectLists.reduce(
-      (sum, l) => sum + (l.items || []).filter((i) => !["Approved", "Closed"].includes(i.status) && !i.resolved).length,
-      0
-    );
-    // activeOpenItems is scoped to the active list — used for the bulk-close button
-    const activeOpenItems = activeList
-      ? (activeList.items || []).filter((i) => !["Approved", "Closed"].includes(i.status) && !i.resolved).length
-      : 0;
-    const groupKey = escapeHtml(projectId || projectName);
-
-    // C: Status-advance button — only shown when rep has an action to take
-    const advance = activeList ? nextPunchListStatus(activeList.status) : null;
-    const advanceBtn = advance
-      ? `<button class="punch-advance-btn punch-advance-${dueLevel}" data-punch-advance="${escapeHtml(activeList.punch_list_id)}" data-punch-next-status="${escapeHtml(advance.next)}" type="button">${escapeHtml(advance.label)} &#8594;</button>`
-      : "";
-
-    // Bulk-close all open items on the active punch list
-    const bulkCloseBtn = (activeList && activeOpenItems > 0)
-      ? `<button class="punch-bulk-close-btn" data-punch-bulk-close="${escapeHtml(activeList.punch_list_id)}" data-punch-bulk-close-count="${activeOpenItems}" type="button">&#10005; Close ${activeOpenItems} Item${activeOpenItems === 1 ? "" : "s"}</button>`
-      : "";
-
-    // D: Compact active-list summary bar — clickable, opens detail
-    const activeSummary = activeList
-      ? `<div class="punch-active-bar" data-open-punch-detail="${escapeHtml(activeList.punch_list_id)}">
-           <span class="punch-active-label">${escapeHtml(activeList.title)}</span>
-           <div class="punch-active-pills">
-             ${activeList.assigned_contractor ? `<span class="pill pill-contractor">&#128295; ${escapeHtml(activeList.assigned_contractor)}</span>` : ""}
-             ${activeList.due_date ? `<span class="pill task-due-${dueLevel}">Due ${escapeHtml(compactDate(activeList.due_date))}</span>` : ""}
-             <span class="pill ${punchItemStatusClass(activeList.status)}">${escapeHtml(activeList.status)}</span>
-             ${openItems > 0
-               ? `<span class="pill pill-open-items">${openItems} open item${openItems === 1 ? "" : "s"}</span>`
-               : `<span class="pill pill-all-clear">&#10003; No open items</span>`}
-           </div>
-         </div>`
-      : "";
-
-    // Add button hidden when no project_id — form would alert on empty project
-    const addButton = projectId
-      ? `<button class="mini-button punch-add-btn" data-open-punch-project="${escapeHtml(projectId)}" type="button">+ Add Punch</button>`
-      : `<span class="muted-label" title="Assign a project to enable this">No linked project</span>`;
-
-    const rawKey = projectId || projectName;
-    const defaultCollapsed = isAllClosed;
-    const isCollapsed = (rawKey in state.punchGroupCollapsed) ? state.punchGroupCollapsed[rawKey] : defaultCollapsed;
-    const groupClass = ["punch-project-group", isAllClosed ? "is-closed-group" : `is-active-group punch-urgency-${dueLevel}`, isCollapsed ? "is-collapsed" : ""].filter(Boolean).join(" ");
-
-    return `<section class="${groupClass}" data-punch-group-key="${groupKey}">
-      <div class="punch-project-header" data-punch-collapse-target="${groupKey}">
-        <div class="punch-project-title">
-          <div class="punch-project-name-row">
-            <span class="punch-collapse-chevron"></span>
-            <h3>${escapeHtml(projectName)}</h3>
-          </div>
-          <div class="punch-project-meta">
-            ${isAllClosed
-              ? `<span class="pill pill-all-clear">All Closed &middot; ${projectLists.length} list${projectLists.length === 1 ? "" : "s"}</span>`
-              : `<span class="pill">${projectLists.length} list${projectLists.length === 1 ? "" : "s"}</span>`}
-          </div>
-        </div>
-        <div class="punch-project-actions">
-          ${bulkCloseBtn}
-          ${advanceBtn}
-          ${addButton}
-        </div>
-      </div>
-      <div class="punch-project-body">
-        ${activeSummary}
-        <div class="punch-project-cards">
-          ${sortedLists.map((l) => punchListCard(l, true)).join("")}
-        </div>
-      </div>
-    </section>`;
-  }).join("");
-}
-
 function renderPunchLists() {
   applyLayout("punchListBoard", "punchLists");
   const stats = punchStats();
   byId("punchSummaryStrip").innerHTML = [
     punchSummaryButton("Open Punch Items", stats.open, "punchStatus", "All statuses"),
-    punchSummaryButton("Overdue", stats.overdue, "punchDue", "Overdue"),
-    punchSummaryButton("Due This Week", stats.dueThisWeek, "punchDue", "Due this week"),
+    punchSummaryButton("Overdue Items", stats.overdue, "punchSort", "dueDate"),
     punchSummaryButton("Pending Review", stats.review, "punchStatus", "Submitted for Review"),
-    punchSummaryButton("Closed Out", stats.closeout, "punchStatus", "Closed"),
+    punchSummaryButton("Contractor Completion", `${stats.completion}%`, "punchStatus", "All statuses"),
+    punchSummaryButton("Final Approval Queue", stats.closeout, "punchStatus", "Approved"),
   ].join("");
   const lists = filteredPunchLists();
-  // Show the "Collapse Closed" and "Active Only" buttons only in By-Project view
-  const isProject = state.layouts.punchLists === "project";
-  const collapseClosedBtn = byId("punchCollapseClosedBtn");
-  if (collapseClosedBtn) collapseClosedBtn.hidden = !isProject;
-  const activeOnlyBtn = byId("punchActiveOnlyBtn");
-  if (activeOnlyBtn) {
-    activeOnlyBtn.hidden = !isProject;
-    activeOnlyBtn.textContent = state.punchActiveOnly ? "Show Closed" : "Active Only";
-    activeOnlyBtn.classList.toggle("is-active-filter", state.punchActiveOnly);
-  }
-  if (state.layouts.punchLists === "project") {
-    byId("punchListBoard").innerHTML = renderPunchListsByProject(lists);
-  } else {
-    byId("punchListBoard").innerHTML = listWrap(
-      lists,
-      punchListCard,
-      "No punch lists match this view.",
-      state.layouts.punchLists === "kanban" ? (list) => list.status : null,
-      punchListStatuses
-    );
-  }
+  byId("punchListBoard").innerHTML = listWrap(
+    lists,
+    punchListCard,
+    "No punch lists match this view.",
+    state.layouts.punchLists === "kanban" ? (list) => list.status : null,
+    punchListStatuses
+  );
 }
 
 function renderPunchCloseoutChecks(closeout = {}) {
@@ -2718,16 +2409,9 @@ function syncPunchProjectDefaults() {
 
 async function addPunchDraftFiles(kind, files) {
   if (!files?.length) return;
-  // Only warn about large files if Supabase Storage is NOT configured
-  // (if configured, photos go to cloud storage — no local size impact)
-  if (!window.gripSync?.isConfigured() && !confirmLargeLocalFiles(files, `${kind} punch photos`)) return;
+  if (!confirmLargeLocalFiles(files, `${kind} punch photos`)) return;
   for (const file of [...files]) {
-    // Try Supabase Storage first (avoids localStorage bloat)
-    let cloudUrl = null;
-    if (window.gripSync?.isConfigured()) {
-      cloudUrl = await window.gripSync.uploadFile(file, `punch/${kind}`).catch(() => null);
-    }
-    let dataUrl = cloudUrl ? "" : await new Promise((resolve) => {
+    const dataUrl = await new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
       reader.readAsDataURL(file);
@@ -2737,9 +2421,7 @@ async function addPunchDraftFiles(kind, files) {
       file_name: file.name,
       file_type: file.type || "application/octet-stream",
       upload_date: new Date().toISOString(),
-      // url is preferred (cloud); dataUrl is fallback (local-only mode)
-      url: cloudUrl || "",
-      thumbnail_url: cloudUrl || (String(file.type || "").startsWith("image/") ? dataUrl : ""),
+      thumbnail_url: String(file.type || "").startsWith("image/") ? dataUrl : "",
       dataUrl,
       size: file.size,
     });
@@ -2753,13 +2435,13 @@ function renderPunchDraftPreview(kind, existing = []) {
   const files = [...existing, ...(state.punchDraftFiles?.[kind] || [])];
   target.innerHTML = files.length
     ? files.map((file) => `<div class="task-attachment-chip">${String(file.file_type || "").startsWith("image/") ? `<img src="${file.dataUrl || file.thumbnail_url}" alt="${escapeHtml(file.file_name || "Punch photo")}" />` : `<span>${escapeHtml((file.file_name || "File").split(".").pop()?.toUpperCase() || "FILE")}</span>`}<strong>${escapeHtml(file.file_name || "File")}</strong><small>${fileSizeLabel(file.size)}</small></div>`).join("")
-    : `<p class="empty-state" data-icon="📷">No ${kind} photos yet.</p>`;
+    : `<p class="empty-state">No ${kind} photos yet.</p>`;
 }
 
 function savePunchListFromForm(formEl) {
   const form = new FormData(formEl);
   const project = findRecord("project", form.get("project_id"));
-  if (!project) { showToast("Choose a project first.", "warning"); return; }
+  if (!project) return alert("Choose a project first.");
   const id = form.get("punch_list_id") || `punch-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const existing = findPunchList(id);
   const now = new Date().toISOString();
@@ -2813,7 +2495,7 @@ function savePunchListFromForm(formEl) {
     created_at: existing?.created_at || now,
     updated_at: now,
   });
-  if (!item.description && !item.required_correction) { showToast("Add a punch item issue or required correction first.", "warning"); return; }
+  if (!item.description && !item.required_correction) return alert("Add a punch item issue or required correction first.");
   if (existing) state.punchLists = state.punchLists.map((existingList) => (existingList.punch_list_id === id ? list : existingList));
   else state.punchLists.unshift(list);
   state.punchDraftFiles = { before: [], after: [] };
@@ -2833,13 +2515,13 @@ function punchAudit(list, action, note = "") {
   list.audit_log = [...(list.audit_log || []), { action, note, user: taskDefaultAssignedUser(), created_at: new Date().toISOString() }];
 }
 
-async function updatePunchItemStatus(listId, itemId, status, note = "") {
+function updatePunchItemStatus(listId, itemId, status, note = "") {
   const list = findPunchList(listId);
   const item = list?.items?.find((entry) => entry.punch_item_id === itemId);
   if (!list || !item) return;
-  if (status === "Submitted for Review" && !(item.contractor_completion_photos || []).length) { showToast("Completion photo required before submitting this punch item for review.", "warning"); return; }
+  if (status === "Submitted for Review" && !(item.contractor_completion_photos || []).length) return alert("Completion photo required before submitting this punch item for review.");
   if (status === "Rejected" || status === "Needs Additional Correction") {
-    const reason = await gripPrompt("Rejection reason or correction note:", note || punchRejectionReasons[0], "Rejection Reason");
+    const reason = prompt("Rejection reason or correction note:", note || punchRejectionReasons[0]);
     if (reason === null) return;
     item.rejected_reason = reason;
     item.reviewer_notes = [item.reviewer_notes, reason].filter(Boolean).join("\n");
@@ -2979,7 +2661,7 @@ function exportPunchListPdf(list, ownerMode = false) {
     </div>`;
   }).join("");
   const win = window.open("", "_blank");
-  if (!win) { showToast("Allow pop-ups to export the punch list report.", "warning"); return; }
+  if (!win) return alert("Allow pop-ups to export the punch list report.");
   const title = ownerMode ? `Final Closeout — ${list.title}` : `Contractor Punch List — ${list.title}`;
   win.document.write(`<html><head><title>${escapeHtml(title)}</title><style>${style}</style></head><body>
     <h1>${escapeHtml(title)}</h1>
@@ -3176,7 +2858,7 @@ function saveTaskFromForm(formEl) {
     updated_at: now,
     completed_at: status === "Completed" ? existing?.completed_at || now : "",
   });
-  if (!task.title) { showToast("Add a task title first.", "warning"); return; }
+  if (!task.title) return alert("Add a task title first.");
   if (existing) state.tasks = state.tasks.map((item) => (item.task_id === id ? task : item));
   else state.tasks.unshift(task);
   state.taskDraftFiles = [];
@@ -3286,20 +2968,16 @@ function renderTaskAttachmentPreview(files) {
           </div>`
         )
         .join("")
-    : `<p class="empty-state" data-icon="📎">No task attachments yet.</p>`;
+    : `<p class="empty-state">No task attachments yet.</p>`;
 }
 
-async function completeTask(taskId, checked, checkboxEl) {
+function completeTask(taskId, checked) {
   const task = findTask(taskId);
   if (!task) return;
   if (checked) {
-    const outcome = await gripPrompt("Completed outcome", task.completed_outcome || "Spoke with Contact", "Complete Task");
-    if (outcome === null) {
-      if (checkboxEl) checkboxEl.checked = false; // revert checkbox — user cancelled
-      return;
-    }
+    const outcome = prompt("Completed outcome", task.completed_outcome || "Spoke with Contact");
     task.status = "Completed";
-    task.completed_outcome = String(outcome).trim();
+    task.completed_outcome = String(outcome || task.completed_outcome || "").trim();
     task.completed_at = new Date().toISOString();
   } else {
     task.status = "Open";
@@ -3343,7 +3021,7 @@ function showTaskDetail(task) {
     </section>
     <section class="detail-section">
       <h4>Attachments</h4>
-      ${task.attachments?.length ? `<div class="file-list">${task.attachments.map((file) => { const href = file.url || file.dataUrl; return `<div class="file-row">${href ? `<a href="${escapeHtml(href)}" ${file.url ? 'target="_blank" rel="noopener"' : `download="${escapeHtml(file.file_name || "attachment")}"`}>${escapeHtml(file.file_name)}</a>` : escapeHtml(file.file_name)}</div>`; }).join("")}</div>` : `<p class="empty-state" data-icon="📎">No attachments.</p>`}
+      ${task.attachments?.length ? `<div class="file-list">${task.attachments.map((file) => `<div class="file-row">${file.dataUrl ? `<a href="${file.dataUrl}" download="${escapeHtml(file.file_name)}">${escapeHtml(file.file_name)}</a>` : escapeHtml(file.file_name)}</div>`).join("")}</div>` : `<p class="empty-state">No attachments.</p>`}
     </section>
     <section class="danger-zone"><button class="delete-button" data-delete-task="${escapeHtml(task.task_id)}" type="button">Delete Task</button></section>
   `;
@@ -3922,26 +3600,7 @@ function renderDashboard() {
     dashboardPanel("Proposals by Client Type", tableRows(countBy(proposals.map((proposal) => ({ entity: proposalEntity(proposal) })), "entity"), "proposals")),
     dashboardPanel("Top 5 Contractors by Proposal Wins", topContractorRows(topContractors, "wins")),
     dashboardPanel("Top 5 Contractors by Proposal Opportunities", topContractorRows(topContractors, "opportunities")),
-    dashboardPanel("Punch Lists", punchListDashboardRows()),
   ].join("");
-}
-
-function punchListDashboardRows() {
-  const lists = state.punchLists; // use in-memory state, not stale localStorage read
-  if (!lists.length) return [metricRow("No punch lists yet", "", "punchList")];
-  const terminal = ["Approved", "Closed"];
-  const open   = lists.filter((l) => !terminal.includes(l.status));
-  const closed = lists.filter((l) =>  terminal.includes(l.status));
-  const openItems = lists.reduce(
-    (sum, l) => sum + (l.items || []).filter((i) => !terminal.includes(i.status) && !i.resolved).length,
-    0
-  );
-  return [
-    metricRow("Total Lists",  lists.length, "punchList"),
-    metricRow("Open Lists",   open.length,  "punchList"),
-    metricRow("Closed Lists", closed.length, "punchList"),
-    metricRow("Open Items",   openItems,    "punchList"),
-  ];
 }
 
 function renderFollowUpQueue() {
@@ -4131,12 +3790,9 @@ function listWrap(records, renderer, emptyMessage, groupKey = null, groupOrder =
 function applyLayout(containerId, viewName) {
   const container = byId(containerId);
   const layout = state.layouts[viewName] || "tile";
-  container.classList.remove("is-list", "is-kanban", "is-project");
+  container.classList.remove("is-list", "is-kanban");
   container.classList.toggle("is-list", layout === "list");
   container.classList.toggle("is-kanban", layout === "kanban");
-  container.classList.toggle("is-project", layout === "project");
-  // Keep the toolbar toggle buttons in sync on every render, not just on click.
-  syncLayoutButtons(viewName);
 }
 
 function isPhoneMode() {
@@ -5022,9 +4678,9 @@ function removeManualTakeoffProduct(id) {
   renderTakeoffEstimator();
 }
 
-async function currentFavoriteSystemSnapshot() {
+function currentFavoriteSystemSnapshot() {
   const defaultName = defaultFavoriteSystemName();
-  const name = (await gripPrompt("Name this system", defaultName, "Save System")) || "";
+  const name = prompt("Name this system", defaultName) || "";
   return {
     id: `favorite-system-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     name,
@@ -5052,8 +4708,8 @@ function defaultFavoriteSystemName() {
     .join(" | ") || "Favorite system";
 }
 
-async function saveCurrentFavoriteSystem() {
-  const favorite = await currentFavoriteSystemSnapshot();
+function saveCurrentFavoriteSystem() {
+  const favorite = currentFavoriteSystemSnapshot();
   if (!favorite.name.trim()) return;
   state.favoriteSystems.unshift(favorite);
   saveFavoriteSystems();
@@ -5103,7 +4759,7 @@ function renderFavoriteSystems() {
   if (!byId("favoriteSystemsList")) return;
   byId("favoriteSystemsList").innerHTML = state.favoriteSystems.length
     ? state.favoriteSystems.map(favoriteSystemCard).join("")
-    : `<p class="empty-state" data-icon="🏛">No systems saved yet. Build a system, then click Save to My Systems.</p>`;
+    : `<p class="empty-state">No systems saved yet. Build a system, then click Save to My Systems.</p>`;
 }
 
 function loadFavoriteSystem(id) {
@@ -5771,7 +5427,6 @@ function renderFilters() {
   fillSelect("punchStatusFilter", ["All statuses", ...punchListStatuses, ...punchItemStatuses.filter((status) => !punchListStatuses.includes(status))], state.filters.punchStatus);
   fillSelect("punchSeverityFilter", ["All severities", ...punchSeverities], state.filters.punchSeverity);
   fillSelect("punchCategoryFilter", ["All categories", ...punchCategories], state.filters.punchCategory);
-  fillSelect("punchDueFilter", ["All dates", "Overdue", "Due this week", "Due this month"], state.filters.punchDue);
   byId("punchSortFilter").value = state.filters.punchSort;
   byId("punchSearchInput").value = state.filters.punchSearch;
   syncDirectionButton("punchSortDirection", state.filters.punchDirection);
@@ -6147,7 +5802,7 @@ function persistRecordEdit(type, id, key, value, refresh = true) {
           .join(", ");
         if (normalize(project.awardedContractor) === oldKey) project.awardedContractor = value;
       });
-      safeSetItem("garlandProposalUpdates", JSON.stringify(proposalUpdates));
+      localStorage.setItem("garlandProposalUpdates", JSON.stringify(proposalUpdates));
     }
     saveCrm();
     if (refresh) {
@@ -6170,16 +5825,6 @@ function persistRecordEdit(type, id, key, value, refresh = true) {
     savedCrm.edits[collection][id] = { ...(savedCrm.edits[collection][id] || {}), [key]: cleanedValue };
   }
   saveCrm();
-  // Propagate renamed project display name to all punch lists that reference this project.
-  // punch lists store project_name = project.projectName || project.client, so both fields matter.
-  if (collection === "projects" && ["projectName", "client"].includes(key)) {
-    const proj = data.projects.find((p) => p.id === id);
-    const newName = proj ? (proj.projectName || proj.client || "") : cleanedValue;
-    state.punchLists.forEach((list) => {
-      if (list.project_id === id) list.project_name = newName;
-    });
-    savePunchLists();
-  }
   if (key === "nextFollowUp" && record) promptFollowUpActivity(type, record, oldValue, cleanedValue);
   if (refresh) {
     renderFilters();
@@ -6188,29 +5833,10 @@ function persistRecordEdit(type, id, key, value, refresh = true) {
   }
 }
 
-function cleanupPunchGroupCollapsed() {
-  // Remove any stale keys from punchGroupCollapsed that no longer correspond
-  // to an existing punch-list group.
-  // Must use the same key logic as renderPunchListsByProject:
-  //   rawKey = (project_id || "") || (project_name || "No Project")
-  const validKeys = new Set(
-    state.punchLists.map((l) => l.project_id || l.project_name || "No Project")
-  );
-  let changed = false;
-  Object.keys(state.punchGroupCollapsed).forEach((k) => {
-    if (!validKeys.has(k)) {
-      delete state.punchGroupCollapsed[k];
-      changed = true;
-    }
-  });
-  if (changed) localStorage.setItem("garlandPunchGroupCollapsed", JSON.stringify(state.punchGroupCollapsed));
-}
-
 function deleteRecord(type, id) {
   if (type === "punchList") {
     state.punchLists = state.punchLists.filter((list) => list.punch_list_id !== id);
     savePunchLists();
-    cleanupPunchGroupCollapsed();
     renderFilters();
     render();
     byId("detailContent").innerHTML = `<p class="empty-detail">Punch list deleted from this CRM view.</p>`;
@@ -6511,7 +6137,7 @@ function showAccountDetail(record) {
         <button class="primary-button" type="submit">Add activity</button>
       </form>
       <div class="activity-list">
-        ${accountActivityEntries(record).length ? accountActivityEntries(record).map(activityEntry).join("") : `<p class="empty-state" data-icon="📅">No activity logged yet.</p>`}
+        ${accountActivityEntries(record).length ? accountActivityEntries(record).map(activityEntry).join("") : `<p class="empty-state">No activity logged yet.</p>`}
       </div>
     </section>
 
@@ -6613,13 +6239,13 @@ function accountProfileTabContent(account, activeTab) {
   if (activeTab === "projects") {
     return `<section class="detail-section">
       <h4>Projects</h4>
-      <div class="stack-list">${related.projects.length ? related.projects.map(accountProjectMiniRecord).join("") : `<p class="empty-state" data-icon="🏗">No linked projects yet.</p>`}</div>
+      <div class="stack-list">${related.projects.length ? related.projects.map(accountProjectMiniRecord).join("") : `<p class="empty-state">No linked projects yet.</p>`}</div>
     </section>`;
   }
   if (activeTab === "proposals") {
     return `<section class="detail-section">
       <h4>Proposals</h4>
-      <div class="stack-list">${related.proposals.length ? related.proposals.map(accountProposalMiniRecord).join("") : `<p class="empty-state" data-icon="📄">No linked proposals yet.</p>`}</div>
+      <div class="stack-list">${related.proposals.length ? related.proposals.map(accountProposalMiniRecord).join("") : `<p class="empty-state">No linked proposals yet.</p>`}</div>
     </section>`;
   }
   if (activeTab === "activity") {
@@ -6630,7 +6256,7 @@ function accountProfileTabContent(account, activeTab) {
         <textarea name="activity" class="note-box" placeholder="Add new activity" required></textarea>
         <button class="primary-button" type="submit">Add activity</button>
       </form>
-      <div class="activity-list">${entries.length ? entries.map(activityEntry).join("") : `<p class="empty-state" data-icon="📅">No activity logged yet.</p>`}</div>
+      <div class="activity-list">${entries.length ? entries.map(activityEntry).join("") : `<p class="empty-state">No activity logged yet.</p>`}</div>
     </section>`;
   }
   if (activeTab === "notes") {
@@ -6702,13 +6328,11 @@ function activityFileLinks(files = []) {
   if (!files.length) return "";
   return `<div class="activity-files">
     ${files
-      .map((file) => {
-        const href = file.url || file.dataUrl;
-        if (!href) return "";
-        return file.url
-          ? `<a href="${escapeHtml(file.url)}" target="_blank" rel="noopener">${escapeHtml(file.name || "Activity file")}</a>`
-          : `<a href="${file.dataUrl}" download="${escapeHtml(file.name || "activity-file")}">${escapeHtml(file.name || "Activity file")}</a>`;
-      })
+      .map((file) =>
+        file.dataUrl
+          ? `<a href="${file.dataUrl}" download="${escapeHtml(file.name || "activity-file")}">${escapeHtml(file.name || "Activity file")}</a>`
+          : ""
+      )
       .join("")}
   </div>`;
 }
@@ -6744,12 +6368,12 @@ function addAccountActivity(accountId, note, showDetailAfter = true, extra = {})
   if (showDetailAfter && account) showAccountDetail(account);
 }
 
-async function promptFollowUpActivity(type, record, oldDate = "", newDate = "") {
+function promptFollowUpActivity(type, record, oldDate = "", newDate = "") {
   if (!record || !newDate || dateKeyFromValue(oldDate) === dateKeyFromValue(newDate)) return;
   const account = type === "account" ? record : findAccountByName(record.client || record.clientName || "");
   if (!account) return;
   const title = type === "account" ? record.client : type === "project" ? record.projectName || record.client : record.project || record.client;
-  const note = await gripPrompt(`Next step for follow-up on ${compactDate(newDate)}?`, "", "Log Follow-Up");
+  const note = prompt(`Add next step for follow-up on ${compactDate(newDate)}?`, "");
   if (!String(note || "").trim()) return;
   const lines = [
     `Follow-up set for ${compactDate(newDate)}${oldDate ? ` (previously ${compactDate(oldDate)})` : ""}.`,
@@ -6766,21 +6390,21 @@ function accountForRecordActivity(type, id) {
   return findAccountByName(record.client || record.clientName || record.project || "");
 }
 
-async function logRecordActivity(type, id) {
+function logRecordActivity(type, id) {
   const account = accountForRecordActivity(type, id);
-  if (!account) { showToast("I could not find a linked account for this record. Open the account and log the activity there.", "error"); return; }
-  const note = await gripPrompt("Log activity note:", "", "Log Activity");
+  if (!account) return alert("I could not find a linked account for this record. Open the account and log the activity there.");
+  const note = prompt("Log activity", "");
   if (!String(note || "").trim()) return;
   addAccountActivity(account.id, note, false, { source: type === "account" ? "Account" : type === "project" ? "Project" : "Proposal" });
   render();
   showDetail("account", account.id);
 }
 
-async function editActivity(accountId, activityId) {
+function editActivity(accountId, activityId) {
   const entries = state.activities[accountId] || [];
   const entry = entries.find((item) => item.id === activityId);
   if (!entry) return;
-  const updated = await gripPrompt("Edit activity note:", entry.note || "", "Edit Activity");
+  const updated = prompt("Edit activity", entry.note || "");
   if (updated === null) return;
   const cleaned = String(updated).trim();
   if (!cleaned) return;
@@ -6793,8 +6417,8 @@ async function editActivity(accountId, activityId) {
   if (account && byId("detailContent").textContent.includes(account.client || "")) showAccountDetail(account);
 }
 
-async function deleteActivity(accountId, activityId) {
-  if (!await gripConfirm("Delete this activity?", "Delete Activity")) return;
+function deleteActivity(accountId, activityId) {
+  if (!confirm("Delete this activity?")) return;
   state.activities[accountId] = (state.activities[accountId] || []).filter((entry) => entry.id !== activityId);
   saveActivities();
   renderAccounts();
@@ -6821,7 +6445,7 @@ function todayCallDay() {
 }
 
 function saveCallLists() {
-  safeSetItem("garlandCallLists", JSON.stringify(state.callLists));
+  localStorage.setItem("garlandCallLists", JSON.stringify(state.callLists));
 }
 
 function callRuleOptions(type) {
@@ -6902,22 +6526,9 @@ function renderCallList() {
     button.classList.toggle("is-active", button.dataset.callListMode === state.callListMode);
   });
   byId("callListView").dataset.mode = state.callListMode;
-  // Weekly preview — shows each day with account count + entity names
-  const weeklyPreview = byId("callListWeeklyPreview");
-  if (weeklyPreview) {
-    weeklyPreview.innerHTML = callListDays().map((weekday) => {
-      const dayAccounts = accountsForCallDay(weekday);
-      const isActive = weekday === day;
-      const entities = [...new Set(dayAccounts.map((a) => a.entity || a.client).filter(Boolean))];
-      const preview = entities.slice(0, 3).map((e) => escapeHtml(e)).join(", ");
-      const overflow = entities.length > 3 ? ` +${entities.length - 3}` : "";
-      return `<button class="call-day-tab${isActive ? " is-active" : ""}" data-call-day="${weekday}" type="button">
-        <span class="call-day-tab-name">${weekday.slice(0, 3)}</span>
-        <strong class="call-day-tab-count">${dayAccounts.length}</strong>
-        <span class="call-day-tab-entities">${preview ? preview + overflow : "<em>No rules assigned</em>"}</span>
-      </button>`;
-    }).join("");
-  }
+  byId("callListWeekdays").innerHTML = callListDays()
+    .map((weekday) => `<button class="sort-tab ${weekday === day ? "is-active" : ""}" data-call-day="${weekday}" type="button">${weekday.slice(0, 3)}</button>`)
+    .join("");
   byId("callListView").querySelector(".call-list-layout").dataset.mode = state.callListMode;
   byId("dailyCallList").classList.remove("is-list", "is-kanban");
   byId("dailyCallList").classList.toggle("is-list", state.layouts.callList === "list");
@@ -6934,7 +6545,7 @@ function renderCallList() {
           </div>`
         )
         .join("")
-    : `<p class="empty-state" data-icon="📋">No call list assignments yet.</p>`;
+    : `<p class="empty-state">No call list assignments yet.</p>`;
   const callItems = accounts
         .map((account) => {
           const key = callCompletionKey(day, account.id);
@@ -6967,7 +6578,7 @@ function renderCallList() {
           <button class="kanban-nav kanban-nav-right" data-kanban-scroll="right" type="button" aria-label="Scroll kanban right">›</button>
         </div>`
       : callItems.join("")
-    : `<p class="empty-state" data-icon="☏">No calls assigned for ${escapeHtml(day)}.</p>`;
+    : `<p class="empty-state">No calls assigned for ${escapeHtml(day)}.</p>`;
 }
 
 function noteTakerRecords() {
@@ -7336,7 +6947,7 @@ function contractorQuickContent(name) {
   <section class="detail-section">
     <h4>Support Contacts</h4>
     <div class="stack-list">
-      ${supportContacts.length ? supportContacts.map((contact, index) => supportContactCard(profile.companyName, contact, index)).join("") : `<p class="empty-state" data-icon="👤">No support contacts yet.</p>`}
+      ${supportContacts.length ? supportContacts.map((contact, index) => supportContactCard(profile.companyName, contact, index)).join("") : `<p class="empty-state">No support contacts yet.</p>`}
     </div>
     <button class="secondary-button support-add-button" data-add-support-contact="${escapeHtml(profile.companyName)}" type="button">Add support contact</button>
   </section>
@@ -7371,12 +6982,12 @@ function openAccountDialog(accountId = "") {
   form.elements.address.value = account?.address || "";
   byId("deleteAccountDialogButton").hidden = !account;
   byId("accountDialogActivity").innerHTML = account
-    ? accountActivityEntries(account).slice(0, 5).map(activityEntry).join("") || `<p class="empty-state" data-icon="📅">No activity logged yet.</p>`
+    ? accountActivityEntries(account).slice(0, 5).map(activityEntry).join("") || `<p class="empty-state">No activity logged yet.</p>`
     : "";
   openDialog("accountDialog");
 }
 
-async function saveAccountFromDialog(form) {
+function saveAccountFromDialog(form) {
   const id = form.get("id");
   const payload = {
     client: form.get("client") || "",
@@ -7395,7 +7006,7 @@ async function saveAccountFromDialog(form) {
   if (id) {
     Object.entries(payload).forEach(([key, value]) => persistRecordEdit("account", id, key, value, false));
   } else {
-    if (await shouldStopForDuplicate("account", payload.client, cleanAccounts().map((account) => account.client))) return;
+    if (shouldStopForDuplicate("account", payload.client, cleanAccounts().map((account) => account.client))) return;
     const account = {
       id: `local-account-${Date.now()}`,
       sourceRow: "Local",
@@ -7408,7 +7019,7 @@ async function saveAccountFromDialog(form) {
     data.accounts.push(account);
     accountId = account.id;
     saveCrm();
-    await promptFollowUpActivity("account", account, "", account.nextFollowUp);
+    promptFollowUpActivity("account", account, "", account.nextFollowUp);
   }
   if (String(form.get("activity") || "").trim()) addAccountActivity(accountId, form.get("activity"), false);
   renderFilters();
@@ -7417,11 +7028,11 @@ async function saveAccountFromDialog(form) {
   if (state.view === "accounts" && state.accountMode === "browse") showDetail("account", accountId);
 }
 
-async function renameAccount(accountId) {
+function renameAccount(accountId) {
   const account = findRecord("account", accountId);
-  if (!account) { showToast("I could not find that account.", "error"); return; }
+  if (!account) return alert("I could not find that account.");
   const oldName = account.client || "";
-  const nextName = await gripPrompt("Rename account:", oldName, "Rename Account");
+  const nextName = prompt("Rename account", oldName);
   const cleaned = String(nextName || "").trim();
   if (!cleaned || cleaned === oldName) return;
   const oldKey = normalize(oldName);
@@ -7538,8 +7149,8 @@ function updateTerritoryColor(type, value, color) {
   render();
 }
 
-async function editTerritoryValue(type, oldValue) {
-  const nextValue = await gripPrompt(`Rename this ${type}:`, oldValue, `Edit ${type[0].toUpperCase() + type.slice(1)}`);
+function editTerritoryValue(type, oldValue) {
+  const nextValue = prompt(`Edit ${type}`, oldValue);
   if (!nextValue || !String(nextValue).trim()) return;
   const cleaned = String(nextValue).trim();
   const listKey = type === "entity" ? "entities" : "counties";
@@ -7586,10 +7197,8 @@ function exportBackup() {
       garlandTerritorySettings: localStorage.getItem("garlandTerritorySettings"),
       garlandPriceBooks: localStorage.getItem("garlandPriceBooks"),
       garlandPriceBookProducts: localStorage.getItem("garlandPriceBookProducts"),
-      garlandTakeoffEstimates: localStorage.getItem("garlandTakeoffEstimates"),
       garlandTakeoffManualProducts: localStorage.getItem("garlandTakeoffManualProducts"),
       garlandFavoriteSystems: localStorage.getItem("garlandFavoriteSystems"),
-      garlandProjectChecklists: localStorage.getItem("garlandProjectChecklists"),
       garlandLastBackupAt: localStorage.getItem("garlandLastBackupAt"),
     },
   };
@@ -7692,7 +7301,7 @@ function exportReportExcel(type) {
 function exportReportPdf(type) {
   const printWindow = window.open("", "_blank");
   if (!printWindow) {
-    showToast("Your browser blocked the export window. Allow pop-ups for GRIP, then try Export PDF again.", "warning");
+    alert("Your browser blocked the export window. Allow pop-ups for GRIP, then try Export PDF again.");
     return;
   }
   printWindow.document.open();
@@ -7754,10 +7363,10 @@ function accountProfileHtml(account) {
 
 function exportAccountProfilePdf(accountId) {
   const account = findRecord("account", accountId);
-  if (!account) { showToast("I could not find that account.", "error"); return; }
+  if (!account) return alert("I could not find that account.");
   const printWindow = window.open("", "_blank");
   if (!printWindow) {
-    showToast("Your browser blocked the export window. Allow pop-ups for GRIP, then try again.", "warning");
+    alert("Your browser blocked the export window. Allow pop-ups for GRIP, then try again.");
     return;
   }
   printWindow.document.open();
@@ -7859,7 +7468,7 @@ function importAccountContactsCsv(file) {
   const reader = new FileReader();
   reader.onload = () => {
     const rows = parseCsv(String(reader.result || ""));
-    if (rows.length < 2) { showToast("No contacts found in that CSV.", "warning"); return; }
+    if (rows.length < 2) return alert("No contacts found in that CSV.");
     const headers = rows[0].map((header) => normalize(header));
     const indexOf = (...names) => headers.findIndex((header) => names.some((name) => header.includes(name)));
     const idx = {
@@ -7898,7 +7507,7 @@ function importAccountContactsCsv(file) {
     saveCrm();
     renderFilters();
     render();
-    showToast(`${imported} account contacts imported.`, "success");
+    alert(`${imported} account contacts imported.`);
   };
   reader.readAsText(file);
 }
@@ -7913,12 +7522,9 @@ function importBackup(file) {
       Object.entries(storage).forEach(([key, value]) => {
         if (key.startsWith("garland") && value !== null && value !== undefined) localStorage.setItem(key, value);
       });
-      // Clear local timestamps so pullAll() doesn't mistake imported data timestamps for offline edits.
-      // The imported data should be treated as fresh and pushed to cloud on next sync.
-      localStorage.removeItem("grip_local_timestamps");
       window.location.reload();
     } catch (error) {
-      showToast("That backup file could not be imported.", "error");
+      alert("That backup file could not be imported.");
     }
   };
   reader.readAsText(file);
@@ -8056,7 +7662,7 @@ function uploadBox(recordId, category, label) {
                 </div>`
               )
               .join("")
-          : `<p class="empty-state" data-icon="📁">No files uploaded yet.</p>`
+          : `<p class="empty-state">No files uploaded yet.</p>`
       }
     </div>
     ${driveLinkForm(recordId, category)}
@@ -8112,7 +7718,7 @@ function saveDriveLink(recordId, category, formEl) {
   const form = new FormData(formEl);
   const url = String(form.get("driveUrl") || "").trim();
   if (!url) return;
-  if (!/^https?:\/\//i.test(url)) { showToast("Paste a full Google Drive link that starts with https://", "warning"); return; }
+  if (!/^https?:\/\//i.test(url)) return alert("Paste a full Google Drive link that starts with https://");
   if (!state.attachments[recordId]) state.attachments[recordId] = {};
   if (!state.attachments[recordId][category]) state.attachments[recordId][category] = [];
   state.attachments[recordId][category].push({
@@ -8128,11 +7734,11 @@ function saveDriveLink(recordId, category, formEl) {
 }
 
 function saveProposalAttachments() {
-  safeSetItem("garlandProposalAttachments", JSON.stringify(state.attachments));
+  localStorage.setItem("garlandProposalAttachments", JSON.stringify(state.attachments));
 }
 
 function saveProjectChecklists() {
-  safeSetItem("garlandProjectChecklists", JSON.stringify(state.projectChecklists));
+  localStorage.setItem("garlandProjectChecklists", JSON.stringify(state.projectChecklists));
 }
 
 function projectChecklistProgress(projectId) {
@@ -8217,7 +7823,7 @@ function checklistUploadBox(projectId, item) {
                 </div>`
               )
               .join("")
-          : `<p class="empty-state" data-icon="📷">Drop photos here or use Upload / Camera.</p>`
+          : `<p class="empty-state">Drop photos here or use Upload / Camera.</p>`
       }
     </div>
   </div>`;
@@ -8387,8 +7993,8 @@ function saveProjectChecklistDraft() {
   return projectId;
 }
 
-async function clearProjectChecklist(projectId) {
-  if (!projectId || !await gripConfirm("Clear this project checklist? All progress will be lost.", "Clear Checklist")) return;
+function clearProjectChecklist(projectId) {
+  if (!projectId || !confirm("Clear this project checklist?")) return;
   delete state.projectChecklists[projectId];
   saveProjectChecklists();
   renderProjectChecklist(projectId);
@@ -8430,7 +8036,7 @@ function saveUploadedScopeToDatabase(recordId, fileIndex, scopeCategory) {
   const type = findRecord("project", recordId) ? "project" : "proposal";
   const uploadCategory = scopeUploadCategory(type);
   const file = state.attachments[recordId]?.[uploadCategory]?.[Number(fileIndex)];
-  if (!file) { showToast("Choose an uploaded scope first.", "warning"); return; }
+  if (!file) return alert("Choose an uploaded scope first.");
   const entry = {
     id: `scope-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     name: file.name,
@@ -8453,7 +8059,7 @@ function saveUploadedScopeToDatabase(recordId, fileIndex, scopeCategory) {
 
 function attachScopeFromDatabase(recordId, scopeId) {
   const item = scopeDatabaseRecords().find((entry) => entry.id === scopeId);
-  if (!item) { showToast("Choose a saved scope first.", "warning"); return; }
+  if (!item) return alert("Choose a saved scope first.");
   const type = findRecord("project", recordId) ? "project" : "proposal";
   const uploadCategory = scopeUploadCategory(type);
   if (!state.attachments[recordId]) state.attachments[recordId] = {};
@@ -8472,8 +8078,8 @@ function attachScopeFromDatabase(recordId, scopeId) {
   showDetail(type, recordId);
 }
 
-async function deleteScopeDatabaseEntry(id) {
-  if (!await gripConfirm("Delete this saved scope of work from the database?", "Delete Scope")) return;
+function deleteScopeDatabaseEntry(id) {
+  if (!confirm("Delete this saved scope of work from the database?")) return;
   state.scopeDatabase = state.scopeDatabase.filter((entry) => entry.id !== id);
   saveScopeDatabase();
   renderScopeDatabase();
@@ -9082,7 +8688,7 @@ function saveStandaloneScope(formEl) {
   const form = new FormData(formEl);
   const file = formEl.elements.file.files?.[0];
   const generatedText = scopeTemplateText(form);
-  if (!file && !String(form.get("scopeType") || form.get("project") || form.get("overview") || scopeManualWorkItems(form).join(" ")).trim()) { showToast("Upload a scope or fill in the template fields.", "warning"); return; }
+  if (!file && !String(form.get("scopeType") || form.get("project") || form.get("overview") || scopeManualWorkItems(form).join(" ")).trim()) return alert("Upload a scope or fill in the template fields.");
   if (!file) {
     state.scopeDatabase.unshift({
       id: `scope-${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -9132,37 +8738,27 @@ function saveStandaloneScope(formEl) {
   reader.readAsDataURL(file);
 }
 
-async function addProposalFiles(proposalId, category, files) {
+function addProposalFiles(proposalId, category, files) {
   if (!files || !files.length) return;
-  if (!window.gripSync?.isConfigured() && !confirmLargeLocalFiles(files, "proposal or project attachments")) return;
+  if (!confirmLargeLocalFiles(files, "proposal or project attachments")) return;
   if (!state.attachments[proposalId]) state.attachments[proposalId] = {};
   if (!state.attachments[proposalId][category]) state.attachments[proposalId][category] = [];
-  for (const file of [...files]) {
-    // Try Supabase Storage first (avoids localStorage bloat)
-    let cloudUrl = null;
-    if (window.gripSync?.isConfigured()) {
-      cloudUrl = await window.gripSync.uploadFile(file, `attachments/${category}`).catch(() => null);
-    }
-    let dataUrl = "";
-    if (!cloudUrl) {
-      dataUrl = await new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.readAsDataURL(file);
+  [...files].forEach((file) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      state.attachments[proposalId][category].push({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        dataUrl: reader.result,
+        uploadedAt: new Date().toISOString(),
       });
-    }
-    state.attachments[proposalId][category].push({
-      name: file.name,
-      type: file.type,
-      size: file.size,
-      url: cloudUrl || "",
-      dataUrl,
-      uploadedAt: new Date().toISOString(),
-    });
-  }
-  saveProposalAttachments();
-  const type = findRecord("project", proposalId) ? "project" : "proposal";
-  showDetail(type, proposalId);
+      saveProposalAttachments();
+      const type = findRecord("project", proposalId) ? "project" : "proposal";
+      showDetail(type, proposalId);
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 function handleDroppedFiles(dropZone, files) {
@@ -9274,7 +8870,7 @@ function showContractorDetail(name, editMode = false) {
         ${
           supportContacts.length
             ? supportContacts.map((contact, index) => supportContactCard(profile.companyName, contact, index)).join("")
-            : `<p class="empty-state" data-icon="👤">No support contacts yet.</p>`
+            : `<p class="empty-state">No support contacts yet.</p>`
         }
       </div>
       <button class="secondary-button support-add-button" data-add-support-contact="${escapeHtml(profile.companyName)}" type="button">Add support contact</button>
@@ -9392,7 +8988,7 @@ function saveContractorProfile(oldName, form) {
         .join(", ");
       if (normalize(project.awardedContractor) === oldKey) project.awardedContractor = profile.companyName;
     });
-    safeSetItem("garlandProposalUpdates", JSON.stringify(proposalUpdates));
+    localStorage.setItem("garlandProposalUpdates", JSON.stringify(proposalUpdates));
   }
   saveCrm();
   renderFilters();
@@ -10009,20 +9605,14 @@ function handleProjectCommissionInput() {
   if (!Number.isNaN(commission)) byId("projectWiseTrophyInput").value = (commission * 4).toFixed(2);
 }
 
+function missingRequiredFields(fields) {
+  return fields.filter((field) => !normalize(field.value)).map((field) => field.label);
+}
 
-function stopForMissingFields(recordType, fields, formEl) {
-  const failing = fields.filter((field) => !normalize(field.value));
-  if (!failing.length) return false;
-  showToast(`Missing required ${recordType} fields: ${failing.map((f) => f.label).join(", ")}`, "warning");
-  // B: Highlight each failing field red
-  if (formEl) {
-    formEl.querySelectorAll(".field-error").forEach((el) => el.classList.remove("field-error"));
-    failing.forEach((field) => {
-      if (!field.name) return;
-      const input = formEl.elements[field.name] || formEl.querySelector(`[name="${CSS.escape(field.name)}"]`);
-      if (input) input.classList.add("field-error");
-    });
-  }
+function stopForMissingFields(recordType, fields) {
+  const missing = missingRequiredFields(fields);
+  if (!missing.length) return false;
+  alert(`Please fill in these required ${recordType} fields before saving:\n\n${missing.join("\n")}`);
   return true;
 }
 
@@ -10048,34 +9638,29 @@ function closestDuplicateName(name, candidates, ignored = []) {
     .sort((a, b) => b.score - a.score || compareText(a.candidate, b.candidate))[0]?.candidate || "";
 }
 
-async function shouldStopForDuplicate(type, name, candidates, ignored = []) {
+function shouldStopForDuplicate(type, name, candidates, ignored = []) {
   const match = closestDuplicateName(name, candidates, ignored);
   if (!match) return false;
-  const proceed = await gripConfirm(
-    `This ${type} looks similar to an existing ${type}:\n\n${match}\n\nContinue creating "${name}" anyway?`,
-    "Possible Duplicate"
-  );
-  return !proceed;
+  return !confirm(`This ${type} looks similar to an existing ${type}:\n\n${match}\n\nContinue creating "${name}" anyway?`);
 }
 
-async function handleProjectSubmit(event) {
+function handleProjectSubmit(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
-  const formEl = event.currentTarget;
   if (
     stopForMissingFields("project", [
-      { label: "Client", name: "client", value: form.get("client") },
-      { label: "ABC Score", name: "abcList", value: form.get("abcList") },
-      { label: "Project Name", name: "projectName", value: form.get("projectName") },
-      { label: "Project Address", name: "address", value: form.get("address") },
-      { label: "Project Stage", name: "stage", value: form.get("stage") },
-      { label: "Project Type", name: "projectType", value: form.get("projectType") },
-    ], formEl)
+      { label: "Client", value: form.get("client") },
+      { label: "ABC Score", value: form.get("abcList") },
+      { label: "Project Name", value: form.get("projectName") },
+      { label: "Project Address", value: form.get("address") },
+      { label: "Project Stage", value: form.get("stage") },
+      { label: "Project Type", value: form.get("projectType") },
+    ])
   ) {
     return;
   }
   if (
-    await shouldStopForDuplicate(
+    shouldStopForDuplicate(
       "project",
       form.get("projectName"),
       cleanProjects().map((project) => project.projectName || project.client)
@@ -10120,7 +9705,7 @@ async function handleProjectSubmit(event) {
   savedCrm.projects.push(project);
   data.projects.push(project);
   saveCrm();
-  await promptFollowUpActivity("project", project, "", project.nextFollowUp);
+  promptFollowUpActivity("project", project, "", project.nextFollowUp);
   renderFilters();
   render();
   byId("projectDialog").close();
@@ -10129,25 +9714,24 @@ async function handleProjectSubmit(event) {
   showDetail("project", project.id);
 }
 
-async function handleProposalSubmit(event) {
+function handleProposalSubmit(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
-  const formEl = event.currentTarget;
   const client = String(form.get("client") || "").trim();
   if (
     stopForMissingFields("proposal", [
-      { label: "Client", name: "client", value: client },
-      { label: "Project Name", name: "project", value: form.get("project") },
-      { label: "Due Date", name: "bidDueDate", value: form.get("bidDueDate") },
-      { label: "Stage", name: "stage", value: form.get("stage") },
-      { label: "Entity", name: "entity", value: form.get("entity") },
-      { label: "County", name: "county", value: form.get("county") },
-    ], formEl)
+      { label: "Client", value: client },
+      { label: "Project Name", value: form.get("project") },
+      { label: "Due Date", value: form.get("bidDueDate") },
+      { label: "Stage", value: form.get("stage") },
+      { label: "Entity", value: form.get("entity") },
+      { label: "County", value: form.get("county") },
+    ])
   ) {
     return;
   }
   if (
-    await shouldStopForDuplicate(
+    shouldStopForDuplicate(
       "proposal",
       form.get("project"),
       cleanProposals().map((proposal) => proposal.project || proposal.client)
@@ -10183,7 +9767,7 @@ async function handleProposalSubmit(event) {
   savedCrm.proposals.push(proposal);
   data.proposals.push(proposal);
   saveCrm();
-  await promptFollowUpActivity("proposal", proposal, "", proposal.nextFollowUp);
+  promptFollowUpActivity("proposal", proposal, "", proposal.nextFollowUp);
   renderFilters();
   render();
   byId("proposalDialog").close();
@@ -10320,13 +9904,12 @@ function setView(view) {
   if (view === "takeoffEstimator") renderTakeoffEstimator();
   if (view === "warrantySummary") renderWarrantySummaryChart();
   if (view === "noteTaker") renderNoteTaker();
-  byId("viewTitle").textContent = { dashboard: "Dashboard", accounts: "Accounts", projects: "Projects", punchList: "Punch List", takeoffEstimator: "Takeoff Estimator", warrantySummary: "Warranty Summary Chart", proposals: "Proposals", scopeDatabase: "Scope of Work", tasks: "Tasks", callList: "Call List", followUpQueue: "Follow-Up Queue", activityLog: "Activity Log", newsReport: "Your News Report", contractors: "Contractors", noteTaker: "Note Taker" }[view] || view;
+  if (view === "assistant") { const el = byId("assistantViewContent"); if (el && window.GRIPAssistant) window.GRIPAssistant.render(el); }
+  byId("viewTitle").textContent = { dashboard: "Dashboard", accounts: "Accounts", projects: "Projects", punchList: "Punch List", takeoffEstimator: "Takeoff Estimator", warrantySummary: "Warranty Summary Chart", proposals: "Proposals", scopeDatabase: "Scope of Work", tasks: "Tasks", callList: "Call List", followUpQueue: "Follow-Up Queue", activityLog: "Activity Log", newsReport: "Your News Report", contractors: "Contractors", noteTaker: "Note Taker", assistant: "Assistant" }[view] || view;
   if (view === "dashboard") {
     showDueTodayProposalDialog();
     showTaskDailyAlertDialog();
   }
-  // Reset scroll so the user always lands at the top of the new view
-  document.querySelector(".workspace")?.scrollTo({ top: 0, behavior: "instant" });
 }
 
 function closeMobileMoreMenu() {
@@ -10424,30 +10007,10 @@ function bindEvents() {
 
   // ── Supabase auth bindings ──────────────────────────────────────
   byId("gripGoogleSignInButton")?.addEventListener("click", () => window.gripSync?.signInWithGoogle());
-  byId("gripContinueLocalButton")?.addEventListener("click", () => {
-    // Always dismiss the auth overlay — even if gripSync failed to initialise.
-    if (window.gripSync) {
-      window.gripSync.continueLocal();
-    } else {
-      const overlay = document.getElementById("gripAuthOverlay");
-      if (overlay) overlay.hidden = true;
-    }
+  byId("gripContinueLocalButton")?.addEventListener("click", () => window.gripSync?.continueLocal());
+  byId("gripSignOutButton")?.addEventListener("click", () => {
+    if (confirm("Sign out of GRIP cloud sync? Your local data stays on this device.")) window.gripSync?.signOut();
   });
-  byId("gripSignOutButton")?.addEventListener("click", async () => {
-    if (await gripConfirm("Sign out of GRIP cloud sync? Your local data stays on this device.", "Sign Out")) window.gripSync?.signOut();
-  });
-  byId("gripSyncNowButton")?.addEventListener("click", async () => {
-    const btn = byId("gripSyncNowButton");
-    const original = btn.textContent;
-    btn.textContent = "Syncing…";
-    btn.disabled = true;
-    await window.gripSync?.syncNow();
-    const info = window.gripSync?.lastSyncInfo() || "";
-    btn.textContent = original;
-    btn.disabled = false;
-    showToast(`Sync complete. ${info}`, "success");
-  });
-  byId("gripForceSignOutButton")?.addEventListener("click", () => window.gripSync?.signOutAllDevices());
   byId("cancelReleaseNotesButton").addEventListener("click", () => byId("releaseNotesDialog").close());
   byId("cancelProposalDueTodayButton").addEventListener("click", () => {
     byId("proposalDueTodayDialog").close();
@@ -10500,11 +10063,9 @@ function bindEvents() {
     addTerritoryValue("county", byId("newCountyInput").value, byId("newCountyColorInput").value);
     byId("newCountyInput").value = "";
   });
-  let _searchDebounceTimer = null;
   byId("globalSearch").addEventListener("input", (event) => {
     state.search = event.target.value;
-    clearTimeout(_searchDebounceTimer);
-    _searchDebounceTimer = setTimeout(() => render(), 180);
+    render();
   });
   byId("taskSearchInput").addEventListener("input", (event) => {
     state.filters.taskSearch = event.target.value;
@@ -10513,9 +10074,7 @@ function bindEvents() {
   byId("taskSummaryStrip").addEventListener("click", (event) => {
     const button = event.target.closest("[data-task-summary-filter]");
     if (!button) return;
-    const filter = button.dataset.taskSummaryFilter;
-    // Toggle off if already active
-    state.filters.taskDue = (state.filters.taskDue === filter) ? "all" : filter;
+    state.filters.taskDue = button.dataset.taskSummaryFilter;
     byId("taskDueFilter").value = state.filters.taskDue;
     renderTasks();
   });
@@ -10571,22 +10130,10 @@ function bindEvents() {
     state.filters.punchSearch = event.target.value;
     renderPunchLists();
   });
-  byId("punchDueFilter").addEventListener("change", (event) => {
-    state.filters.punchDue = event.target.value;
-    renderPunchLists();
-  });
-  byId("punchActiveOnlyBtn").addEventListener("click", () => {
-    state.punchActiveOnly = !state.punchActiveOnly;
-    localStorage.setItem("garlandPunchActiveOnly", state.punchActiveOnly ? "1" : "0");
-    renderPunchLists();
-  });
   byId("punchSummaryStrip").addEventListener("click", (event) => {
     const button = event.target.closest("[data-punch-summary-key]");
     if (!button) return;
-    // Toggle off if already active
-    const key = button.dataset.punchSummaryKey;
-    const val = button.dataset.punchSummaryValue;
-    state.filters[key] = (state.filters[key] === val) ? (key === "punchDue" ? "All dates" : "All statuses") : val;
+    state.filters[button.dataset.punchSummaryKey] = button.dataset.punchSummaryValue;
     renderFilters();
     renderPunchLists();
   });
@@ -10800,16 +10347,16 @@ function bindEvents() {
     if (id) openAccountDialog(id);
     else byId("accountForm").reset();
   });
-  byId("deleteAccountDialogButton").addEventListener("click", async () => {
+  byId("deleteAccountDialogButton").addEventListener("click", () => {
     const id = byId("accountIdInput").value;
-    if (id && await gripConfirm("Delete this account from the CRM? This cannot be undone.", "Delete Account")) {
+    if (id && confirm("Delete this account from the CRM?")) {
       deleteRecord("account", id);
       byId("accountDialog").close();
     }
   });
-  byId("accountForm").addEventListener("submit", async (event) => {
+  byId("accountForm").addEventListener("submit", (event) => {
     event.preventDefault();
-    await saveAccountFromDialog(new FormData(event.currentTarget));
+    saveAccountFromDialog(new FormData(event.currentTarget));
   });
   byId("cancelProjectButton").addEventListener("click", () => byId("projectDialog").close());
   byId("clearProjectButton").addEventListener("click", resetProjectForm);
@@ -10860,7 +10407,7 @@ function bindEvents() {
   byId("projectForm").addEventListener("submit", handleProjectSubmit);
   byId("cancelProjectChecklistButton").addEventListener("click", () => byId("projectChecklistDialog").close());
   byId("printProjectChecklistButton").addEventListener("click", printProjectChecklist);
-  byId("clearProjectChecklistButton").addEventListener("click", async () => { await clearProjectChecklist(byId("projectChecklistProjectId").value); });
+  byId("clearProjectChecklistButton").addEventListener("click", () => clearProjectChecklist(byId("projectChecklistProjectId").value));
   byId("projectChecklistForm").addEventListener("submit", (event) => {
     event.preventDefault();
     saveProjectChecklistFromForm(event.currentTarget);
@@ -10936,7 +10483,7 @@ function bindEvents() {
     event.preventDefault();
     saveNoteTakerEntry(event.currentTarget);
   });
-  document.body.addEventListener("click", async (event) => {
+  document.body.addEventListener("click", (event) => {
     const toggleChecklistNa = event.target.closest("[data-toggle-checklist-na]");
     if (toggleChecklistNa) {
       event.preventDefault();
@@ -10980,7 +10527,7 @@ function bindEvents() {
       try {
         downloadCalendarIcs(JSON.parse(calendarIcs.dataset.calendarIcs || "{}"));
       } catch (_error) {
-        showToast("Could not build that calendar file.", "error");
+        alert("Could not build that calendar file.");
       }
       return;
     }
@@ -10990,7 +10537,7 @@ function bindEvents() {
       event.stopPropagation();
       const proposal = findRecord("proposal", requestProposal.dataset.proposalRequestId);
       const contractor = requestProposal.dataset.proposalRequestContractor || "";
-      if (!proposal) { showToast("I could not find that proposal.", "error"); return; }
+      if (!proposal) return alert("I could not find that proposal.");
       const draft = proposalRequestDraft(proposal, contractor);
       if (!draft.to) {
         copyProposalRequestDraft(draft.text, "Contractor email is missing, so the draft was copied instead.");
@@ -11005,7 +10552,7 @@ function bindEvents() {
       event.stopPropagation();
       const proposal = findRecord("proposal", copyProposalRequest.dataset.proposalRequestId);
       const contractor = copyProposalRequest.dataset.proposalRequestContractor || "";
-      if (!proposal) { showToast("I could not find that proposal.", "error"); return; }
+      if (!proposal) return alert("I could not find that proposal.");
       copyProposalRequestDraft(proposalRequestDraft(proposal, contractor).text);
       return;
     }
@@ -11013,7 +10560,7 @@ function bindEvents() {
     if (logRecordActivityButton) {
       event.preventDefault();
       event.stopPropagation();
-      await logRecordActivity(logRecordActivityButton.dataset.logRecordActivity, logRecordActivityButton.dataset.logRecordId);
+      logRecordActivity(logRecordActivityButton.dataset.logRecordActivity, logRecordActivityButton.dataset.logRecordId);
       return;
     }
     const exportAccountProfileButton = event.target.closest("[data-export-account-profile]");
@@ -11065,7 +10612,7 @@ function bindEvents() {
     }
     const deleteFavorite = event.target.closest("[data-delete-favorite-system]");
     if (deleteFavorite) {
-      if (await gripConfirm("Delete this saved system?", "Delete System")) deleteFavoriteSystem(deleteFavorite.dataset.deleteFavoriteSystem);
+      if (confirm("Delete this saved system?")) deleteFavoriteSystem(deleteFavorite.dataset.deleteFavoriteSystem);
       return;
     }
     const dashboardRow = event.target.closest("[data-dashboard-view]");
@@ -11124,7 +10671,7 @@ function bindEvents() {
     }
     const editTerritory = event.target.closest("[data-edit-territory]");
     if (editTerritory) {
-      await editTerritoryValue(editTerritory.dataset.editTerritory, editTerritory.dataset.territoryValue);
+      editTerritoryValue(editTerritory.dataset.editTerritory, editTerritory.dataset.territoryValue);
       return;
     }
     const editRecord = event.target.closest("[data-edit-record]");
@@ -11160,12 +10707,12 @@ function bindEvents() {
     const completeTaskButton = event.target.closest("[data-complete-task]");
     if (completeTaskButton) {
       event.stopPropagation();
-      await completeTask(completeTaskButton.dataset.completeTask, completeTaskButton.checked, completeTaskButton);
+      completeTask(completeTaskButton.dataset.completeTask, completeTaskButton.checked);
       return;
     }
     const deleteTaskButton = event.target.closest("[data-delete-task]");
     if (deleteTaskButton) {
-      if (await gripConfirm("Delete this task?", "Delete Task")) deleteRecord("task", deleteTaskButton.dataset.deleteTask);
+      if (confirm("Delete this task?")) deleteRecord("task", deleteTaskButton.dataset.deleteTask);
       return;
     }
     const generateContractorLinkButton = event.target.closest("[data-generate-contractor-link]");
@@ -11173,7 +10720,7 @@ function bindEvents() {
       const list = findPunchList(generateContractorLinkButton.dataset.generateContractorLink);
       if (!list) return;
       if (!window.gripSync?.isConfigured()) {
-        showToast("Configure Supabase and sign in to generate contractor portal links.", "warning");
+        alert("Configure Supabase in src/supabase-client.js and sign in to generate contractor portal links.");
         return;
       }
       generateContractorLinkButton.textContent = "Generating…";
@@ -11182,14 +10729,11 @@ function bindEvents() {
         generateContractorLinkButton.textContent = "🔗 Contractor Portal Link";
         generateContractorLinkButton.disabled = false;
         if (!url) return;
-        const expiresDate = new Date();
-        expiresDate.setDate(expiresDate.getDate() + 30);
-        const expiresStr = expiresDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
         navigator.clipboard.writeText(url).then(() => {
-          generateContractorLinkButton.textContent = `✓ Copied — expires ${expiresStr}`;
-          setTimeout(() => { generateContractorLinkButton.textContent = "🔗 Contractor Portal Link"; }, 5000);
-        }).catch(async () => {
-          await gripPrompt("Copy this contractor portal link:", url, `Contractor Link — expires ${expiresStr}`);
+          generateContractorLinkButton.textContent = "✓ Link Copied!";
+          setTimeout(() => { generateContractorLinkButton.textContent = "🔗 Contractor Portal Link"; }, 3000);
+        }).catch(() => {
+          prompt("Copy this contractor portal link:", url);
         });
       });
       return;
@@ -11204,109 +10748,9 @@ function bindEvents() {
       openPunchListDialog(addPunchItemButton.dataset.addPunchItem, "", true);
       return;
     }
-    // A: Collapse/expand a project group — fires on header click, not on its buttons
-    const collapseTarget = event.target.closest("[data-punch-collapse-target]");
-    if (collapseTarget && !event.target.closest("button")) {
-      const rawKey = collapseTarget.dataset.punchCollapseTarget;
-      const group = document.querySelector(`.punch-project-group[data-punch-group-key="${CSS.escape(rawKey)}"]`);
-      if (group) {
-        const nowCollapsed = group.classList.toggle("is-collapsed");
-        state.punchGroupCollapsed[rawKey] = nowCollapsed;
-        localStorage.setItem("garlandPunchGroupCollapsed", JSON.stringify(state.punchGroupCollapsed));
-      }
-      return;
-    }
-
-    // "Collapse All Closed" toolbar button
-    if (event.target.closest("#punchCollapseClosedBtn")) {
-      const closedGroups = document.querySelectorAll(".punch-project-group.is-closed-group");
-      const anyOpen = [...closedGroups].some((g) => !g.classList.contains("is-collapsed"));
-      closedGroups.forEach((group) => {
-        const key = group.dataset.punchGroupKey;
-        const shouldCollapse = anyOpen; // collapse if any open; otherwise expand all
-        group.classList.toggle("is-collapsed", shouldCollapse);
-        state.punchGroupCollapsed[key] = shouldCollapse;
-      });
-      // Update button label to reflect new state
-      const btn = event.target.closest("#punchCollapseClosedBtn");
-      btn.textContent = anyOpen ? "Expand Closed ↓" : "Collapse Closed ↑";
-      localStorage.setItem("garlandPunchGroupCollapsed", JSON.stringify(state.punchGroupCollapsed));
-      return;
-    }
-
-    // C: Quick status advance from the project header button
-    const punchAdvanceBtn = event.target.closest("[data-punch-advance]");
-    if (punchAdvanceBtn) {
-      const list = findPunchList(punchAdvanceBtn.dataset.punchAdvance);
-      const nextStatus = punchAdvanceBtn.dataset.punchNextStatus;
-      if (!list || !nextStatus) return;
-      const _openCount = (list.items || []).filter((i) => !["Approved", "Closed"].includes(i.status)).length;
-      const _confirmLines = [
-        `Advance to: ${nextStatus}`,
-        `Project: ${list.project_name || "—"}`,
-        list.assigned_contractor ? `Contractor: ${list.assigned_contractor}` : null,
-        list.due_date ? `Due: ${compactDate(list.due_date)}` : null,
-        _openCount > 0 ? `Open items: ${_openCount}` : "✓ All items resolved",
-      ].filter(Boolean).join("\n");
-      if (!await gripConfirm(_confirmLines, `Advance to: ${nextStatus}`)) return;
-      list.status = nextStatus;
-      list.updated_at = new Date().toISOString();
-      if (nextStatus === "Sent to Contractor") list.sent_at = list.sent_at || new Date().toISOString();
-      if (nextStatus === "Closed") list.closed_at = list.closed_at || new Date().toISOString();
-      punchAudit(list, `Status advanced to ${nextStatus}`);
-      savePunchLists();
-      renderPunchLists();
-      return;
-    }
-
-    // Bulk-close all open items on a punch list
-    const bulkCloseBtn = event.target.closest("[data-punch-bulk-close]");
-    if (bulkCloseBtn) {
-      const list = findPunchList(bulkCloseBtn.dataset.punchBulkClose);
-      const count = Number(bulkCloseBtn.dataset.punchBulkCloseCount) || 0;
-      if (!list || !count) return;
-      if (!await gripConfirm(
-        `Close all ${count} open item${count === 1 ? "" : "s"} on "${list.title}"?\n\nProject: ${list.project_name || "—"}\n\nThis marks every unresolved item as Closed.`,
-        "Bulk Close Items"
-      )) return;
-      const bulkNow = new Date().toISOString();
-      (list.items || []).forEach((item) => {
-        if (!["Approved", "Closed"].includes(item.status) && !item.resolved) {
-          item.status = "Closed";
-          item.resolved = true;
-          item.resolved_at = item.resolved_at || bulkNow;
-          item.updated_at = bulkNow;
-        }
-      });
-      list.updated_at = bulkNow;
-      // C: If all items are now resolved, auto-advance the list status to Closed
-      const allResolved = (list.items || []).every((i) => ["Approved", "Closed"].includes(i.status) || i.resolved);
-      if (allResolved && (list.items || []).length) {
-        list.status = "Closed";
-        list.closed_at = list.closed_at || bulkNow;
-        punchAudit(list, `Bulk-closed ${count} item${count === 1 ? "" : "s"} — list auto-closed`);
-      } else {
-        punchAudit(list, `Bulk-closed ${count} open item${count === 1 ? "" : "s"}`);
-      }
-      savePunchLists();
-      renderPunchLists();
-      return;
-    }
-
     const openPunchProjectButton = event.target.closest("[data-open-punch-project]");
     if (openPunchProjectButton) {
-      const projectId = openPunchProjectButton.dataset.openPunchProject;
-      // B: Warn before creating a second active punch list for the same project
-      if (projectId) {
-        const existingActive = state.punchLists.find(
-          (l) => l.project_id === projectId && !["Closed", "Approved"].includes(l.status)
-        );
-        if (existingActive && !await gripConfirm(
-          `"${existingActive.title}" is already open for this project.\n\nCreate another punch list anyway?`,
-          "Duplicate Punch List"
-        )) return;
-      }
-      openPunchListDialog("", projectId);
+      openPunchListDialog("", openPunchProjectButton.dataset.openPunchProject);
       return;
     }
     const openPunchDetailButton = event.target.closest("[data-open-punch-detail]");
@@ -11343,56 +10787,55 @@ function bindEvents() {
     }
     const submitPunchItemButton = event.target.closest("[data-submit-punch-item]");
     if (submitPunchItemButton) {
-      await updatePunchItemStatus(submitPunchItemButton.dataset.punchList, submitPunchItemButton.dataset.submitPunchItem, "Submitted for Review");
+      updatePunchItemStatus(submitPunchItemButton.dataset.punchList, submitPunchItemButton.dataset.submitPunchItem, "Submitted for Review");
       return;
     }
     const approvePunchItemButton = event.target.closest("[data-approve-punch-item]");
     if (approvePunchItemButton) {
-      await updatePunchItemStatus(approvePunchItemButton.dataset.punchList, approvePunchItemButton.dataset.approvePunchItem, "Approved");
+      updatePunchItemStatus(approvePunchItemButton.dataset.punchList, approvePunchItemButton.dataset.approvePunchItem, "Approved");
       return;
     }
     const rejectPunchItemButton = event.target.closest("[data-reject-punch-item]");
     if (rejectPunchItemButton) {
-      await updatePunchItemStatus(rejectPunchItemButton.dataset.punchList, rejectPunchItemButton.dataset.rejectPunchItem, "Rejected");
+      updatePunchItemStatus(rejectPunchItemButton.dataset.punchList, rejectPunchItemButton.dataset.rejectPunchItem, "Rejected");
       return;
     }
     const requestCorrectionButton = event.target.closest("[data-request-correction]");
     if (requestCorrectionButton) {
-      await updatePunchItemStatus(requestCorrectionButton.dataset.punchList, requestCorrectionButton.dataset.requestCorrection, "Needs Additional Correction");
+      updatePunchItemStatus(requestCorrectionButton.dataset.punchList, requestCorrectionButton.dataset.requestCorrection, "Needs Additional Correction");
       return;
     }
     const deletePunchButton = event.target.closest("[data-delete-punch-list]");
     if (deletePunchButton) {
-      if (await gripConfirm("Delete this punch list? This cannot be undone.", "Delete Punch List")) deleteRecord("punchList", deletePunchButton.dataset.deletePunchList);
+      if (confirm("Delete this punch list?")) deleteRecord("punchList", deletePunchButton.dataset.deletePunchList);
       return;
     }
     const deleteRecordButton = event.target.closest("[data-delete-record]");
     if (deleteRecordButton) {
       const type = deleteRecordButton.dataset.deleteRecord;
       const id = deleteRecordButton.dataset.deleteId;
-      if (await gripConfirm(`Delete this ${type} from the CRM? This cannot be undone.`, `Delete ${type[0].toUpperCase() + type.slice(1)}`)) deleteRecord(type, id);
+      if (confirm(`Delete this ${type} from the CRM?`)) deleteRecord(type, id);
       return;
     }
     const archiveRecordButton = event.target.closest("[data-archive-record]");
     if (archiveRecordButton) {
       const type = archiveRecordButton.dataset.archiveRecord;
       const id = archiveRecordButton.dataset.archiveId;
-      if (await gripConfirm(`Archive this ${type} from active views?`, "Archive Record")) archiveRecord(type, id);
+      if (confirm(`Archive this ${type} from active views?`)) archiveRecord(type, id);
       return;
     }
     const editActivityButton = event.target.closest("[data-edit-activity]");
     if (editActivityButton) {
-      await editActivity(editActivityButton.dataset.activityAccount, editActivityButton.dataset.editActivity);
+      editActivity(editActivityButton.dataset.activityAccount, editActivityButton.dataset.editActivity);
       return;
     }
     const deleteActivityButton = event.target.closest("[data-delete-activity]");
     if (deleteActivityButton) {
-      await deleteActivity(deleteActivityButton.dataset.activityAccount, deleteActivityButton.dataset.deleteActivity);
+      deleteActivity(deleteActivityButton.dataset.activityAccount, deleteActivityButton.dataset.deleteActivity);
       return;
     }
     const removeFile = event.target.closest("[data-remove-file]");
     if (removeFile) {
-      if (!await gripConfirm("Remove this attachment?", "Remove File")) return;
       const proposalId = removeFile.dataset.fileRecord || removeFile.dataset.fileProposal;
       const category = removeFile.dataset.fileCategory;
       state.attachments[proposalId]?.[category]?.splice(Number(removeFile.dataset.removeFile), 1);
@@ -11420,7 +10863,7 @@ function bindEvents() {
     }
     const deleteScope = event.target.closest("[data-delete-scope-db]");
     if (deleteScope) {
-      await deleteScopeDatabaseEntry(deleteScope.dataset.deleteScopeDb);
+      deleteScopeDatabaseEntry(deleteScope.dataset.deleteScopeDb);
       return;
     }
     const useScope = event.target.closest("[data-use-scope-template]");
@@ -11442,7 +10885,7 @@ function bindEvents() {
     }
     const renameAccountButton = event.target.closest("[data-rename-account]");
     if (renameAccountButton) {
-      await renameAccount(renameAccountButton.dataset.renameAccount);
+      renameAccount(renameAccountButton.dataset.renameAccount);
       return;
     }
     const openCallAccount = event.target.closest("[data-open-call-account]");
@@ -11481,12 +10924,12 @@ function bindEvents() {
     }
     const deleteTakeoff = event.target.closest("[data-delete-takeoff-estimate]");
     if (deleteTakeoff) {
-      if (await gripConfirm("Delete this saved takeoff estimate?", "Delete Takeoff")) deleteTakeoffEstimate(deleteTakeoff.dataset.deleteTakeoffEstimate);
+      if (confirm("Delete this saved takeoff estimate?")) deleteTakeoffEstimate(deleteTakeoff.dataset.deleteTakeoffEstimate);
       return;
     }
     const deletePriceBookButton = event.target.closest("[data-delete-price-book]");
     if (deletePriceBookButton) {
-      if (await gripConfirm("Delete this price book reference?", "Delete Price Book")) deletePriceBook(deletePriceBookButton.dataset.deletePriceBook);
+      if (confirm("Delete this price book reference?")) deletePriceBook(deletePriceBookButton.dataset.deletePriceBook);
       return;
     }
     const record = event.target.closest("[data-type][data-id]");
@@ -11546,7 +10989,7 @@ function bindEvents() {
     const noteId = event.target.dataset.noteId;
     if (!noteId) return;
     state.notes[noteId] = event.target.value;
-    safeSetItem("garlandCrmNotes", JSON.stringify(state.notes));
+    localStorage.setItem("garlandCrmNotes", JSON.stringify(state.notes));
   });
   document.body.addEventListener("dragstart", (event) => {
     const card = event.target.closest(".record-grid.is-kanban .record-card[data-type][data-id]");
@@ -11752,8 +11195,6 @@ standardizeProjectTypeLabels();
 standardizeAbcScoreLabels();
 applyRequestedDataCleanup();
 migrateSheetNotesToActivities();
-ensurePunchShape(); // normalize once at startup — not on every render
-ensureTaskShape();  // normalize once at startup — not on every render
 renderFilters();
 renderInchFractionOptions();
 resetProjectForm();
@@ -11764,58 +11205,3 @@ setDetailsHidden(false);
 showDueTodayProposalDialog();
 showTaskDailyAlertDialog();
 showFridayWeeklyReviewDialog();
-
-// ── D: Topbar scroll-shadow — only elevate once workspace scrolls ──
-(function setupTopbarScrollShadow() {
-  const workspace = document.querySelector(".workspace");
-  if (!workspace) return;
-  let ticking = false;
-  workspace.addEventListener("scroll", () => {
-    if (ticking) return;
-    ticking = true;
-    requestAnimationFrame(() => {
-      const scrolled = workspace.scrollTop > 8;
-      document.querySelectorAll(".topbar").forEach((tb) => tb.classList.toggle("topbar--scrolled", scrolled));
-      ticking = false;
-    });
-  }, { passive: true });
-})();
-
-// ── B: Clear field-error highlight when user starts correcting a field ──
-document.body.addEventListener("input", (event) => {
-  if (event.target.classList.contains("field-error")) event.target.classList.remove("field-error");
-}, true);
-
-// ── Realtime remote-update handler ──────────────────────────────
-// grip-sync.js fires "grip:remote-update" when another device pushes
-// a change. Re-read the affected key from localStorage (already updated
-// by grip-sync) and re-render the relevant section.
-window._gripHandleRemoteUpdate = function (key) {
-  if (key === "garlandTasks") {
-    state.tasks = readStorageJson("garlandTasks", []);
-    ensureTaskShape();
-    renderTasks();
-  } else if (key === "garlandPunchLists") {
-    state.punchLists = readStorageJson("garlandPunchLists", []);
-    ensurePunchShape();
-    renderPunchLists();
-  } else if (key === "garlandCrmData") {
-    // Full CRM data changed — full render required
-    window.location.reload();
-  } else if (key === "garlandAccountActivities") {
-    state.activities = readStorageJson("garlandAccountActivities", {});
-    renderDashboard();
-  } else if (key === "garlandCrmNotes") {
-    state.notes = readStorageJson("garlandCrmNotes", {});
-  } else if (key === "garlandProposalAttachments") {
-    state.attachments = readStorageJson("garlandProposalAttachments", {});
-  } else if (key === "garlandProjectChecklists") {
-    state.projectChecklists = readStorageJson("garlandProjectChecklists", {});
-  } else if (key === "garlandScopeDatabase") {
-    state.scopeDatabase = readStorageJson("garlandScopeDatabase", []);
-    renderScopeDatabase();
-  } else if (key === "garlandCallLists") {
-    state.callLists = readStorageJson("garlandCallLists", { rules: [], completed: {} });
-    renderCallList();
-  }
-};

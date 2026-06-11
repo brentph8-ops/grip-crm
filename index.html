@@ -4,18 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>GRIP</title>
-    <link rel="manifest" href="manifest.json" />
-    <!-- Light / dark theme-color for Safari tab tinting -->
-    <meta name="theme-color" content="#f3f6fb" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#0e1c2b" media="(prefers-color-scheme: dark)" />
-    <!-- Tells the browser this app supports both colour schemes -->
-    <meta name="color-scheme" content="light dark" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="GRIP" />
-    <link rel="apple-touch-icon" href="icons/icon-192.png" />
     <link rel="stylesheet" href="src/styles.css" />
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
     <script src="src/supabase-client.js"></script>
   </head>
   <body>
@@ -34,9 +24,9 @@
         </button>
         <p id="gripAuthError" class="auth-error" hidden></p>
         <button class="secondary-button" id="gripContinueLocalButton" type="button">
-          Use locally for now (tap sync badge to sign in later)
+          Continue without sign-in (local only)
         </button>
-        <p class="auth-note">Authorized for @garlandco.com accounts. Each rep gets their own private data. Local mode keeps data on this device only — tap the sync indicator in the toolbar any time to sign in.</p>
+        <p class="auth-note">Authorized access only — bphillips@garlandco.com. Local mode keeps data on this device; sign in for cross-device sync and the contractor portal.</p>
       </div>
     </div>
 
@@ -116,6 +106,10 @@
           <button class="nav-button" data-view="newsReport" type="button">
             <span aria-hidden="true">◫</span>
             Your News Report
+          </button>
+          <button class="nav-button" data-view="assistant" type="button">
+            <span aria-hidden="true">✦</span>
+            Assistant
           </button>
           <button class="nav-button" data-view="contractors" type="button">
             <span class="nav-icon" aria-hidden="true">
@@ -220,11 +214,9 @@
             <span aria-hidden="true">⌕</span>
             <input id="globalSearch" type="search" placeholder="Search clients, projects, contacts, notes" />
           </div>
-          <button id="gripSyncStatus" class="grip-sync-status sync-local" title="Tap to sign in" type="button"></button>
+          <span id="gripSyncStatus" class="grip-sync-status sync-local" title="Cloud sync status"></span>
           <span id="gripUserDisplay" class="grip-user-display" hidden></span>
-          <button class="secondary-button" id="gripSyncNowButton" type="button" hidden title="Push all local data to cloud now">↑ Sync</button>
           <button class="secondary-button" id="gripSignOutButton" type="button" hidden>Sign Out</button>
-          <button class="secondary-button grip-force-signout-btn" id="gripForceSignOutButton" type="button" hidden title="Sign out on all devices">Sign Out All</button>
           <button class="secondary-button detail-toggle" id="territorySettingsButton" type="button">My Settings</button>
           <button class="secondary-button detail-toggle" id="printSummaryButton" type="button">Print</button>
           <button class="primary-button detail-toggle" id="newTaskButton" type="button">+ Task</button>
@@ -401,6 +393,10 @@
           <textarea id="newsPromptPreview" class="news-prompt" readonly></textarea>
         </section>
 
+        <section id="assistantView" class="view">
+          <div id="assistantViewContent" class="asst-root"></div>
+        </section>
+
         <section id="projectsView" class="view">
           <div class="toolbar toolbar-split">
             <div class="toolbar-group">
@@ -448,7 +444,6 @@
               <select id="punchStatusFilter" aria-label="Filter punch lists by status"></select>
               <select id="punchSeverityFilter" aria-label="Filter punch lists by severity"></select>
               <select id="punchCategoryFilter" aria-label="Filter punch lists by category"></select>
-              <select id="punchDueFilter" aria-label="Filter punch lists by due date"></select>
             </div>
             <div class="toolbar-group">
               <select id="punchSortFilter" aria-label="Sort punch lists">
@@ -459,11 +454,8 @@
                 <option value="contractor">Contractor</option>
               </select>
               <button class="sort-direction-button" id="punchSortDirection" data-direction="desc" type="button" aria-label="Toggle punch list sort direction">↓</button>
-              <button class="mini-button" id="punchActiveOnlyBtn" type="button" hidden>Active Only</button>
-              <button class="mini-button" id="punchCollapseClosedBtn" type="button" hidden>Collapse Closed ↑</button>
               <div class="view-toggle" data-view-toggle="punchLists" aria-label="Punch list layout">
-                <button class="sort-tab" data-layout="project" type="button">By Project</button>
-                <button class="sort-tab" data-layout="tile" type="button">Tile</button>
+                <button class="sort-tab is-active" data-layout="tile" type="button">Tile</button>
                 <button class="sort-tab" data-layout="list" type="button">List</button>
                 <button class="sort-tab" data-layout="kanban" type="button">Kanban</button>
               </div>
@@ -883,7 +875,10 @@
               <button class="sort-tab" data-layout="kanban" type="button">Kanban</button>
             </span>
           </div>
-          <div id="callListWeeklyPreview" class="call-weekly-preview" aria-label="Weekly call overview"></div>
+          <div class="weekday-ribbon" id="callListWeekdayRibbon">
+            <span>Day</span>
+            <span class="weekday-tabs" id="callListWeekdays" aria-label="Choose call list day"></span>
+          </div>
           <div class="call-list-layout">
             <section class="panel call-list-setup" id="callListSetupPanel">
               <div class="panel-header">
@@ -2103,44 +2098,6 @@
     <script src="src/data.js"></script>
     <script src="src/grip-sync.js"></script>
     <script src="src/app.js"></script>
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/grip-crm/sw.js')
-            .then(reg => console.log('GRIP SW registered', reg.scope))
-            .catch(err => console.warn('GRIP SW registration failed:', err));
-        });
-      }
-    </script>
-    <div id="gripToastContainer" class="toast-container" role="status" aria-live="polite"></div>
-
-    <dialog id="gripConfirmDialog" class="modal small-modal"
-            aria-modal="true" aria-labelledby="gripConfirmTitle" aria-describedby="gripConfirmMessage">
-      <div class="modal-header">
-        <h3 id="gripConfirmTitle">Confirm</h3>
-      </div>
-      <p id="gripConfirmMessage" class="grip-confirm-message"></p>
-      <div class="modal-actions">
-        <button class="secondary-button" id="gripConfirmCancelButton" type="button">Cancel</button>
-        <button class="primary-button" id="gripConfirmOkButton" type="button">OK</button>
-      </div>
-    </dialog>
-
-    <dialog id="gripPromptDialog" class="modal small-modal"
-            aria-modal="true" aria-labelledby="gripPromptTitle" aria-describedby="gripPromptLabel">
-      <div class="modal-header">
-        <h3 id="gripPromptTitle">Enter value</h3>
-      </div>
-      <div class="form-grid" style="margin-bottom:20px">
-        <label class="full-field">
-          <span id="gripPromptLabel"></span>
-          <input id="gripPromptInput" type="text" autocomplete="off" />
-        </label>
-      </div>
-      <div class="modal-actions">
-        <button class="secondary-button" id="gripPromptCancelButton" type="button">Cancel</button>
-        <button class="primary-button" id="gripPromptOkButton" type="button">OK</button>
-      </div>
-    </dialog>
+    <script src="src/assistant.js"></script>
   </body>
 </html>

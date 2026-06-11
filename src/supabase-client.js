@@ -7,10 +7,8 @@
 // ─────────────────────────────────────────────────────────────────
 
 window.GRIP_SUPABASE_URL     = "https://azrmxqrufdviffgytxws.supabase.co";
-window.GRIP_SUPABASE_ANON    = "sb_publishable_Zwnq3r45Wf54MNDztTR1kQ_t6av38OK";
+window.GRIP_SUPABASE_ANON    = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF6cm14cXJ1ZmR2aWZmZ3l0eHdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NzEwMTIsImV4cCI6MjA5NTQ0NzAxMn0.fnLxA9iLPRwZ9A5daTEf-yBeWX6LZJ9LAfSHeuo3jg8";
 
-// Only @garlandco.com Google accounts may access GRIP.
-// Each rep gets their own private data silo.
-// To restrict to a single email instead, set GRIP_AUTHORIZED_EMAIL.
-window.GRIP_AUTHORIZED_DOMAIN = "garlandco.com";
-window.GRIP_AUTHORIZED_EMAIL  = "";          // leave blank = anyone on the domain
+// Only this Google account may access GRIP.
+// Change to your own email if you ever transfer ownership.
+window.GRIP_AUTHORIZED_EMAIL = "bphillips@garlandco.com";
