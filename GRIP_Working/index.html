@@ -1,0 +1,2103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GRIP</title>
+    <link rel="stylesheet" href="src/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    <script src="src/supabase-client.js"></script>
+  </head>
+  <body>
+    <div id="gripAuthOverlay" class="auth-overlay" hidden>
+      <div class="auth-card">
+        <div class="auth-brand">
+          <div class="brand-mark">G</div>
+          <div>
+            <h1>GRIP</h1>
+            <p>Garland Relationship Intelligence Platform</p>
+          </div>
+        </div>
+        <p class="auth-tagline">Sign in with your Garland Google account to sync data and access the contractor portal.</p>
+        <button class="primary-button auth-google-btn" id="gripGoogleSignInButton" type="button">
+          Sign in with Garland Google Account
+        </button>
+        <p id="gripAuthError" class="auth-error" hidden></p>
+        <button class="secondary-button" id="gripContinueLocalButton" type="button">
+          Continue without sign-in (local only)
+        </button>
+        <p class="auth-note">Authorized access only — bphillips@garlandco.com. Local mode keeps data on this device; sign in for cross-device sync and the contractor portal.</p>
+      </div>
+    </div>
+
+    <div class="app-shell" id="appShell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark" id="brandMark">BP</div>
+          <div>
+            <h1>GRIP</h1>
+            <p>Garland Relationship Intelligence Platform</p>
+          </div>
+        </div>
+
+        <nav class="nav" aria-label="Primary views">
+          <button class="nav-button is-active" data-view="dashboard" type="button">
+            <span aria-hidden="true">⌂</span>
+            Dashboard
+          </button>
+          <button class="nav-button" data-view="accounts" type="button">
+            <span aria-hidden="true">◎</span>
+            Accounts
+          </button>
+          <div class="nav-projects-group">
+            <button class="nav-button" data-view="projects" type="button">
+              <span class="nav-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <path d="M3 20h18v2H3v-2Zm3-2h3v-5H6v5Zm5 0h3V8h-3v10Zm5 0h3v-8h-3v8ZM5 5l7-3 7 3v2H5V5Zm7-.9L8.2 5h7.6L12 4.1ZM4 7h16v2H4V7Z" />
+                </svg>
+              </span>
+              Projects
+            </button>
+            <button class="nav-button nav-sub-button" data-view="punchList" type="button">
+              <span aria-hidden="true">☒</span>
+              Punch List
+            </button>
+            <button class="nav-button nav-sub-button" data-view="takeoffEstimator" type="button">
+              <span class="nav-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <path d="M4 6.5C4 4 6 2 8.5 2S13 4 13 6.5 11 11 8.5 11 4 9 4 6.5Zm3 0C7 7.3 7.7 8 8.5 8S10 7.3 10 6.5 9.3 5 8.5 5 7 5.7 7 6.5ZM6 13h14c1.1 0 2 .9 2 2v5c0 1.1-.9 2-2 2H6c-1.1 0-2-.9-2-2v-5c0-1.1.9-2 2-2Zm1 3v3h2v-2h2v2h2v-3h2v2h2v-2h2v-1H7v1Z" />
+                </svg>
+              </span>
+              Takeoff Estimator
+            </button>
+            <button class="nav-button nav-sub-button" data-view="warrantySummary" type="button">
+              <span class="nav-icon nav-letter-icon" aria-hidden="true">WS</span>
+              Warranty Summary
+            </button>
+          </div>
+          <button class="nav-button" data-view="proposals" type="button">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M14.7 2.5 22 9.8l-2.8 2.8-2.1-2.1-8.7 8.7c-.7.7-1.8.7-2.5 0l-1.1-1.1c-.7-.7-.7-1.8 0-2.5l8.7-8.7-1.9-1.9 3.1-2.5Zm-7.5 15 8.3-8.3-1.1-1.1-8.3 8.3 1.1 1.1Z" />
+              </svg>
+            </span>
+            Proposals
+          </button>
+          <button class="nav-button" data-view="scopeDatabase" type="button">
+            <span class="nav-icon nav-letter-icon nav-letter-icon-wide" aria-hidden="true">SOW</span>
+            Scope of Work
+          </button>
+          <button class="nav-button" data-view="tasks" type="button">
+            <span aria-hidden="true">☑</span>
+            Tasks
+          </button>
+          <button class="nav-button" data-view="callList" type="button">
+            <span aria-hidden="true">☏</span>
+            Call List
+          </button>
+          <button class="nav-button" data-view="followUpQueue" type="button">
+            <span aria-hidden="true">✓</span>
+            Follow-Up Queue
+          </button>
+          <button class="nav-button" data-view="activityLog" type="button">
+            <span aria-hidden="true">☷</span>
+            Activity Log
+          </button>
+          <button class="nav-button" data-view="newsReport" type="button">
+            <span aria-hidden="true">◫</span>
+            Your News Report
+          </button>
+          <button class="nav-button" data-view="assistant" type="button">
+            <span aria-hidden="true">✦</span>
+            Assistant
+          </button>
+          <button class="nav-button" data-view="contractors" type="button">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M5 12a7 7 0 0 1 4-6.3V10h2V5.1a7.9 7.9 0 0 1 2 0V10h2V5.7A7 7 0 0 1 19 12h1.5c.8 0 1.5.7 1.5 1.5S21.3 15 20.5 15h-17C2.7 15 2 14.3 2 13.5S2.7 12 3.5 12H5Zm1.2 5h11.6l-1.1 3H7.3l-1.1-3Z" />
+              </svg>
+            </span>
+            Contractors
+          </button>
+          <button class="nav-button nav-more-button" id="mobileMoreButton" type="button" aria-expanded="false" aria-controls="mobileMoreMenu">
+            <span aria-hidden="true">⋯</span>
+            More
+          </button>
+        </nav>
+
+        <div class="mobile-more-menu" id="mobileMoreMenu" hidden>
+          <button class="nav-button" data-view="punchList" type="button">
+            <span aria-hidden="true">☒</span>
+            Punch
+          </button>
+          <button class="nav-button" data-view="takeoffEstimator" type="button">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M4 6.5C4 4 6 2 8.5 2S13 4 13 6.5 11 11 8.5 11 4 9 4 6.5Zm3 0C7 7.3 7.7 8 8.5 8S10 7.3 10 6.5 9.3 5 8.5 5 7 5.7 7 6.5ZM6 13h14c1.1 0 2 .9 2 2v5c0 1.1-.9 2-2 2H6c-1.1 0-2-.9-2-2v-5c0-1.1.9-2 2-2Zm1 3v3h2v-2h2v2h2v-3h2v2h2v-2h2v-1H7v1Z" />
+              </svg>
+            </span>
+            Takeoff
+          </button>
+          <button class="nav-button" data-view="warrantySummary" type="button">
+            <span class="nav-icon nav-letter-icon" aria-hidden="true">WS</span>
+            Warranty
+          </button>
+          <button class="nav-button" data-view="tasks" type="button">
+            <span aria-hidden="true">☑</span>
+            Tasks
+          </button>
+          <button class="nav-button" data-view="followUpQueue" type="button">
+            <span aria-hidden="true">✓</span>
+            Follow-Up
+          </button>
+          <button class="nav-button" data-view="activityLog" type="button">
+            <span aria-hidden="true">☷</span>
+            Activity
+          </button>
+          <button class="nav-button" data-view="scopeDatabase" type="button">
+            <span class="nav-icon nav-letter-icon nav-letter-icon-wide" aria-hidden="true">SOW</span>
+            Scope
+          </button>
+          <button class="nav-button" data-view="contractors" type="button">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M5 12a7 7 0 0 1 4-6.3V10h2V5.1a7.9 7.9 0 0 1 2 0V10h2V5.7A7 7 0 0 1 19 12h1.5c.8 0 1.5.7 1.5 1.5S21.3 15 20.5 15h-17C2.7 15 2 14.3 2 13.5S2.7 12 3.5 12H5Zm1.2 5h11.6l-1.1 3H7.3l-1.1-3Z" />
+              </svg>
+            </span>
+            Contractors
+          </button>
+          <button class="nav-button" data-view="newsReport" type="button">
+            <span aria-hidden="true">◫</span>
+            News
+          </button>
+          <button class="nav-button" data-view="noteTaker" type="button">
+            <span aria-hidden="true">✎</span>
+            Notes
+          </button>
+        </div>
+
+        <div class="external-links">
+          <span>Garland links</span>
+          <a href="https://www.garlandco.com/?utm_source=website&utm_medium=find-a-rep&utm_content=" target="_blank" rel="noopener">Garland Website</a>
+          <a href="https://projectcenter.garlandhq.com/dashboard/projects" target="_blank" rel="noopener">Project Center</a>
+          <a href="https://ramp-v2.garlandhq.com/" target="_blank" rel="noopener">RAMP V2</a>
+          <a href="https://winduplift.garlandhq.com/index-dashboard.php" target="_blank" rel="noopener">Wind Uplift</a>
+          <a href="https://wingman.garlandhq.com/" target="_blank" rel="noopener">Wingman</a>
+          <a href="https://www.thedryzone.com/ramp/core/home.jsp" target="_blank" rel="noopener">DryZone</a>
+          <a href="https://lucid.app/documents/#/home?folder_id=recent" target="_blank" rel="noopener">Lucid Charts</a>
+        </div>
+        <div class="sidebar-actions">
+          <span>CRM tools</span>
+          <button id="exportBackupButton" type="button">Download Backup</button>
+          <button id="importBackupButton" type="button">Restore Backup</button>
+          <button id="cloudSyncButton" type="button">Drive Setup</button>
+          <button id="releaseNotesButton" type="button">Release Notes</button>
+          <input id="backupImportInput" type="file" accept="application/json" hidden />
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div class="topbar-title">
+            <div>
+              <p class="eyebrow">Live working copy</p>
+              <h2 id="viewTitle">Dashboard</h2>
+            </div>
+            <button class="mobile-version-button" id="mobileVersionButton" type="button" title="Mobile Version" aria-label="Mobile Version">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M8 2h8c1.1 0 2 .9 2 2v16c0 1.1-.9 2-2 2H8c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2Zm0 3v14h8V5H8Zm3 15h2v1h-2v-1Z" />
+              </svg>
+              <span>Mobile</span>
+            </button>
+          </div>
+          <div class="search">
+            <span aria-hidden="true">⌕</span>
+            <input id="globalSearch" type="search" placeholder="Search clients, projects, contacts, notes" />
+          </div>
+          <span id="gripSyncStatus" class="grip-sync-status sync-local" title="Cloud sync status"></span>
+          <span id="gripUserDisplay" class="grip-user-display" hidden></span>
+          <button class="secondary-button" id="gripSignOutButton" type="button" hidden>Sign Out</button>
+          <button class="secondary-button detail-toggle" id="territorySettingsButton" type="button">My Settings</button>
+          <button class="secondary-button detail-toggle" id="printSummaryButton" type="button">Print</button>
+          <button class="primary-button detail-toggle" id="newTaskButton" type="button">+ Task</button>
+          <button class="secondary-button detail-toggle" id="detailToggle" type="button">Hide Details</button>
+        </header>
+        <section class="mobile-quick-add" aria-label="Mobile quick add">
+          <button data-mobile-quick-add="task" type="button">Task</button>
+          <button data-mobile-quick-add="note" type="button">New Note</button>
+          <button data-mobile-quick-add="account" type="button">Account</button>
+          <button data-mobile-quick-add="project" type="button">Project</button>
+          <button data-mobile-quick-add="punch" type="button">Punch</button>
+          <button data-mobile-quick-add="proposal" type="button">Proposal</button>
+          <button data-mobile-quick-add="activity" type="button">Activity</button>
+        </section>
+
+        <section id="dashboardView" class="view is-active" aria-labelledby="viewTitle">
+          <div id="dashboardGoals" class="goal-strip"></div>
+          <div id="commandCenter" class="command-center"></div>
+          <div id="quickFilters" class="quick-filter-strip"></div>
+          <div class="dashboard-grid" id="dashboardGrid"></div>
+        </section>
+
+        <section id="tasksView" class="view">
+          <div class="task-hero">
+            <div>
+              <p class="eyebrow">Task Command Center</p>
+              <h3>Tasks</h3>
+              <p>Fast follow-ups, field reminders, project actions, and proposal next steps.</p>
+            </div>
+            <button class="primary-button" id="newTaskHeroButton" type="button">+ Task</button>
+          </div>
+          <div id="taskSummaryStrip" class="task-summary-strip"></div>
+          <div class="toolbar toolbar-split task-toolbar">
+            <div class="toolbar-group">
+              <input id="taskSearchInput" class="toolbar-input" type="search" placeholder="Search tasks, accounts, notes" />
+              <select id="taskDueFilter" aria-label="Filter tasks by due date">
+                <option value="all">All due dates</option>
+                <option value="today">Today</option>
+                <option value="upcoming">Upcoming</option>
+                <option value="overdue">Overdue</option>
+                <option value="completed">Completed</option>
+                <option value="unassigned">Unassigned</option>
+              </select>
+              <select id="taskAccountFilter" aria-label="Filter tasks by account"></select>
+              <select id="taskTypeFilter" aria-label="Filter tasks by type"></select>
+              <select id="taskPriorityFilter" aria-label="Filter tasks by priority"></select>
+              <select id="taskStatusFilter" aria-label="Filter tasks by status"></select>
+              <select id="taskAssignedFilter" aria-label="Filter tasks by assigned user"></select>
+            </div>
+            <div class="toolbar-group">
+              <select id="taskSortFilter" aria-label="Sort tasks">
+                <option value="dueDate">Due Date</option>
+                <option value="priority">Priority</option>
+                <option value="account">Account</option>
+                <option value="taskType">Task Type</option>
+                <option value="createdAt">Date Created</option>
+                <option value="updatedAt">Last Updated</option>
+              </select>
+              <button class="sort-direction-button" id="taskSortDirection" data-direction="asc" type="button" aria-label="Toggle task sort direction">↑</button>
+              <div class="view-toggle" data-view-toggle="tasks" aria-label="Task layout">
+                <button class="sort-tab is-active" data-layout="tile" type="button">Tile</button>
+                <button class="sort-tab" data-layout="list" type="button">List</button>
+                <button class="sort-tab" data-layout="kanban" type="button">Kanban</button>
+              </div>
+            </div>
+          </div>
+          <div id="tasksList" class="record-grid task-grid"></div>
+        </section>
+
+        <section id="followUpQueueView" class="view">
+          <div class="toolbar toolbar-split">
+            <div class="toolbar-group">
+              <select id="queueTypeFilter" aria-label="Filter follow-up queue">
+                <option value="all">All records</option>
+                <option value="account">Accounts</option>
+                <option value="project">Projects</option>
+                <option value="proposal">Proposals</option>
+              </select>
+              <select id="queueUrgencyFilter" aria-label="Filter follow-up urgency">
+                <option value="all">All urgency</option>
+                <option value="overdue">Overdue</option>
+                <option value="today">Due today</option>
+                <option value="soon">Next 7 days</option>
+                <option value="missing">No next step</option>
+              </select>
+            </div>
+            <div class="toolbar-group">
+              <button class="secondary-button" id="copyWeeklyReviewButton" type="button">Copy Weekly Review</button>
+            </div>
+          </div>
+          <div id="followUpQueueList" class="timeline-list"></div>
+        </section>
+
+        <section id="accountsView" class="view">
+          <div class="sub-tabs" aria-label="Account views">
+            <button class="sort-tab is-active" data-account-mode="browse" type="button">Accounts</button>
+            <button class="sort-tab" data-account-mode="manage" type="button">Manage Accounts</button>
+          </div>
+          <div class="toolbar toolbar-split">
+            <div class="toolbar-group">
+              <select id="rankFilter" aria-label="Filter by account ranking"></select>
+              <select id="entityFilter" aria-label="Filter by entity type"></select>
+              <select id="countyFilter" aria-label="Filter by county"></select>
+              <select id="accountActivityFilter" aria-label="Filter by account activity"></select>
+            </div>
+            <div class="toolbar-group">
+              <select id="accountSortFilter" aria-label="Sort accounts">
+                <option value="client">Client</option>
+                <option value="rank">Ranking</option>
+                <option value="entity">Entity</option>
+                <option value="county">County</option>
+                <option value="activity">Last Activity</option>
+              </select>
+              <button class="sort-direction-button" id="accountSortDirection" data-direction="asc" type="button" aria-label="Toggle account sort direction">↑</button>
+              <details class="toolbar-menu">
+                <summary class="mini-button utility-mini">Contact Import / Export</summary>
+                <div class="toolbar-menu-panel">
+                  <button class="mini-button utility-mini" id="importAccountContactsButton" type="button">Import Contacts</button>
+                  <button class="mini-button utility-mini" id="exportAccountContactsButton" type="button">Export CSV</button>
+                  <button class="mini-button utility-mini" id="exportAccountVcardsButton" type="button">Export vCard</button>
+                </div>
+              </details>
+              <input id="accountContactsImportInput" type="file" accept=".csv,text/csv" hidden />
+              <div class="view-toggle" data-view-toggle="accounts" aria-label="Account layout">
+                <button class="sort-tab is-active" data-layout="tile" type="button">Tile</button>
+                <button class="sort-tab" data-layout="list" type="button">List</button>
+                <button class="sort-tab" data-layout="kanban" type="button">Kanban</button>
+              </div>
+              <button class="primary-button create-button" id="newAccountButton" type="button">+ Account</button>
+            </div>
+          </div>
+          <div id="accountsList" class="record-grid"></div>
+          <div id="accountsManageList" class="manage-table" hidden></div>
+        </section>
+
+        <section id="activityLogView" class="view">
+          <div class="toolbar toolbar-split">
+            <div class="toolbar-group">
+              <select id="activityAccountFilter" aria-label="Filter activity by account"></select>
+              <select id="activityEntityFilter" aria-label="Filter activity by entity"></select>
+              <select id="activityCountyFilter" aria-label="Filter activity by county"></select>
+              <select id="activityRepFilter" aria-label="Filter activity by shared rep"></select>
+              <select id="activityDateFilter" aria-label="Filter activity by date">
+                <option value="all">All activity</option>
+                <option value="today">Today</option>
+                <option value="7">Last 7 days</option>
+                <option value="14">Last 14 days</option>
+                <option value="30">Last 30 days</option>
+                <option value="45">Last 45 days</option>
+              </select>
+            </div>
+            <div class="toolbar-group">
+              <button class="sort-direction-button" id="activitySortDirection" data-direction="desc" type="button" aria-label="Toggle activity sort direction">↓</button>
+            </div>
+          </div>
+          <div id="activitySummary" class="activity-summary"></div>
+          <div id="activityTimeline" class="timeline-list"></div>
+        </section>
+
+        <section id="newsReportView" class="view">
+          <div class="news-report-panel">
+            <div>
+              <p class="eyebrow">Movement intelligence</p>
+              <h3>90-Day Roofing News Report</h3>
+              <p>Builds a territory-aware research prompt from your saved state, counties, and non-private entities.</p>
+            </div>
+            <div class="news-actions">
+              <button class="primary-button" id="copyNewsPromptButton" type="button">Copy Report Prompt</button>
+              <a class="secondary-button" href="https://chatgpt.com/" target="_blank" rel="noopener">Open ChatGPT</a>
+              <a class="secondary-button" href="https://gemini.google.com/app" target="_blank" rel="noopener">Open Gemini</a>
+            </div>
+          </div>
+          <div id="newsTerritorySummary" class="news-summary"></div>
+          <textarea id="newsPromptPreview" class="news-prompt" readonly></textarea>
+        </section>
+
+        <section id="assistantView" class="view">
+          <div id="assistantViewContent" class="asst-root"></div>
+        </section>
+
+        <section id="projectsView" class="view">
+          <div class="toolbar toolbar-split">
+            <div class="toolbar-group">
+              <select id="projectStageFilter" aria-label="Filter by project stage"></select>
+              <select id="projectRankFilter" aria-label="Filter by project rank"></select>
+              <select id="projectContractorFilter" aria-label="Filter by project contractor"></select>
+            </div>
+            <div class="toolbar-group">
+              <select id="projectSortFilter" aria-label="Sort projects">
+                <option value="stage">Stage</option>
+                <option value="client">Client</option>
+                <option value="project">Project</option>
+                <option value="score">ABC Score</option>
+                <option value="start">Start Date</option>
+                <option value="materials">Materials</option>
+                <option value="commission">Commission</option>
+              </select>
+              <button class="sort-direction-button" id="projectSortDirection" data-direction="asc" type="button" aria-label="Toggle project sort direction">↑</button>
+              <div class="view-toggle" data-view-toggle="projects" aria-label="Project layout">
+                <button class="sort-tab is-active" data-layout="tile" type="button">Tile</button>
+                <button class="sort-tab" data-layout="list" type="button">List</button>
+                <button class="sort-tab" data-layout="kanban" type="button">Kanban</button>
+              </div>
+              <button class="primary-button create-button" id="newProjectButton" type="button">+ Project</button>
+            </div>
+          </div>
+          <div id="projectsList" class="record-grid"></div>
+        </section>
+
+        <section id="punchListView" class="view">
+          <div class="task-hero punch-hero">
+            <div>
+              <p class="eyebrow">Project Closeout</p>
+              <h3>Punch List</h3>
+              <p>Running roof punch items, contractor corrections, review, and closeout documentation tied to projects.</p>
+            </div>
+            <button class="primary-button" id="newPunchListButton" type="button">+ Punch List</button>
+          </div>
+          <div id="punchSummaryStrip" class="task-summary-strip punch-summary-strip"></div>
+          <div class="toolbar toolbar-split">
+            <div class="toolbar-group">
+              <input id="punchSearchInput" class="toolbar-input" type="search" placeholder="Search punch lists, projects, roof areas" />
+              <select id="punchProjectFilter" aria-label="Filter punch lists by project"></select>
+              <select id="punchContractorFilter" aria-label="Filter punch lists by contractor"></select>
+              <select id="punchStatusFilter" aria-label="Filter punch lists by status"></select>
+              <select id="punchSeverityFilter" aria-label="Filter punch lists by severity"></select>
+              <select id="punchCategoryFilter" aria-label="Filter punch lists by category"></select>
+            </div>
+            <div class="toolbar-group">
+              <select id="punchSortFilter" aria-label="Sort punch lists">
+                <option value="updatedAt">Last Updated</option>
+                <option value="dueDate">Due Date</option>
+                <option value="project">Project</option>
+                <option value="status">Status</option>
+                <option value="contractor">Contractor</option>
+              </select>
+              <button class="sort-direction-button" id="punchSortDirection" data-direction="desc" type="button" aria-label="Toggle punch list sort direction">↓</button>
+              <div class="view-toggle" data-view-toggle="punchLists" aria-label="Punch list layout">
+                <button class="sort-tab is-active" data-layout="tile" type="button">Tile</button>
+                <button class="sort-tab" data-layout="list" type="button">List</button>
+                <button class="sort-tab" data-layout="kanban" type="button">Kanban</button>
+              </div>
+            </div>
+          </div>
+          <div id="punchListBoard" class="record-grid punch-grid"></div>
+        </section>
+
+        <section id="takeoffEstimatorView" class="view">
+          <div class="subnav">
+            <button class="sort-tab is-active" id="takeoffBuilderTab" data-takeoff-mode="builder" type="button">Estimator</button>
+            <button class="sort-tab" id="takeoffSystemsTab" data-takeoff-mode="systems" type="button">My Systems</button>
+            <button class="sort-tab" id="takeoffSavedTab" data-takeoff-mode="saved" type="button">Saved Estimates</button>
+          </div>
+          <div id="takeoffBuilderPanel">
+          <div class="takeoff-panel">
+            <div class="takeoff-header">
+              <div>
+                <p class="eyebrow">Quick material takeoff</p>
+                <h3>Takeoff Estimator</h3>
+              </div>
+              <div class="toolbar-group">
+                <button class="primary-button" id="saveTakeoffEstimateButton" type="button">Save Estimate</button>
+                <button class="secondary-button" id="takeoffResetButton" type="button">New Estimate</button>
+                <button class="secondary-button" id="priceBookSettingsButton" type="button">Price Book Settings</button>
+                <button class="mini-button utility-mini" id="exportTakeoffPdfButton" type="button">Export PDF</button>
+                <button class="mini-button utility-mini" id="exportTakeoffExcelButton" type="button">Export Excel</button>
+              </div>
+            </div>
+            <div class="form-grid takeoff-grid">
+              <label class="full-field">
+                <span>Current project or new estimate</span>
+                <select id="takeoffProjectSelect"></select>
+              </label>
+              <label>
+                <span>Estimate name</span>
+                <input id="takeoffNameInput" placeholder="Quick estimate" />
+              </label>
+              <label>
+                <span>Roof area</span>
+                <input id="takeoffSqftInput" type="number" min="0" step="1" placeholder="Square feet" />
+              </label>
+              <label>
+                <span>Slope</span>
+                <select id="takeoffSlopeInput">
+                  <option value="0">Flat / field measured</option>
+                  <option value="0.125">1/8:12</option>
+                  <option value="0.25">1/4:12</option>
+                  <option value="0.5">1/2:12</option>
+                  <option value="1">1:12</option>
+                  <option value="2">2:12</option>
+                  <option value="3">3:12</option>
+                  <option value="4">4:12</option>
+                  <option value="6">6:12</option>
+                </select>
+              </label>
+              <label>
+                <span>Waste factor</span>
+                <select id="takeoffWasteInput">
+                  <option value="5">5%</option>
+                  <option value="10" selected>10%</option>
+                  <option value="15">15%</option>
+                  <option value="20">20%</option>
+                  <option value="25">25%</option>
+                  <option value="30">30%</option>
+                </select>
+              </label>
+              <label>
+                <span>Pricing program</span>
+                <select id="takeoffPricingTypeInput"></select>
+              </label>
+              <label>
+                <span>Pricing year</span>
+                <select id="takeoffPricingYearInput"></select>
+              </label>
+            </div>
+          </div>
+
+          <section class="system-builder-panel takeoff-system-panel">
+            <div class="modal-section-header">
+              <div>
+                <h4>System Builder</h4>
+                <span>Choose the assembly to estimate</span>
+              </div>
+              <div class="toolbar-group">
+                <button class="secondary-button" id="saveFavoriteSystemButton" type="button">Save to My Systems</button>
+                <button class="secondary-button" id="favoriteSystemsButton" type="button">My Systems</button>
+              </div>
+            </div>
+            <div class="form-grid system-builder-grid">
+              <label class="system-tree-root">
+                <span>Project type</span>
+                <select id="takeoffProjectTypeInput"></select>
+              </label>
+              <label>
+                <span>Warranty type</span>
+                <select id="takeoffWarrantyTypeInput"></select>
+              </label>
+              <label>
+                <span>Existing / material type</span>
+                <select id="takeoffMaterialInput"></select>
+              </label>
+              <label>
+                <span>System</span>
+                <select id="takeoffSystemInput"></select>
+              </label>
+              <label>
+                <span>Warranty term</span>
+                <select id="takeoffWarrantyTermInput"></select>
+              </label>
+              <label>
+                <span>Cap sheet</span>
+                <select id="takeoffCapSheetInput"></select>
+              </label>
+              <label>
+                <span>Cap sheet adhesive</span>
+                <select id="takeoffCapAdhesiveInput"></select>
+              </label>
+              <label>
+                <span>Base sheet</span>
+                <select id="takeoffBaseSheetInput"></select>
+              </label>
+              <label>
+                <span>Base sheet adhesive</span>
+                <select id="takeoffBaseAdhesiveInput"></select>
+              </label>
+              <label>
+                <span>Surfacing</span>
+                <select id="takeoffSurfacingInput"></select>
+              </label>
+              <label>
+                <span>Primer</span>
+                <input id="takeoffPrimerInput" readonly />
+              </label>
+            </div>
+            <div class="manual-product-panel">
+              <div class="modal-section-header">
+                <div>
+                  <h4>Add Products</h4>
+                  <span>Search by product name or product number</span>
+                </div>
+              </div>
+              <div class="form-grid add-product-grid">
+                <label>
+                  <span>Price book category</span>
+                  <select id="takeoffProductCategoryInput"></select>
+                </label>
+                <label>
+                  <span>Search product</span>
+                  <input id="takeoffProductSearchInput" type="search" placeholder="Name or product #" />
+                </label>
+                <label>
+                  <span>Product</span>
+                  <select id="takeoffProductSelect"></select>
+                </label>
+                <label>
+                  <span>Quantity</span>
+                  <input id="takeoffProductQtyInput" type="number" min="1" step="1" value="1" />
+                </label>
+                <button class="primary-button" id="addTakeoffProductButton" type="button">Add Product</button>
+              </div>
+              <div id="takeoffManualProducts" class="manual-product-list"></div>
+            </div>
+          </section>
+
+          <section class="takeoff-results-panel">
+            <div class="takeoff-result-summary" id="takeoffSummary"></div>
+            <div class="takeoff-table-wrap">
+              <table class="takeoff-table">
+                <thead>
+                  <tr>
+                    <th>Product #</th>
+                    <th>Product name</th>
+                    <th>Coverage rate</th>
+                    <th># per pallet</th>
+                    <th>Estimated qty</th>
+                    <th>Order unit</th>
+                    <th>Unit price</th>
+                    <th>Line total</th>
+                    <th>Notes / reference</th>
+                  </tr>
+                </thead>
+                <tbody id="takeoffResults"></tbody>
+              </table>
+            </div>
+          </section>
+          </div>
+          <div id="takeoffSystemsPanel" hidden>
+            <div id="favoriteSystemsList" class="record-grid"></div>
+          </div>
+          <div id="takeoffSavedPanel" hidden>
+            <div class="toolbar toolbar-split">
+              <div class="toolbar-group">
+                <input id="takeoffSearchFilter" type="search" placeholder="Search estimates" aria-label="Search saved estimates" />
+                <select id="takeoffProjectFilter" aria-label="Filter estimates by project"></select>
+              </div>
+              <div class="toolbar-group">
+                <select id="takeoffSortFilter" aria-label="Sort estimates">
+                  <option value="savedAt">Saved Date</option>
+                  <option value="name">Estimate Name</option>
+                  <option value="project">Project</option>
+                  <option value="area">Adjusted Area</option>
+                </select>
+                <button class="sort-direction-button" id="takeoffSortDirection" data-direction="desc" type="button" aria-label="Toggle estimate sort direction">↓</button>
+                <div class="view-toggle" data-view-toggle="takeoffEstimates" aria-label="Saved estimate layout">
+                  <button class="sort-tab is-active" data-layout="tile" type="button">Tile</button>
+                  <button class="sort-tab" data-layout="list" type="button">List</button>
+                  <button class="sort-tab" data-layout="kanban" type="button">Kanban</button>
+                </div>
+              </div>
+            </div>
+            <div id="takeoffEstimateList" class="record-grid"></div>
+          </div>
+        </section>
+
+        <section id="warrantySummaryView" class="view">
+          <div class="takeoff-panel">
+            <div class="takeoff-header">
+              <div>
+                <p class="eyebrow">Warranty logic</p>
+                <h3>Warranty Summary Chart</h3>
+              </div>
+              <div class="toolbar-group">
+                <button class="mini-button utility-mini" id="exportWarrantyPdfButton" type="button">Export PDF</button>
+                <button class="mini-button utility-mini" id="exportWarrantyExcelButton" type="button">Export Excel</button>
+              </div>
+            </div>
+            <section class="system-builder-panel warranty-summary-panel">
+              <div class="modal-section-header">
+                <div>
+                  <h4>System Builder</h4>
+                  <span>Choose project type first, then filter by cap sheet or warranty term.</span>
+                </div>
+              </div>
+              <div class="form-grid system-builder-grid">
+                <label class="system-tree-root">
+                  <span>Project type</span>
+                  <select id="warrantyProjectTypeInput"></select>
+                </label>
+                <label>
+                  <span>Build order</span>
+                  <select id="warrantyBuildOrderInput">
+                    <option value="cap">Cap sheet first</option>
+                    <option value="term">Warranty term first</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Warranty type</span>
+                  <select id="warrantyTypeInput"></select>
+                </label>
+                <label>
+                  <span>Existing / material type</span>
+                  <select id="warrantyMaterialInput"></select>
+                </label>
+                <label>
+                  <span>Cap sheet</span>
+                  <select id="warrantyCapSheetInput"></select>
+                </label>
+                <label>
+                  <span>Warranty term</span>
+                  <select id="warrantyTermInput"></select>
+                </label>
+                <label>
+                  <span>System</span>
+                  <select id="warrantySystemInput"></select>
+                </label>
+                <label>
+                  <span>Cap sheet adhesive</span>
+                  <select id="warrantyCapAdhesiveInput"></select>
+                </label>
+                <label>
+                  <span>Base sheet</span>
+                  <select id="warrantyBaseSheetInput"></select>
+                </label>
+                <label>
+                  <span>Base sheet adhesive</span>
+                  <select id="warrantyBaseAdhesiveInput"></select>
+                </label>
+                <label>
+                  <span>Surfacing</span>
+                  <select id="warrantySurfacingInput"></select>
+                </label>
+                <label>
+                  <span>Primer</span>
+                  <input id="warrantyPrimerInput" readonly />
+                </label>
+                <label>
+                  <span>Contractor warranty</span>
+                  <select id="warrantyContractorWarrantyInput"></select>
+                </label>
+              </div>
+            </section>
+            <section class="takeoff-results-panel">
+              <div id="warrantySummaryCards" class="takeoff-result-summary"></div>
+              <div class="takeoff-table-wrap">
+                <table class="takeoff-table">
+                  <thead>
+                    <tr>
+                      <th>Warranty</th>
+                      <th>Term</th>
+                      <th>System</th>
+                      <th>Cap sheet options</th>
+                      <th>Key requirements</th>
+                    </tr>
+                  </thead>
+                  <tbody id="warrantySummaryRows"></tbody>
+                </table>
+              </div>
+              <label class="full-field">
+                <span>System notes</span>
+                <textarea id="warrantySummaryNotes" class="system-notes-box" readonly></textarea>
+              </label>
+            </section>
+          </div>
+        </section>
+
+        <section id="proposalsView" class="view">
+          <div class="toolbar toolbar-split">
+            <div class="toolbar-group">
+              <select id="proposalStageFilter" aria-label="Filter by proposal stage"></select>
+              <select id="contractorFilter" aria-label="Filter by awarded contractor"></select>
+              <select id="proposalBidStatusFilter" aria-label="Filter by bid status"></select>
+            </div>
+            <div class="toolbar-group">
+              <div class="sort-tabs" aria-label="Sort proposals">
+                <button class="sort-tab is-active" data-sort="stage" type="button">Stage</button>
+                <button class="sort-tab" data-sort="dueDate" type="button">Due Date</button>
+                <button class="sort-tab" data-sort="client" type="button">Client</button>
+                <button class="sort-tab" data-sort="project" type="button">Project</button>
+              </div>
+              <button class="sort-direction-button" id="proposalSortDirection" data-direction="asc" type="button" aria-label="Toggle proposal sort direction">↑</button>
+              <div class="view-toggle" data-view-toggle="proposals" aria-label="Proposal layout">
+                <button class="sort-tab is-active" data-layout="tile" type="button">Tile</button>
+                <button class="sort-tab" data-layout="list" type="button">List</button>
+                <button class="sort-tab" data-layout="kanban" type="button">Kanban</button>
+              </div>
+              <button class="primary-button create-button" id="newProposalButton" type="button">+ Proposal</button>
+            </div>
+          </div>
+          <div id="proposalsList" class="record-grid"></div>
+        </section>
+
+        <section id="scopeDatabaseView" class="view">
+          <div class="toolbar toolbar-split">
+            <div class="toolbar-group">
+              <input id="scopeSearchInput" class="toolbar-input" type="search" placeholder="Search scopes of work" />
+              <select id="scopeCategoryFilter" aria-label="Filter scopes of work">
+                <option value="All categories">All categories</option>
+                <option>Repair</option>
+                <option>Coating</option>
+                <option>Restoration</option>
+                <option>Reroof</option>
+              </select>
+            </div>
+            <div class="toolbar-group">
+              <select id="scopeSortFilter" aria-label="Sort scopes of work">
+                <option value="savedAt">Date Saved</option>
+                <option value="name">Name</option>
+                <option value="category">Category</option>
+                <option value="source">Source</option>
+              </select>
+              <button class="sort-direction-button" id="scopeSortDirection" data-direction="desc" type="button" aria-label="Toggle scope sort direction">↓</button>
+              <div class="view-toggle" data-view-toggle="scopeDatabase" aria-label="Scope database layout">
+                <button class="sort-tab is-active" data-layout="tile" type="button">Tile</button>
+                <button class="sort-tab" data-layout="list" type="button">List</button>
+                <button class="sort-tab" data-layout="kanban" type="button">Kanban</button>
+              </div>
+              <button class="primary-button" id="newScopeButton" type="button">+ Scope of Work</button>
+            </div>
+          </div>
+          <div id="scopeDatabaseList" class="record-grid scope-database-list"></div>
+        </section>
+
+        <section id="contractorsView" class="view">
+          <div class="toolbar toolbar-split">
+            <div class="toolbar-group">
+              <select id="contractorSortFilter" aria-label="Sort contractors">
+                <option value="name">Company Name</option>
+                <option value="opportunities">Opportunities</option>
+                <option value="wins">Wins</option>
+                <option value="lastGiven">Last Opportunity Given</option>
+                <option value="lastWon">Last Opportunity Won</option>
+              </select>
+              <button class="sort-direction-button" id="contractorSortDirection" data-direction="asc" type="button" aria-label="Toggle contractor sort direction">↑</button>
+              <select id="contractorWinFilter" aria-label="Filter contractors by wins">
+                <option value="all">All contractors</option>
+                <option value="wins">Has wins</option>
+                <option value="open">No wins yet</option>
+              </select>
+              <button class="mini-button utility-mini" id="exportContractorContactsButton" type="button">CSV</button>
+              <button class="mini-button utility-mini" id="exportContractorVcardsButton" type="button">vCard</button>
+              <div class="view-toggle" data-view-toggle="contractors" aria-label="Contractor layout">
+                <button class="sort-tab is-active" data-layout="tile" type="button">Tile</button>
+                <button class="sort-tab" data-layout="list" type="button">List</button>
+                <button class="sort-tab" data-layout="kanban" type="button">Kanban</button>
+              </div>
+            </div>
+          </div>
+          <div id="contractorsList" class="record-grid"></div>
+        </section>
+
+        <section id="callListView" class="view">
+          <div class="call-list-tabs" aria-label="Call list views">
+            <button class="sort-tab is-active" data-call-list-mode="today" type="button">Call List</button>
+            <button class="sort-tab" data-call-list-mode="setup" type="button">Call List Setup</button>
+            <select id="callListSortFilter" aria-label="Sort call list">
+              <option value="name">Name</option>
+              <option value="county">County</option>
+              <option value="entity">Entity</option>
+              <option value="rep">Shared Rep</option>
+              <option value="activity">Last Activity</option>
+            </select>
+            <button class="sort-direction-button" id="callListSortDirection" data-direction="asc" type="button" aria-label="Toggle call list sort direction">↑</button>
+            <span class="view-toggle" data-view-toggle="callList" aria-label="Call list layout">
+              <button class="sort-tab is-active" data-layout="tile" type="button">Tile</button>
+              <button class="sort-tab" data-layout="list" type="button">List</button>
+              <button class="sort-tab" data-layout="kanban" type="button">Kanban</button>
+            </span>
+          </div>
+          <div class="weekday-ribbon" id="callListWeekdayRibbon">
+            <span>Day</span>
+            <span class="weekday-tabs" id="callListWeekdays" aria-label="Choose call list day"></span>
+          </div>
+          <div class="call-list-layout">
+            <section class="panel call-list-setup" id="callListSetupPanel">
+              <div class="panel-header">
+                <h3>Call List Setup</h3>
+                <span>Assign by Day</span>
+              </div>
+              <form id="callListRuleForm" class="inline-form">
+                <label>
+                  <span>Day</span>
+                  <select id="callListDay" name="day"></select>
+                </label>
+                <label>
+                  <span>Assign by</span>
+                  <select id="callListType" name="type">
+                    <option value="entity">Entity</option>
+                    <option value="county">County</option>
+                    <option value="client">Client</option>
+                  </select>
+                </label>
+                <label class="full-field">
+                  <span>Value</span>
+                  <select id="callListValue" name="value"></select>
+                </label>
+                <button class="primary-button" type="submit">Add to call list</button>
+              </form>
+              <div id="callListRules" class="call-rule-list"></div>
+            </section>
+            <section class="panel call-list-current" id="callListTodayPanel">
+              <div class="panel-header">
+                <h3 id="callListTitle">Today’s Calls</h3>
+                <span id="callListCount"></span>
+              </div>
+              <div id="dailyCallList" class="call-checklist"></div>
+            </section>
+          </div>
+        </section>
+
+        <section id="noteTakerView" class="view">
+          <div class="note-taker-layout">
+            <section class="panel">
+              <div class="panel-header">
+                <h3>Note Taker</h3>
+                <span>Save field notes to an account</span>
+              </div>
+              <form id="noteTakerForm" class="note-taker-form">
+                <datalist id="noteClientOptions"></datalist>
+                <label>
+                  <span>Client</span>
+                  <input id="noteClientInput" name="client" list="noteClientOptions" type="text" placeholder="Search or type client name" required />
+                </label>
+                <label>
+                  <span>Address</span>
+                  <input id="noteAddressInput" name="address" type="text" placeholder="Client or facility address" />
+                </label>
+                <label>
+                  <span>Facility Name</span>
+                  <input id="noteFacilityInput" name="facility" type="text" placeholder="Roof, campus, building, or facility" />
+                </label>
+                <label>
+                  <span>Date</span>
+                  <input id="noteDateInput" name="date" type="date" />
+                </label>
+                <label class="full-field">
+                  <span>Note</span>
+                  <textarea class="note-box" name="note" placeholder="Type your field note here" required></textarea>
+                </label>
+                <div class="note-new-account is-collapsed" id="noteNewAccountPanel">
+                  <div class="note-new-account-header">
+                    <div>
+                      <h4>New Account Details</h4>
+                      <p>Use these if the client is not already in GRIP.</p>
+                    </div>
+                    <button class="mini-button" id="toggleNoteNewAccountButton" type="button" aria-expanded="false">Show</button>
+                  </div>
+                  <div class="field-grid" id="noteNewAccountFields" hidden>
+                    <label>
+                      <span>Entity</span>
+                      <select id="noteEntityInput" name="entity"></select>
+                    </label>
+                    <label>
+                      <span>County</span>
+                      <select id="noteCountyInput" name="county"></select>
+                    </label>
+                    <label>
+                      <span>Point of Contact</span>
+                      <input name="poc" type="text" />
+                    </label>
+                    <label>
+                      <span>Phone</span>
+                      <input name="phone" type="tel" />
+                    </label>
+                    <label>
+                      <span>Email</span>
+                      <input name="email" type="email" />
+                    </label>
+                  </div>
+                </div>
+                <div class="note-media-grid">
+                  <div class="upload-box">
+                    <span>Pictures / Videos</span>
+                    <input id="noteCameraInput" class="file-input" name="cameraMedia" type="file" accept="image/*,video/*" capture="environment" multiple />
+                    <input id="notePhotoInput" class="file-input" name="photos" type="file" accept="image/*,video/*" multiple />
+                    <div class="media-button-row">
+                      <label class="media-pick-button" for="noteCameraInput">Take Photo / Video</label>
+                      <label class="media-pick-button" for="notePhotoInput">Add From Library</label>
+                    </div>
+                    <small id="noteMediaSummary">Take new photos/videos or select multiple from your phone library.</small>
+                  </div>
+                  <div class="upload-box">
+                    <span>Voice Memo</span>
+                    <input id="noteAudioInput" class="file-input" name="voiceMemo" type="file" accept="audio/*" capture="microphone" multiple />
+                    <div class="media-button-row">
+                      <label class="media-pick-button" for="noteAudioInput">Record / Add Voice Memo</label>
+                    </div>
+                    <small id="noteAudioSummary">Record a memo on your phone or upload audio.</small>
+                  </div>
+                </div>
+                <div class="modal-actions">
+                  <button class="secondary-button" id="clearNoteTakerButton" type="button">Clear</button>
+                  <button class="primary-button" type="submit">Save note</button>
+                </div>
+              </form>
+            </section>
+            <section class="panel">
+              <div class="panel-header">
+                <h3>Saved Notes</h3>
+                <span id="noteTakerCount"></span>
+              </div>
+              <div id="noteTakerLog" class="timeline-list"></div>
+            </section>
+          </div>
+        </section>
+      </main>
+
+      <aside class="detail-drawer" id="detailDrawer" aria-live="polite">
+        <button class="drawer-close" id="drawerClose" type="button" aria-label="Close details">×</button>
+        <div id="detailContent" class="detail-content">
+          <p class="empty-detail">Select a record to see contacts, next steps, projects, and proposals together.</p>
+        </div>
+      </aside>
+    </div>
+
+    <dialog id="proposalDialog" class="modal">
+      <form id="proposalForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">New proposal</p>
+            <h3>Add Proposal</h3>
+          </div>
+          <button class="icon-button" id="cancelProposalButton" type="button" aria-label="Close">×</button>
+        </div>
+
+        <div class="form-grid">
+          <label class="full-field">
+            <span>Client name</span>
+            <input id="proposalClientSearch" name="client" list="clientOptions" autocomplete="off" placeholder="Search existing or type a new client" required />
+            <datalist id="clientOptions"></datalist>
+            <datalist id="inchFractionOptions"></datalist>
+          </label>
+
+          <div id="newClientFields" class="new-client-fields full-field">
+            <div class="inline-alert" id="clientInfoStatus">Select a client to populate account details, or type a new one.</div>
+            <label>
+              <span>Entity</span>
+              <select id="proposalEntityInput" name="entity"></select>
+            </label>
+            <label>
+              <span>County</span>
+              <select id="proposalCountyInput" name="county"></select>
+            </label>
+            <label>
+              <span>Client ranking</span>
+              <select name="clientRanking">
+                <option>Prospecting</option>
+                <option>In Progress</option>
+                <option>Meeting</option>
+                <option>C</option>
+                <option>B</option>
+                <option>A</option>
+                <option>Dead End</option>
+              </select>
+            </label>
+            <label>
+              <span>Follow-up date</span>
+              <input name="nextFollowUp" type="date" />
+            </label>
+            <label>
+              <span>Address</span>
+              <input name="address" />
+            </label>
+            <label>
+              <span>POC</span>
+              <input name="poc" />
+            </label>
+            <label>
+              <span>Title</span>
+              <input name="title" />
+            </label>
+            <label>
+              <span>Phone</span>
+              <input name="phone" type="tel" />
+            </label>
+            <label>
+              <span>Email</span>
+              <input name="email" type="email" />
+            </label>
+          </div>
+
+          <label>
+            <span>Project name</span>
+            <input name="project" required />
+          </label>
+          <label>
+            <span>Due date</span>
+            <input id="proposalDueDate" name="bidDueDate" type="date" required />
+          </label>
+          <label>
+            <span>Follow-up date</span>
+            <input name="nextFollowUp" type="date" />
+          </label>
+          <label>
+            <span>Stage of proposal</span>
+            <select id="proposalStageInput" name="stage" required></select>
+          </label>
+          <label>
+            <span>Estimated material amount</span>
+            <input name="materials" type="number" min="0" step="0.01" value="250.00" />
+          </label>
+        </div>
+
+        <section class="contractor-picker">
+          <div class="modal-section-header">
+            <h4>Bidding Contractors</h4>
+            <div class="add-contractor">
+              <input id="newContractorName" type="text" placeholder="Contractor name" />
+              <button id="addContractorButton" type="button">Add contractor</button>
+            </div>
+          </div>
+          <div id="contractorChecklist" class="check-grid"></div>
+        </section>
+
+        <section class="contractor-picker">
+          <div class="modal-section-header">
+            <h4>Bids Received</h4>
+            <span>Select contractors after their email comes in.</span>
+          </div>
+          <div id="receivedChecklist" class="check-grid"></div>
+        </section>
+
+        <label class="full-field">
+          <span>Awarded contractor</span>
+          <select id="awardedContractorInput" name="awardedContractor"></select>
+        </label>
+
+        <div class="modal-actions">
+          <button class="secondary-button" id="clearProposalButton" type="button">Clear</button>
+          <button class="primary-button" type="submit">Add proposal</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="accountDialog" class="modal small-modal">
+      <form id="accountForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Account</p>
+            <h3 id="accountDialogTitle">Add Account</h3>
+          </div>
+          <button class="icon-button" id="cancelAccountButton" type="button" aria-label="Close">×</button>
+        </div>
+        <input id="accountIdInput" name="id" type="hidden" />
+        <div class="form-grid">
+          <label class="full-field">
+            <span>Client / Account Name</span>
+            <input name="client" required />
+          </label>
+          <label>
+            <span>Entity</span>
+            <select name="entity" id="accountEntityInput"></select>
+          </label>
+          <label>
+            <span>County</span>
+            <select name="county" id="accountCountyInput"></select>
+          </label>
+          <label>
+            <span>Stage / Rank</span>
+            <select name="clientRanking">
+              <option>Prospecting</option>
+              <option>In Progress</option>
+              <option>Meeting</option>
+              <option>C</option>
+              <option>B</option>
+              <option>A</option>
+              <option>Dead End</option>
+            </select>
+          </label>
+          <label>
+            <span>Shared Rep</span>
+            <input name="sharedRep" />
+          </label>
+          <label>
+            <span>Follow-up Date</span>
+            <input name="nextFollowUp" type="date" />
+          </label>
+          <label>
+            <span>Point of Contact</span>
+            <input name="poc" />
+          </label>
+          <label>
+            <span>Title</span>
+            <input name="title" />
+          </label>
+          <label>
+            <span>Phone</span>
+            <input name="phone" type="tel" />
+          </label>
+          <label>
+            <span>Email</span>
+            <input name="email" type="email" />
+          </label>
+          <label class="full-field">
+            <span>Address</span>
+            <input name="address" />
+          </label>
+          <label class="full-field">
+            <span>Add activity</span>
+            <textarea class="note-box" name="activity" placeholder="Add a note while you are here"></textarea>
+          </label>
+        </div>
+        <div id="accountDialogActivity" class="activity-list compact-activity"></div>
+        <div class="modal-actions">
+          <button class="delete-button modal-delete-button" id="deleteAccountDialogButton" type="button">Delete Account</button>
+          <button class="secondary-button" id="clearAccountButton" type="button">Clear</button>
+          <button class="primary-button" type="submit">Save account</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="territoryDialog" class="modal small-modal">
+      <form id="territoryForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Settings</p>
+            <h3>Territory Settings</h3>
+          </div>
+          <button class="icon-button" id="cancelTerritoryButton" type="button" aria-label="Close">×</button>
+        </div>
+        <div class="territory-settings">
+          <section class="full-field">
+            <h4>Rep Profile</h4>
+            <div class="field-grid">
+              <label>
+                <span>Name</span>
+                <input name="repName" id="repNameInput" type="text" placeholder="Your name" />
+              </label>
+              <label>
+                <span>Phone</span>
+                <input name="repPhone" id="repPhoneInput" type="tel" placeholder="Phone number" />
+              </label>
+              <label>
+                <span>Email</span>
+                <input name="repEmail" id="repEmailInput" type="email" placeholder="Email address" />
+              </label>
+              <label>
+                <span>State</span>
+                <select name="territoryState" id="territoryStateInput"></select>
+              </label>
+              <label>
+                <span>Territory Population</span>
+                <input name="territoryPopulation" id="territoryPopulationInput" type="number" min="0" step="1" inputmode="numeric" placeholder="Population" />
+              </label>
+            </div>
+          </section>
+          <section>
+            <h4>Entities</h4>
+            <div class="add-territory-row">
+              <input id="newEntityInput" type="text" placeholder="Add entity" />
+              <input id="newEntityColorInput" type="color" value="#0057a8" aria-label="Entity color" />
+              <button class="secondary-button" id="addEntityButton" type="button">Add</button>
+            </div>
+            <div id="entitySettingsList" class="territory-list"></div>
+          </section>
+          <section>
+            <h4>Counties</h4>
+            <div class="add-territory-row">
+              <input id="newCountyInput" type="text" placeholder="Add county" />
+              <input id="newCountyColorInput" type="color" value="#f58220" aria-label="County color" />
+              <button class="secondary-button" id="addCountyButton" type="button">Add</button>
+            </div>
+            <div id="countySettingsList" class="territory-list"></div>
+          </section>
+        </div>
+        <div class="modal-actions">
+          <button class="primary-button" type="submit">Save settings</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="goalDialog" class="modal small-modal">
+      <form id="goalForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Dashboard</p>
+            <h3>Goal Settings</h3>
+          </div>
+          <button class="icon-button" id="cancelGoalButton" type="button" aria-label="Close">×</button>
+        </div>
+        <div class="territory-settings">
+          <section>
+            <label>
+              <span>Material Goal</span>
+              <input name="materialGoal" type="number" min="0" step="0.01" />
+            </label>
+            <label>
+              <span>Commission Goal</span>
+              <input name="commissionGoal" type="number" min="0" step="0.01" />
+            </label>
+            <label>
+              <span>Wise Trophy Goal</span>
+              <input name="wiseGoal" type="number" min="0" step="0.01" />
+            </label>
+          </section>
+        </div>
+        <div class="modal-actions">
+          <button class="primary-button" type="submit">Save goals</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="cloudSyncDialog" class="modal small-modal">
+      <div class="quick-record-shell">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Cloud</p>
+            <h3>Cloud Sync Prep</h3>
+          </div>
+          <button class="icon-button" id="cancelCloudSyncButton" type="button" aria-label="Close">×</button>
+        </div>
+        <div class="cloud-sync-copy">
+          <p>Use Google Drive as the file home for large PDFs, photos, videos, voice memos, drawings, bid forms, and contractor proposals.</p>
+          <div class="territory-list">
+            <div class="territory-row"><span>1. Create a GRIP folder in Google Drive</span></div>
+            <div class="territory-row"><span>2. Store large project files in Drive folders</span></div>
+            <div class="territory-row"><span>3. Keep the Drive share link inside GRIP</span></div>
+            <div class="territory-row"><span>4. Download a GRIP backup regularly for records and settings</span></div>
+          </div>
+          <div class="modal-actions compact-actions">
+            <a class="secondary-button" href="https://drive.google.com/drive/my-drive" target="_blank" rel="noreferrer">Open Google Drive</a>
+          </div>
+          <small>True automatic two-way syncing between Mac and phone still needs a hosted database later. Drive is the clean no-hosting home for the big files.</small>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="releaseNotesDialog" class="modal small-modal">
+      <div class="quick-record-shell">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">GRIP</p>
+            <h3>Release Notes</h3>
+          </div>
+          <button class="icon-button" id="cancelReleaseNotesButton" type="button" aria-label="Close">×</button>
+        </div>
+        <div class="cloud-sync-copy">
+          <p><strong>Current build:</strong> GRIP 2026.05.05</p>
+          <div class="territory-list">
+            <div class="territory-row"><span>Dashboard now includes data quality, proposal aging, and recently updated activity.</span></div>
+            <div class="territory-row"><span>Accounts, projects, and proposals can be archived from active views instead of only deleted.</span></div>
+            <div class="territory-row"><span>Account profiles can be exported as printer-friendly PDFs.</span></div>
+            <div class="territory-row"><span>Proposal and project saves now check required fields before saving.</span></div>
+            <div class="territory-row"><span>Recommended deployment: S3 or Cloudflare as the official copy, local Mac as backup/dev.</span></div>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="proposalDueTodayDialog" class="modal small-modal">
+      <div class="quick-record-shell">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Dashboard Alert</p>
+            <h3>Proposals Due Today</h3>
+          </div>
+          <button class="icon-button" id="cancelProposalDueTodayButton" type="button" aria-label="Close">×</button>
+        </div>
+        <div id="proposalDueTodayList" class="due-today-list"></div>
+        <div class="modal-actions">
+          <button class="secondary-button" id="viewDueTodayProposalsButton" type="button">View Proposals</button>
+          <button class="primary-button" id="closeDueTodayProposalsButton" type="button">Got it</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="taskDailyAlertDialog" class="modal small-modal">
+      <div class="quick-record-shell">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Daily Task Alert</p>
+            <h3>Today in GRIP</h3>
+          </div>
+          <button class="icon-button" id="cancelTaskDailyAlertButton" type="button" aria-label="Close">×</button>
+        </div>
+        <div id="taskDailyAlertContent" class="due-today-list"></div>
+        <div class="modal-actions">
+          <button class="secondary-button" id="viewIncompleteTaskAccountsButton" type="button">View Accounts</button>
+          <button class="secondary-button" id="viewTodayTasksButton" type="button">View Tasks</button>
+          <button class="primary-button" id="closeTaskDailyAlertButton" type="button">Got it</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="projectDialog" class="modal">
+      <form id="projectForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">New project</p>
+            <h3>Add Project</h3>
+          </div>
+          <button class="icon-button" id="cancelProjectButton" type="button" aria-label="Close">×</button>
+        </div>
+
+        <div class="form-grid project-form-grid">
+          <label class="project-client-field">
+            <span>Client</span>
+            <input id="projectClientSearch" name="client" list="clientOptions" autocomplete="off" required />
+          </label>
+          <label class="project-score-field">
+            <span>ABC Score</span>
+            <select id="projectScoreInput" name="abcList" required></select>
+          </label>
+          <label class="full-field">
+            <span>Project name</span>
+            <input name="projectName" required />
+          </label>
+          <label class="full-field">
+            <span>Project address</span>
+            <input id="projectAddressInput" name="address" placeholder="Defaults to client address when available" />
+          </label>
+          <div class="full-field">
+            <button class="secondary-button" id="differentProjectAddressButton" type="button">Different address</button>
+          </div>
+          <div class="new-client-fields full-field">
+            <div class="inline-alert" id="projectClientInfoStatus">Select a client to populate account contact details, or use these fields to fill missing account information.</div>
+            <label>
+              <span>Account POC</span>
+              <input name="poc" />
+            </label>
+            <label>
+              <span>Title</span>
+              <input name="title" />
+            </label>
+            <label>
+              <span>Phone</span>
+              <input name="phone" type="tel" />
+            </label>
+            <label>
+              <span>Email</span>
+              <input name="email" type="email" />
+            </label>
+          </div>
+          <label>
+            <span>Project stage</span>
+            <select id="projectStageInput" name="stage" required></select>
+          </label>
+          <label>
+            <span>Start quarter</span>
+            <select name="startQuarter">
+              <option>Q1</option>
+              <option>Q2</option>
+              <option>Q3</option>
+              <option>Q4</option>
+            </select>
+          </label>
+          <label>
+            <span>Start year</span>
+            <select id="projectStartYearInput" name="startYear"></select>
+          </label>
+          <label>
+            <span>Follow-up date</span>
+            <input name="nextFollowUp" type="date" />
+          </label>
+          <label>
+            <span>Materials</span>
+            <input id="projectMaterialsInput" name="materials" type="number" min="0" step="0.01" />
+          </label>
+          <label>
+            <span>SQ/FT</span>
+            <input name="squareFeet" type="number" min="0" step="1" />
+          </label>
+          <label>
+            <span>Commission</span>
+            <input id="projectCommissionInput" name="commission" type="number" min="0" step="0.01" />
+          </label>
+          <label>
+            <span>Wise Trophy</span>
+            <input id="projectWiseTrophyInput" name="wiseTrophy" type="number" min="0" step="0.01" />
+          </label>
+        </div>
+
+        <section class="contractor-picker">
+          <div class="modal-section-header">
+            <h4>Bidding Contractors</h4>
+            <button class="mini-button" id="toggleProjectContractorsButton" type="button">Show contractors</button>
+          </div>
+          <div id="projectContractorPickerBody" class="contractor-picker-body" hidden>
+            <div class="add-contractor">
+              <input id="newProjectContractorName" type="text" placeholder="Contractor name" />
+              <button id="addProjectContractorButton" type="button">Add contractor</button>
+            </div>
+            <div id="projectContractorChecklist" class="check-grid"></div>
+          </div>
+        </section>
+
+        <section class="system-builder-panel">
+          <div class="modal-section-header">
+            <div>
+              <h4>System Builder</h4>
+              <span>Guided by Garland Warranty Charts</span>
+            </div>
+          </div>
+          <div class="form-grid system-builder-grid">
+            <label class="system-tree-root">
+              <span>Project type</span>
+              <select id="projectTypeInput" name="projectType" required></select>
+            </label>
+            <label>
+              <span>Warranty type</span>
+              <select id="systemWarrantyTypeInput" name="systemWarrantyType"></select>
+            </label>
+            <label id="systemMaterialField">
+              <span id="systemMaterialLabel">Existing / material type</span>
+              <select id="systemMaterialInput" name="systemMaterial"></select>
+            </label>
+            <label id="systemProductField">
+              <span id="systemProductLabel">System</span>
+              <select id="systemProductInput" name="systemProduct"></select>
+            </label>
+            <label>
+              <span>Warranty term</span>
+              <select id="systemWarrantyTermInput" name="systemWarrantyTerm"></select>
+            </label>
+            <label id="systemCapSheetField">
+              <span>Cap sheet</span>
+              <select id="systemCapSheetInput" name="systemCapSheet"></select>
+            </label>
+            <label id="systemCapAdhesiveField">
+              <span>Cap sheet adhesive</span>
+              <select id="systemCapAdhesiveInput" name="systemCapAdhesive"></select>
+            </label>
+            <label id="systemBaseSheetField">
+              <span>Base sheet</span>
+              <select id="systemBaseSheetInput" name="systemBaseSheet"></select>
+            </label>
+            <label id="systemBaseAdhesiveField">
+              <span>Base sheet adhesive</span>
+              <select id="systemBaseAdhesiveInput" name="systemBaseAdhesive"></select>
+            </label>
+            <label id="systemSurfacingField">
+              <span>Surfacing</span>
+              <select id="systemSurfacingInput" name="systemSurfacing"></select>
+            </label>
+            <label>
+              <span>Primer</span>
+              <input id="systemPrimerInput" name="systemPrimer" readonly />
+            </label>
+            <label>
+              <span>Contractor warranty</span>
+              <select id="contractorWarrantyInput" name="contractorWarranty"></select>
+            </label>
+            <label class="full-field">
+              <span>System notes</span>
+              <textarea id="systemNotesInput" name="systemNotes" readonly></textarea>
+            </label>
+          </div>
+        </section>
+
+        <div class="modal-actions">
+          <button class="secondary-button" id="clearProjectButton" type="button">Clear</button>
+          <button class="primary-button" type="submit">Add project</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="projectChecklistDialog" class="modal checklist-modal">
+      <form id="projectChecklistForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Project Checklist</p>
+            <h3 id="projectChecklistTitle">Project Checklist</h3>
+          </div>
+          <button class="icon-button" id="cancelProjectChecklistButton" type="button" aria-label="Close">×</button>
+        </div>
+        <input id="projectChecklistProjectId" name="projectId" type="hidden" />
+        <div id="projectChecklistContent" class="project-checklist-content"></div>
+        <div class="modal-actions sticky-actions">
+          <button class="secondary-button" id="printProjectChecklistButton" type="button">Print Checklist</button>
+          <button class="secondary-button" id="clearProjectChecklistButton" type="button">Clear checklist</button>
+          <button class="primary-button" type="submit">Save checklist</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="taskDialog" class="modal task-modal">
+      <form id="taskForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Fast task entry</p>
+            <h3 id="taskDialogTitle">New Task</h3>
+          </div>
+          <button class="icon-button" id="cancelTaskButton" type="button" aria-label="Close">×</button>
+        </div>
+        <input id="taskIdInput" name="task_id" type="hidden" />
+        <section class="task-template-strip" aria-label="Quick task templates">
+          <button type="button" data-task-template="Follow Up on Proposal">Follow Up on Proposal</button>
+          <button type="button" data-task-template="Schedule Roof Walk">Schedule Roof Walk</button>
+          <button type="button" data-task-template="Send Scope of Work">Send Scope of Work</button>
+          <button type="button" data-task-template="Call Contractor">Call Contractor</button>
+          <button type="button" data-task-template="Check Leak Status">Check Leak Status</button>
+          <button type="button" data-task-template="Send Warranty Info">Send Warranty Info</button>
+          <button type="button" data-task-template="OAC Follow-Up">OAC Follow-Up</button>
+          <button type="button" data-task-template="Project Site Visit">Project Site Visit</button>
+          <button type="button" data-task-template="Capital Planning Follow-Up">Capital Planning Follow-Up</button>
+        </section>
+        <div class="form-grid task-form-grid">
+          <label class="full-field">
+            <span>Task Title</span>
+            <input id="taskTitleInput" name="title" placeholder="Type task and press save" required />
+          </label>
+          <label class="full-field">
+            <span>Description / Notes</span>
+            <textarea name="description" placeholder="Notes, context, links, or field instructions"></textarea>
+          </label>
+          <fieldset class="full-field task-account-mode">
+            <legend>Account</legend>
+            <label><input type="radio" name="accountMode" value="unassigned" checked /> Unassigned</label>
+            <label><input type="radio" name="accountMode" value="existing" /> Existing Account</label>
+            <label><input type="radio" name="accountMode" value="new" /> New Account</label>
+          </fieldset>
+          <label class="task-account-search" data-task-existing-account hidden>
+            <span>Search Account</span>
+            <input id="taskAccountSearchInput" name="account_name" list="clientOptions" placeholder="Start typing account name" />
+          </label>
+          <div class="new-client-fields task-new-account-fields full-field" data-task-new-account hidden>
+            <label>
+              <span>New Account Name</span>
+              <input name="newAccountName" placeholder="Client / account name" />
+            </label>
+            <label>
+              <span>Entity</span>
+              <select id="taskNewAccountEntity" name="newAccountEntity"></select>
+            </label>
+            <label>
+              <span>County</span>
+              <select id="taskNewAccountCounty" name="newAccountCounty"></select>
+            </label>
+            <label>
+              <span>Point of Contact</span>
+              <input name="newAccountPoc" />
+            </label>
+            <label>
+              <span>Phone</span>
+              <input name="newAccountPhone" type="tel" />
+            </label>
+            <label>
+              <span>Email</span>
+              <input name="newAccountEmail" type="email" />
+            </label>
+          </div>
+          <label>
+            <span>Related Opportunity / Project</span>
+            <select id="taskProjectInput" name="related_project_id"></select>
+          </label>
+          <label>
+            <span>Due Date</span>
+            <input id="taskDueDateInput" name="due_date" type="date" required />
+          </label>
+          <label>
+            <span>Optional Time</span>
+            <input name="due_time" type="time" />
+          </label>
+          <div class="task-date-buttons full-field" aria-label="Quick due dates">
+            <button type="button" data-task-due="today">Today</button>
+            <button type="button" data-task-due="tomorrow">Tomorrow</button>
+            <button type="button" data-task-due="7">+7 Days Out</button>
+            <button type="button" data-task-due="choose">Choose Date</button>
+          </div>
+          <label>
+            <span>Priority</span>
+            <select id="taskPriorityInput" name="priority"></select>
+          </label>
+          <label>
+            <span>Task Type</span>
+            <select id="taskTypeInput" name="task_type"></select>
+          </label>
+          <label>
+            <span>Next Action</span>
+            <input id="taskNextActionInput" name="next_action" list="taskNextActionOptions" placeholder="Choose or type your own" />
+            <datalist id="taskNextActionOptions"></datalist>
+          </label>
+          <label>
+            <span>Reminder</span>
+            <select id="taskReminderInput" name="reminder_type"></select>
+          </label>
+          <label>
+            <span>Custom Reminder</span>
+            <input name="reminder_custom" type="datetime-local" />
+          </label>
+          <label>
+            <span>Recurring Schedule</span>
+            <select id="taskRecurringInput" name="recurring_type"></select>
+          </label>
+          <label>
+            <span>Status</span>
+            <select id="taskStatusInput" name="status"></select>
+          </label>
+          <label>
+            <span>Assigned User</span>
+            <input name="assigned_user" placeholder="Defaults to territory rep" />
+          </label>
+          <label>
+            <span>Completed Outcome</span>
+            <input id="taskOutcomeInput" name="completed_outcome" list="taskOutcomeOptions" placeholder="Prompted when completed" />
+            <datalist id="taskOutcomeOptions"></datalist>
+          </label>
+          <label class="full-field task-drop-zone" data-task-drop-zone>
+            <span>Attachments / Photo Capture</span>
+            <input id="taskAttachmentInput" name="attachments" type="file" accept="image/*,video/*,audio/*,application/pdf,.doc,.docx,.xls,.xlsx" capture="environment" multiple />
+            <small>Upload from device, take pictures/videos on mobile, or drag files here.</small>
+          </label>
+          <div id="taskAttachmentPreview" class="task-attachment-preview full-field"></div>
+        </div>
+        <div class="modal-actions sticky-actions">
+          <button class="secondary-button" id="clearTaskButton" type="button">Clear</button>
+          <button class="primary-button" type="submit">Save Task</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="punchListDialog" class="modal punch-modal">
+      <form id="punchListForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Roofing closeout</p>
+            <h3 id="punchListDialogTitle">New Punch List</h3>
+          </div>
+          <button class="icon-button" id="cancelPunchListButton" type="button" aria-label="Close">×</button>
+        </div>
+        <input id="punchListIdInput" name="punch_list_id" type="hidden" />
+        <input id="punchItemIdInput" name="punch_item_id" type="hidden" />
+        <div class="form-grid punch-form-grid">
+          <label class="full-field">
+            <span>Project</span>
+            <select id="punchProjectInput" name="project_id" required></select>
+          </label>
+          <label>
+            <span>Punch List Title</span>
+            <input id="punchTitleInput" name="title" placeholder="Running punch list" required />
+          </label>
+          <label>
+            <span>Punch List Type</span>
+            <select id="punchTypeInput" name="list_type"></select>
+          </label>
+          <label>
+            <span>List Status</span>
+            <select id="punchListStatusInput" name="list_status"></select>
+          </label>
+          <label>
+            <span>Primary Contractor</span>
+            <select id="punchAssignedContractorInput" name="assigned_contractor"></select>
+          </label>
+          <label>
+            <span>Due Date</span>
+            <input id="punchDueDateInput" name="due_date" type="date" />
+          </label>
+          <label>
+            <span>Reviewer</span>
+            <input id="punchReviewerInput" name="reviewer" placeholder="Defaults to territory rep" />
+          </label>
+          <div class="full-field punch-existing-items" id="punchExistingItemsPanel" hidden>
+            <h4>Existing Items <span id="punchExistingItemsCount"></span></h4>
+            <div id="punchExistingItemsList"></div>
+          </div>
+
+          <div class="full-field punch-item-builder">
+            <div class="modal-section-header">
+              <div>
+                <h4>Punch Item</h4>
+                <span>Add the issue, required correction, and photos from the field.</span>
+              </div>
+              <button class="mini-button utility-mini" id="punchSaveAddItemButton" type="button" title="Save current item and add another">+ Save &amp; Add Item</button>
+            </div>
+            <div class="form-grid">
+              <label>
+                <span>Item Number</span>
+                <input id="punchItemNumberInput" name="item_number" placeholder="Auto" />
+              </label>
+              <label>
+                <span>Roof Area</span>
+                <input name="roof_area" placeholder="Roof A" />
+              </label>
+              <label>
+                <span>Section / Grid</span>
+                <input name="section" placeholder="Section 3 / Grid B-2" />
+              </label>
+              <label>
+                <span>Location</span>
+                <input name="location" placeholder="South parapet / Drain D-2" />
+              </label>
+              <label>
+                <span>Category</span>
+                <select id="punchCategoryInput" name="category"></select>
+              </label>
+              <label>
+                <span>Severity</span>
+                <select id="punchSeverityInput" name="severity"></select>
+              </label>
+              <label>
+                <span>Item Status</span>
+                <select id="punchItemStatusInput" name="item_status"></select>
+              </label>
+              <label>
+                <span>Water Test / Verification</span>
+                <select id="punchWaterStatusInput" name="water_test_status"></select>
+              </label>
+              <label class="full-field">
+                <span>Description of Issue</span>
+                <textarea name="description" placeholder="What was found?"></textarea>
+              </label>
+              <label class="full-field">
+                <span>Required Correction</span>
+                <textarea name="required_correction" placeholder="What does the contractor need to correct?"></textarea>
+              </label>
+              <label class="full-field task-drop-zone" data-punch-drop-zone="before">
+                <span>Before Photos / Issue Photos</span>
+                <input id="punchBeforePhotoInput" name="before_photos" type="file" accept="image/*,video/*,application/pdf" capture="environment" multiple />
+                <small>Take photos from phone, upload from gallery, or drag files here.</small>
+              </label>
+              <div id="punchBeforePreview" class="task-attachment-preview full-field"></div>
+              <label class="full-field task-drop-zone" data-punch-drop-zone="after">
+                <span>After Photos / Contractor Completion</span>
+                <input id="punchAfterPhotoInput" name="after_photos" type="file" accept="image/*,video/*,application/pdf" capture="environment" multiple />
+                <small>Contractor completion photos are required before submitting for review.</small>
+              </label>
+              <div id="punchAfterPreview" class="task-attachment-preview full-field"></div>
+              <label class="full-field">
+                <span>Reviewer Notes</span>
+                <textarea name="reviewer_notes" placeholder="Internal notes, rejection reason, water test notes"></textarea>
+              </label>
+              <label class="full-field">
+                <span>Contractor Notes</span>
+                <textarea name="contractor_notes" placeholder="Completion notes from contractor"></textarea>
+              </label>
+            </div>
+          </div>
+          <section class="full-field punch-closeout-panel">
+            <div class="modal-section-header">
+              <div>
+                <h4>Closeout Checklist</h4>
+                <span>These become part of the final closeout record.</span>
+              </div>
+            </div>
+            <div id="punchCloseoutChecks" class="checklist-grid"></div>
+          </section>
+        </div>
+        <div class="modal-actions sticky-actions">
+          <button class="secondary-button" id="clearPunchListButton" type="button">Clear</button>
+          <button class="primary-button" type="submit">Save Punch List</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="supportContactDialog" class="modal small-modal">
+      <form id="supportContactForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Contractor contact</p>
+            <h3>Add Support Contact</h3>
+          </div>
+          <button class="icon-button" id="cancelSupportContactButton" type="button" aria-label="Close">×</button>
+        </div>
+        <input id="supportContactContractor" name="contractor" type="hidden" />
+        <div class="form-grid">
+          <label>
+            <span>Name</span>
+            <input name="name" required />
+          </label>
+          <label>
+            <span>Role</span>
+            <select name="role">
+              <option>Support</option>
+              <option>Bid/Proposal</option>
+              <option>Service</option>
+              <option>Project Management</option>
+              <option>Other</option>
+            </select>
+          </label>
+          <label>
+            <span>Title</span>
+            <input name="title" />
+          </label>
+          <label>
+            <span>Phone</span>
+            <input name="phone" type="tel" />
+          </label>
+          <label class="full-field">
+            <span>Email</span>
+            <input name="email" type="email" />
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button class="secondary-button" id="clearSupportContactButton" type="button">Clear</button>
+          <button class="primary-button" type="submit">Save contact</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="scopeDialog" class="modal small-modal">
+      <form id="scopeForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Scope of Work Database</p>
+            <h3>Add Scope of Work</h3>
+          </div>
+          <button class="icon-button" id="cancelScopeButton" type="button" aria-label="Close">×</button>
+        </div>
+        <div class="form-grid">
+          <label>
+            <span>Name</span>
+            <input name="name" placeholder="Scope name" required />
+          </label>
+          <label>
+            <span>Category</span>
+            <select name="category">
+              <option>Repair</option>
+              <option>Coating</option>
+              <option>Restoration</option>
+              <option>Reroof</option>
+            </select>
+          </label>
+          <label class="full-field">
+            <span>Scope Type</span>
+            <select name="scopeType" id="scopeTypeInput">
+              <option value="">Custom Scope</option>
+              <option value="localized-metal-r-panel-repair">Localized Metal R-Panel Repair</option>
+              <option value="metal-roof-seam-fastener-restoration">Metal Roof Seam and Fastener Restoration</option>
+              <option value="full-metal-roof-silicone-coating">Full Metal Roof Silicone Coating System</option>
+              <option value="ridge-cap-restoration">Ridge Cap Restoration</option>
+              <option value="two-ply-modified-bitumen-replacement">2-Ply Modified Bitumen Roof Replacement</option>
+              <option value="thermoplastic-recover-replacement">Thermoplastic Roof Recover or Replacement</option>
+              <option value="drain-sump-water-test-repair">Drain, Sump, and Water Test Repair</option>
+              <option value="pipe-curb-flashing-repair">Pipe Penetration, Curb, and Flashing Repair</option>
+              <option value="emergency-leak-temporary-repair">Emergency Leak Response / Temporary Repair</option>
+              <option value="general-project-requirements-addon">General Project Requirements Add-On</option>
+            </select>
+          </label>
+          <label class="full-field">
+            <span>Upload Scope of Work</span>
+            <input name="file" type="file" />
+          </label>
+          <label>
+            <span>Project</span>
+            <input name="project" placeholder="Project name" />
+          </label>
+          <label>
+            <span>Location</span>
+            <input name="location" placeholder="Project location" />
+          </label>
+          <label class="full-field">
+            <span>Overview</span>
+            <textarea name="overview" placeholder="Brief summary of the scope and intent of work"></textarea>
+          </label>
+          <div class="full-field scope-work-items">
+            <div class="modal-section-header">
+              <h4>Work Items</h4>
+              <button class="secondary-button" id="addScopeWorkItemButton" type="button">+ Add Work Item</button>
+            </div>
+            <div id="scopeWorkItemsList" class="scope-work-items-list">
+              <label class="scope-work-item">
+                <span>Work Item 1</span>
+                <textarea name="workItems" placeholder="Summary, preparation, Garland products, rates, overlaps, cure times, verification"></textarea>
+              </label>
+            </div>
+          </div>
+          <label class="full-field">
+            <span>Client / Contractor Email Name</span>
+            <input name="clientName" placeholder="Client name" />
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button class="secondary-button" id="clearScopeButton" type="button">Clear</button>
+          <button class="secondary-button" id="generateScopeButton" type="button">Generate Preview</button>
+          <button class="primary-button" type="submit">Save scope</button>
+        </div>
+        <textarea id="scopeTemplatePreview" class="scope-template-preview" readonly placeholder="Generated scope preview will appear here."></textarea>
+      </form>
+    </dialog>
+
+    <dialog id="accountProfileDialog" class="modal account-profile-modal">
+      <div class="account-profile-shell">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Account Profile</p>
+            <h3 id="accountProfileTitle">Account</h3>
+          </div>
+          <button class="icon-button" id="cancelAccountProfileButton" type="button" aria-label="Close">×</button>
+        </div>
+        <div id="accountProfileContent"></div>
+      </div>
+    </dialog>
+
+    <dialog id="priceBookDialog" class="modal small-modal">
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">Estimator</p>
+          <h3>Price Book Settings</h3>
+        </div>
+        <button class="icon-button" id="cancelPriceBookButton" type="button" aria-label="Close">×</button>
+      </div>
+      <section class="price-book-panel">
+        <div class="modal-section-header">
+          <div>
+            <h4>Price Book References</h4>
+            <span>Upload current pricing PDFs by year, program, and category</span>
+          </div>
+        </div>
+        <div class="price-book-uploader" id="priceBookDropZone" data-price-book-drop>
+          <div class="form-grid">
+            <label>
+              <span>Price book year</span>
+              <input id="priceBookYearInput" type="number" min="2020" max="2100" step="1" />
+            </label>
+            <label>
+              <span>Pricing program</span>
+              <select id="priceBookProgramInput"></select>
+            </label>
+            <label>
+              <span>Price book category</span>
+              <select id="priceBookTypeInput"></select>
+            </label>
+            <label class="full-field">
+              <span>Upload price book PDFs</span>
+              <input id="priceBookFileInput" type="file" accept="application/pdf,.pdf" multiple />
+            </label>
+          </div>
+          <small>Drag and drop current price book PDFs here, or use the upload field. Use Auto-detect to tag files from their names.</small>
+        </div>
+        <div id="priceBookList" class="price-book-list"></div>
+      </section>
+    </dialog>
+
+    <dialog id="callActivityDialog" class="modal small-modal">
+      <form id="callActivityForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Call list</p>
+            <h3 id="callActivityTitle">Client Call</h3>
+          </div>
+          <button class="icon-button" id="cancelCallActivityButton" type="button" aria-label="Close">×</button>
+        </div>
+        <input id="callActivityAccountId" name="accountId" type="hidden" />
+        <input id="callActivityDay" name="day" type="hidden" />
+        <input id="callActivityComplete" name="completeCall" type="hidden" />
+        <div id="callActivityDetails" class="quick-client-details"></div>
+        <section class="call-outcome-panel">
+          <span>Call outcome</span>
+          <div class="call-outcome-buttons">
+            <button class="mini-button" data-call-outcome="Left voicemail." type="button">Left Voicemail</button>
+            <button class="mini-button" data-call-outcome="Spoke with contact." type="button">Spoke</button>
+            <button class="mini-button" data-call-outcome="Sent follow-up email." type="button">Sent Email</button>
+            <button class="mini-button" data-call-outcome="No answer." type="button">No Answer</button>
+            <button class="mini-button" data-call-outcome="Meeting set." type="button">Meeting Set</button>
+            <button class="mini-button" data-call-outcome="Not interested at this time." type="button">Not Interested</button>
+          </div>
+        </section>
+        <label class="full-field">
+          <span>Add activity</span>
+          <textarea class="note-box" name="activity" placeholder="Type your call notes here" required></textarea>
+        </label>
+        <div class="modal-actions">
+          <button class="secondary-button" id="clearCallActivityButton" type="button">Clear</button>
+          <button class="primary-button" type="submit">Save activity</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="weeklyReviewDialog" class="modal small-modal">
+      <div class="quick-record-shell">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Friday Review</p>
+            <h3>Weekly Recap</h3>
+          </div>
+          <button class="icon-button" id="cancelWeeklyReviewButton" type="button" aria-label="Close">×</button>
+        </div>
+        <pre id="weeklyReviewContent" class="weekly-review-content"></pre>
+        <div class="modal-actions">
+          <button class="secondary-button" id="copyWeeklyReviewDialogButton" type="button">Copy Recap</button>
+          <button class="primary-button" id="closeWeeklyReviewButton" type="button">Done</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="recordQuickDialog" class="modal">
+      <div class="quick-record-shell">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow" id="recordQuickType">Record</p>
+            <h3 id="recordQuickTitle">Details</h3>
+          </div>
+          <button class="icon-button" id="cancelRecordQuickButton" type="button" aria-label="Close">×</button>
+        </div>
+        <div id="recordQuickContent" class="detail-content"></div>
+      </div>
+    </dialog>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="src/data.js"></script>
+    <script src="src/grip-sync.js"></script>
+    <script src="src/app.js"></script>
+    <script src="src/assistant.js"></script>
+  </body>
+</html>
