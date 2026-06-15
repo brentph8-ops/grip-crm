@@ -1113,7 +1113,16 @@ Keep it tight — 150 words max. No headers, just clean paragraphs.`;
     }
 
     el.querySelector("#vdSubmit").addEventListener("click", async () => {
-      if (isRecording && recognition) { recognition.stop(); isRecording = false; }
+      // Stop recording and wait for onend to flush final results before reading transcript
+      if (isRecording && recognition) {
+        await new Promise(resolve => {
+          recognition.onend = () => { statusEl.textContent = "Recording stopped."; resolve(); };
+          recognition.stop();
+          isRecording = false;
+          micBtn.textContent = "🎙️ Start Recording";
+          micBtn.classList.remove("asst-voice-active");
+        });
+      }
       const accountName = el.querySelector("#vdAcct").value.trim();
       const transcript = transcriptEl.value.trim();
       if (!accountName) return showError(el, "#vdResult", "Please select an account.");
@@ -1137,10 +1146,10 @@ Keep it tight — 150 words max. No headers, just clean paragraphs.`;
         `);
 
         resultEl.querySelector("#vdSaveMem").addEventListener("click", () => {
-          // Extract facts after "Things to remember" section
-          const factsMatch = result.match(/\*\*Things to remember[^*]*\*\*([^#]*)/i);
-          const factsText = factsMatch ? factsMatch[1].trim() : result;
-          const facts = factsText.split(/\n/).map(l => l.replace(/^[-•*\d.]+\s*/, "").trim()).filter(Boolean);
+          // Extract only the "Things to remember" bullet lines; never fall back to full result
+          const factsMatch = result.match(/\*\*Things to remember[^*]*\*\*([\s\S]*?)(?:\*\*|$)/i);
+          const factsText = factsMatch ? factsMatch[1].trim() : "";
+          const facts = factsText.split(/\n/).map(l => l.replace(/^[-•*\d.]+\s*/, "").trim()).filter(l => l.length > 10 && l.length < 200);
           if (facts.length) saveMemory(accountName, facts);
           resultEl.querySelector(".asst-memory-offer").innerHTML = `<div class="asst-sequence-done">✓ Key facts saved to ${escHtml(accountName)}'s memory</div>`;
         });
@@ -1280,10 +1289,11 @@ Keep it tight — 150 words max. No headers, just clean paragraphs.`;
       });
     });
 
-    // Delete fact handler
+    // Delete fact handler — disable immediately to prevent double-click race
     el.querySelector("#memList").addEventListener("click", (e) => {
       const btn = e.target.closest(".asst-mem-delete");
-      if (!btn) return;
+      if (!btn || btn.disabled) return;
+      btn.disabled = true;
       const acct = btn.dataset.acct;
       const idx = parseInt(btn.dataset.idx);
       deleteMemoryFact(acct, idx);

@@ -308,18 +308,20 @@ Subject: [subject line]
       `${accountName} Texas news superintendent facilities director`,
     ];
     const results: string[] = [];
-    for (const q of queries) {
-      const r = await fetch("https://google.serper.dev/search", {
-        method: "POST",
-        headers: { "X-API-KEY": SERPER_KEY, "Content-Type": "application/json" },
-        body: JSON.stringify({ q, num: 5 }),
-      });
-      const d = await r.json();
-      const snippets = (d.organic || []).map((item: { title: string; snippet: string; link: string }) =>
-        `Source: ${item.title}\n${item.snippet}\nURL: ${item.link}`
-      ).join("\n\n");
-      if (snippets) results.push(snippets);
-    }
+    await Promise.allSettled(queries.map(async (q) => {
+      try {
+        const r = await fetch("https://google.serper.dev/search", {
+          method: "POST",
+          headers: { "X-API-KEY": SERPER_KEY, "Content-Type": "application/json" },
+          body: JSON.stringify({ q, num: 5 }),
+        });
+        const d = await r.json();
+        const snippets = (d.organic || []).map((item: { title: string; snippet: string; link: string }) =>
+          `Source: ${item.title}\n${item.snippet}\nURL: ${item.link}`
+        ).join("\n\n");
+        if (snippets) results.push(snippets);
+      } catch { /* skip failed query, return partial results */ }
+    }));
     const combined = results.join("\n\n---\n\n") || "No results found.";
     return new Response(JSON.stringify({ result: combined }), {
       headers: { ...CORS, "Content-Type": "application/json" },
