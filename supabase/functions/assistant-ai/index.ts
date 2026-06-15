@@ -220,8 +220,8 @@ Return ONLY the JSON array.`;
   } else if (action === "prospects") {
     const { accounts, searchQuery } = body;
     const accountSummary = accounts?.length
-      ? accounts.slice(0, 30).map((a: { name: string; type?: string; city?: string; state?: string }) =>
-          `${a.name} (${a.type || "unknown"}, ${a.city || ""} ${a.state || ""})`.trim()
+      ? accounts.slice(0, 30).map((a: { client?: string; name?: string; type?: string; city?: string; state?: string }) =>
+          `${a.client || a.name || "Unknown"} (${a.type || "unknown"}, ${a.city || ""} ${a.state || ""})`.trim()
         ).join("\n")
       : "No existing accounts.";
     prompt = searchQuery

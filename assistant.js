@@ -219,7 +219,7 @@
 
   function renderResearch(el) {
     const accounts = getAccounts();
-    const acctOpts = accounts.map(a => `<option value="${escAttr(a.name)}">${escHtml(a.name)}</option>`).join("");
+    const acctOpts = accounts.map(a => `<option value="${escAttr(a.client || a.name)}">${escHtml(a.client || a.name)}</option>`).join("");
 
     el.innerHTML = `
       <div class="asst-panel">
@@ -280,7 +280,7 @@
 
   function renderOutreach(el) {
     const accounts = getAccounts();
-    const acctOpts = accounts.map(a => `<option value="${escAttr(a.name)}">${escHtml(a.name)}</option>`).join("");
+    const acctOpts = accounts.map(a => `<option value="${escAttr(a.client || a.name)}">${escHtml(a.client || a.name)}</option>`).join("");
 
     el.innerHTML = `
       <div class="asst-panel">
@@ -359,7 +359,7 @@
 
   function renderMeetingPrep(el) {
     const accounts = getAccounts();
-    const acctOpts = accounts.map(a => `<option value="${escAttr(a.name)}">${escHtml(a.name)}</option>`).join("");
+    const acctOpts = accounts.map(a => `<option value="${escAttr(a.client || a.name)}">${escHtml(a.client || a.name)}</option>`).join("");
 
     el.innerHTML = `
       <div class="asst-panel">
@@ -430,7 +430,7 @@
 
   function renderScore(el) {
     const accounts = getAccounts();
-    const acctOpts = accounts.map(a => `<option value="${escAttr(a.name)}">${escHtml(a.name)}</option>`).join("");
+    const acctOpts = accounts.map(a => `<option value="${escAttr(a.client || a.name)}">${escHtml(a.client || a.name)}</option>`).join("");
 
     el.innerHTML = `
       <div class="asst-panel">
@@ -503,7 +503,7 @@
 
   function renderSchedule(el) {
     const accounts = getAccounts();
-    const acctOpts = accounts.map(a => `<option value="${escAttr(a.name)}">${escHtml(a.name)}</option>`).join("");
+    const acctOpts = accounts.map(a => `<option value="${escAttr(a.client || a.name)}">${escHtml(a.client || a.name)}</option>`).join("");
 
     el.innerHTML = `
       <div class="asst-panel">
