@@ -319,7 +319,6 @@
         options: {
           redirectTo: window.location.href,
           queryParams: hd ? { hd } : {},
-          scopes: "https://www.googleapis.com/auth/calendar",
         },
       });
     },
