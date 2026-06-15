@@ -1694,6 +1694,28 @@ textarea {
   border-color: #aebbb5;
 }
 
+/* ── Filter field with visible label ────────────────────────────── */
+.filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.filter-field::before {
+  content: attr(data-label);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+  padding-left: 2px;
+  white-space: nowrap;
+}
+
+.filter-field select {
+  margin: 0;
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;

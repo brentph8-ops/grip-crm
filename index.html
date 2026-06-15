@@ -268,11 +268,11 @@
                 <option value="completed">Completed</option>
                 <option value="unassigned">Unassigned</option>
               </select>
-              <select id="taskAccountFilter" aria-label="Filter tasks by account"></select>
-              <select id="taskTypeFilter" aria-label="Filter tasks by type"></select>
-              <select id="taskPriorityFilter" aria-label="Filter tasks by priority"></select>
-              <select id="taskStatusFilter" aria-label="Filter tasks by status"></select>
-              <select id="taskAssignedFilter" aria-label="Filter tasks by assigned user"></select>
+              <div class="filter-field" data-label="Account"><select id="taskAccountFilter" aria-label="Filter tasks by account"></select></div>
+              <div class="filter-field" data-label="Type"><select id="taskTypeFilter" aria-label="Filter tasks by type"></select></div>
+              <div class="filter-field" data-label="Priority"><select id="taskPriorityFilter" aria-label="Filter tasks by priority"></select></div>
+              <div class="filter-field" data-label="Status"><select id="taskStatusFilter" aria-label="Filter tasks by status"></select></div>
+              <div class="filter-field" data-label="Assigned"><select id="taskAssignedFilter" aria-label="Filter tasks by assigned user"></select></div>
             </div>
             <div class="toolbar-group">
               <select id="taskSortFilter" aria-label="Sort tasks">
@@ -297,19 +297,19 @@
         <section id="followUpQueueView" class="view">
           <div class="toolbar toolbar-split">
             <div class="toolbar-group">
-              <select id="queueTypeFilter" aria-label="Filter follow-up queue">
+              <div class="filter-field" data-label="Record Type"><select id="queueTypeFilter" aria-label="Filter follow-up queue">
                 <option value="all">All records</option>
                 <option value="account">Accounts</option>
                 <option value="project">Projects</option>
                 <option value="proposal">Proposals</option>
-              </select>
-              <select id="queueUrgencyFilter" aria-label="Filter follow-up urgency">
+              </select></div>
+              <div class="filter-field" data-label="Urgency"><select id="queueUrgencyFilter" aria-label="Filter follow-up urgency">
                 <option value="all">All urgency</option>
                 <option value="overdue">Overdue</option>
                 <option value="today">Due today</option>
                 <option value="soon">Next 7 days</option>
                 <option value="missing">No next step</option>
-              </select>
+              </select></div>
             </div>
             <div class="toolbar-group">
               <button class="secondary-button" id="copyWeeklyReviewButton" type="button">Copy Weekly Review</button>
@@ -325,10 +325,10 @@
           </div>
           <div class="toolbar toolbar-split">
             <div class="toolbar-group">
-              <select id="rankFilter" aria-label="Filter by account ranking"></select>
-              <select id="entityFilter" aria-label="Filter by entity type"></select>
-              <select id="countyFilter" aria-label="Filter by county"></select>
-              <select id="accountActivityFilter" aria-label="Filter by account activity"></select>
+              <div class="filter-field" data-label="Ranking"><select id="rankFilter" aria-label="Filter by account ranking"></select></div>
+              <div class="filter-field" data-label="Entity"><select id="entityFilter" aria-label="Filter by entity type"></select></div>
+              <div class="filter-field" data-label="County"><select id="countyFilter" aria-label="Filter by county"></select></div>
+              <div class="filter-field" data-label="Activity"><select id="accountActivityFilter" aria-label="Filter by account activity"></select></div>
             </div>
             <div class="toolbar-group">
               <select id="accountSortFilter" aria-label="Sort accounts">
@@ -363,10 +363,10 @@
         <section id="activityLogView" class="view">
           <div class="toolbar toolbar-split">
             <div class="toolbar-group">
-              <select id="activityAccountFilter" aria-label="Filter activity by account"></select>
-              <select id="activityEntityFilter" aria-label="Filter activity by entity"></select>
-              <select id="activityCountyFilter" aria-label="Filter activity by county"></select>
-              <select id="activityRepFilter" aria-label="Filter activity by shared rep"></select>
+              <div class="filter-field" data-label="Account"><select id="activityAccountFilter" aria-label="Filter activity by account"></select></div>
+              <div class="filter-field" data-label="Entity"><select id="activityEntityFilter" aria-label="Filter activity by entity"></select></div>
+              <div class="filter-field" data-label="County"><select id="activityCountyFilter" aria-label="Filter activity by county"></select></div>
+              <div class="filter-field" data-label="Rep"><select id="activityRepFilter" aria-label="Filter activity by shared rep"></select></div>
               <select id="activityDateFilter" aria-label="Filter activity by date">
                 <option value="all">All activity</option>
                 <option value="today">Today</option>
@@ -408,9 +408,9 @@
         <section id="projectsView" class="view">
           <div class="toolbar toolbar-split">
             <div class="toolbar-group">
-              <select id="projectStageFilter" aria-label="Filter by project stage"></select>
-              <select id="projectRankFilter" aria-label="Filter by project rank"></select>
-              <select id="projectContractorFilter" aria-label="Filter by project contractor"></select>
+              <div class="filter-field" data-label="Stage"><select id="projectStageFilter" aria-label="Filter by project stage"></select></div>
+              <div class="filter-field" data-label="Rank"><select id="projectRankFilter" aria-label="Filter by project rank"></select></div>
+              <div class="filter-field" data-label="Contractor"><select id="projectContractorFilter" aria-label="Filter by project contractor"></select></div>
             </div>
             <div class="toolbar-group">
               <select id="projectSortFilter" aria-label="Sort projects">
@@ -447,11 +447,11 @@
           <div class="toolbar toolbar-split">
             <div class="toolbar-group">
               <input id="punchSearchInput" class="toolbar-input" type="search" placeholder="Search punch lists, projects, roof areas" />
-              <select id="punchProjectFilter" aria-label="Filter punch lists by project"></select>
-              <select id="punchContractorFilter" aria-label="Filter punch lists by contractor"></select>
-              <select id="punchStatusFilter" aria-label="Filter punch lists by status"></select>
-              <select id="punchSeverityFilter" aria-label="Filter punch lists by severity"></select>
-              <select id="punchCategoryFilter" aria-label="Filter punch lists by category"></select>
+              <div class="filter-field" data-label="Project"><select id="punchProjectFilter" aria-label="Filter punch lists by project"></select></div>
+              <div class="filter-field" data-label="Contractor"><select id="punchContractorFilter" aria-label="Filter punch lists by contractor"></select></div>
+              <div class="filter-field" data-label="Status"><select id="punchStatusFilter" aria-label="Filter punch lists by status"></select></div>
+              <div class="filter-field" data-label="Severity"><select id="punchSeverityFilter" aria-label="Filter punch lists by severity"></select></div>
+              <div class="filter-field" data-label="Category"><select id="punchCategoryFilter" aria-label="Filter punch lists by category"></select></div>
             </div>
             <div class="toolbar-group">
               <select id="punchSortFilter" aria-label="Sort punch lists">
@@ -783,9 +783,9 @@
         <section id="proposalsView" class="view">
           <div class="toolbar toolbar-split">
             <div class="toolbar-group">
-              <select id="proposalStageFilter" aria-label="Filter by proposal stage"></select>
-              <select id="contractorFilter" aria-label="Filter by awarded contractor"></select>
-              <select id="proposalBidStatusFilter" aria-label="Filter by bid status"></select>
+              <div class="filter-field" data-label="Stage"><select id="proposalStageFilter" aria-label="Filter by proposal stage"></select></div>
+              <div class="filter-field" data-label="Contractor"><select id="contractorFilter" aria-label="Filter by awarded contractor"></select></div>
+              <div class="filter-field" data-label="Bid Status"><select id="proposalBidStatusFilter" aria-label="Filter by bid status"></select></div>
             </div>
             <div class="toolbar-group">
               <div class="sort-tabs" aria-label="Sort proposals">
@@ -810,21 +810,21 @@
           <div class="toolbar toolbar-split">
             <div class="toolbar-group">
               <input id="scopeSearchInput" class="toolbar-input" type="search" placeholder="Search scopes of work" />
-              <select id="scopeCategoryFilter" aria-label="Filter scopes of work">
+              <div class="filter-field" data-label="Category"><select id="scopeCategoryFilter" aria-label="Filter scopes of work">
                 <option value="All categories">All categories</option>
                 <option>Repair</option>
                 <option>Coating</option>
                 <option>Restoration</option>
                 <option>Reroof</option>
-              </select>
+              </select></div>
             </div>
             <div class="toolbar-group">
-              <select id="scopeSortFilter" aria-label="Sort scopes of work">
+              <div class="filter-field" data-label="Sort By"><select id="scopeSortFilter" aria-label="Sort scopes of work">
                 <option value="savedAt">Date Saved</option>
                 <option value="name">Name</option>
                 <option value="category">Category</option>
                 <option value="source">Source</option>
-              </select>
+              </select></div>
               <button class="sort-direction-button" id="scopeSortDirection" data-direction="desc" type="button" aria-label="Toggle scope sort direction">↓</button>
               <div class="view-toggle" data-view-toggle="scopeDatabase" aria-label="Scope database layout">
                 <button class="sort-tab is-active" data-layout="tile" type="button">Tile</button>
@@ -840,19 +840,19 @@
         <section id="contractorsView" class="view">
           <div class="toolbar toolbar-split">
             <div class="toolbar-group">
-              <select id="contractorSortFilter" aria-label="Sort contractors">
+              <div class="filter-field" data-label="Sort By"><select id="contractorSortFilter" aria-label="Sort contractors">
                 <option value="name">Company Name</option>
                 <option value="opportunities">Opportunities</option>
                 <option value="wins">Wins</option>
                 <option value="lastGiven">Last Opportunity Given</option>
                 <option value="lastWon">Last Opportunity Won</option>
-              </select>
+              </select></div>
               <button class="sort-direction-button" id="contractorSortDirection" data-direction="asc" type="button" aria-label="Toggle contractor sort direction">↑</button>
-              <select id="contractorWinFilter" aria-label="Filter contractors by wins">
+              <div class="filter-field" data-label="Filter"><select id="contractorWinFilter" aria-label="Filter contractors by wins">
                 <option value="all">All contractors</option>
                 <option value="wins">Has wins</option>
                 <option value="open">No wins yet</option>
-              </select>
+              </select></div>
               <button class="mini-button utility-mini" id="exportContractorContactsButton" type="button">CSV</button>
               <button class="mini-button utility-mini" id="exportContractorVcardsButton" type="button">vCard</button>
               <div class="view-toggle" data-view-toggle="contractors" aria-label="Contractor layout">
@@ -869,13 +869,13 @@
           <div class="call-list-tabs" aria-label="Call list views">
             <button class="sort-tab is-active" data-call-list-mode="today" type="button">Call List</button>
             <button class="sort-tab" data-call-list-mode="setup" type="button">Call List Setup</button>
-            <select id="callListSortFilter" aria-label="Sort call list">
+            <div class="filter-field" data-label="Sort By"><select id="callListSortFilter" aria-label="Sort call list">
               <option value="name">Name</option>
               <option value="county">County</option>
               <option value="entity">Entity</option>
               <option value="rep">Shared Rep</option>
               <option value="activity">Last Activity</option>
-            </select>
+            </select></div>
             <button class="sort-direction-button" id="callListSortDirection" data-direction="asc" type="button" aria-label="Toggle call list sort direction">↑</button>
             <span class="view-toggle" data-view-toggle="callList" aria-label="Call list layout">
               <button class="sort-tab is-active" data-layout="tile" type="button">Tile</button>
