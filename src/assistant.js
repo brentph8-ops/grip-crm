@@ -147,9 +147,10 @@
       if (!data.notes) data.notes = {};
       const acct = getAccountByName(accountName);
       if (!acct) return false;
-      const existing = data.notes[acct.id] || "";
+      const key = acct.client; // use .client as the stable account key — .id is undefined on these objects
+      const existing = data.notes[key] || "";
       const ts = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-      data.notes[acct.id] = existing ? `${existing}\n\n--- AI Note (${ts}) ---\n${noteText}` : `--- AI Note (${ts}) ---\n${noteText}`;
+      data.notes[key] = existing ? `${existing}\n\n--- AI Note (${ts}) ---\n${noteText}` : `--- AI Note (${ts}) ---\n${noteText}`;
       localStorage.setItem("garlandCrmData", JSON.stringify(data));
       return true;
     } catch { return false; }
@@ -240,11 +241,14 @@
     const btn = container.querySelector(`[data-agent="${agent}"]`);
     if (btn) btn.classList.add("active");
     activeAgent = agent;
-    // Refresh due badge live
+    // Refresh due badge live on all outreach buttons (sidebar + bottom nav)
     const due = countDueFollowups();
-    container.querySelectorAll(`[data-agent="outreach"]`).forEach(el => {
-      el.innerHTML = el.innerHTML.replace(/\s*<span class="asst-due-badge"[^>]*>[^<]*<\/span>/, "");
-      if (due > 0) el.innerHTML += ` <span class="asst-due-badge">${due}</span>`;
+    container.querySelectorAll(`[data-agent="outreach"]`).forEach(outreachBtn => {
+      // Strip any existing badge/count then re-add
+      outreachBtn.innerHTML = outreachBtn.innerHTML
+        .replace(/\s*<span class="asst-due-badge"[^>]*>[^<]*<\/span>/g, "")
+        .replace(/\s*\(\d+\)/, "");
+      if (due > 0) outreachBtn.innerHTML += ` <span class="asst-due-badge">${due}</span>`;
     });
     renderPanel(container.querySelector("#asstMain"), agent);
   }
@@ -343,7 +347,7 @@
 
   function renderChat(el) {
     const last = getLastViewedAccount();
-    const acct = last ? getAccountByName(last) : null;
+    const acct = last ? (getAccountByName(last) || null) : null;
 
     el.innerHTML = `
       <div class="asst-panel">
@@ -516,8 +520,8 @@ Keep it tight — 150 words max. No headers, just clean paragraphs.`;
           const container = root.parentElement;
           switchAgent(container, "outreach");
           setTimeout(() => {
-            const search = document.querySelector("#oAcctSearch");
-            const hidden = document.querySelector("#oAcct");
+            const search = container.querySelector("#oAcctSearch");
+            const hidden = container.querySelector("#oAcct");
             if (search && hidden) {
               search.value = mentioned.client;
               hidden.value = mentioned.client;
