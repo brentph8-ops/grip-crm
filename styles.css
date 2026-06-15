@@ -5364,6 +5364,27 @@ textarea {
 .asst-radio-label { display: flex; align-items: center; gap: 5px; font-size: 13px; color: #334155; cursor: pointer; }
 .asst-radio-label input { cursor: pointer; }
 
+/* Searchable account picker */
+.asst-acct-picker { position: relative; }
+.asst-acct-search { padding-right: 28px; }
+.asst-acct-list {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 100;
+  background: #fff; border: 1px solid #d7e0ea; border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12); max-height: 220px; overflow-y: auto; margin-top: 2px;
+}
+.asst-acct-opt {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 12px; font-size: 13px; color: #0f1f35; cursor: pointer;
+}
+.asst-acct-opt:hover { background: #f0f7ff; }
+.asst-acct-rank {
+  font-size: 11px; color: #64748b; background: #f0f4f8;
+  border-radius: 99px; padding: 1px 7px; flex-shrink: 0;
+}
+.asst-acct-selected {
+  font-size: 12px; color: #0057a8; font-weight: 600; margin-top: 4px;
+}
+
 .asst-checklist { display: flex; flex-direction: column; gap: 8px; margin: 6px 0 12px; }
 .asst-check-label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #334155; cursor: pointer; }
 .asst-check-label input { cursor: pointer; width: 15px; height: 15px; }

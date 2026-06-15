@@ -21,14 +21,88 @@
   async function callEdge(action, payload) {
     const base = (window.GRIP_SUPABASE_URL || "").replace(/\/$/, "");
     const url = `${base}/functions/v1/assistant-ai`;
+    const anon = window.GRIP_SUPABASE_ANON || "";
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(anon ? { "Authorization": `Bearer ${anon}` } : {}),
+      },
       body: JSON.stringify({ action, ...payload }),
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     return data;
+  }
+
+  async function copyToClipboard(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+  }
+
+  // Get last account Brent was viewing in GRIP
+  function getLastViewedAccount() {
+    try {
+      const raw = localStorage.getItem("garlandCrmData");
+      if (!raw) return "";
+      const data = JSON.parse(raw);
+      return data._lastViewedAccount || "";
+    } catch { return ""; }
+  }
+
+  // Build searchable account picker HTML
+  function accountPickerHtml(id, label = "Account") {
+    const accounts = getAccounts().filter(a => a.client);
+    const last = getLastViewedAccount();
+    return `
+      <label class="asst-label">${label}</label>
+      <div class="asst-acct-picker" data-picker="${id}">
+        <input class="asst-input asst-acct-search" id="${id}Search" placeholder="Search accounts..." autocomplete="off" value="${escAttr(last)}" />
+        <div class="asst-acct-list" id="${id}List" style="display:none"></div>
+        <input type="hidden" id="${id}" value="${escAttr(last)}" />
+        ${last ? `<div class="asst-acct-selected" id="${id}Badge">✓ ${escHtml(last)}</div>` : ""}
+      </div>
+    `;
+  }
+
+  function initAccountPicker(container, pickerId) {
+    const accounts = getAccounts().filter(a => a.client);
+    const searchEl = container.querySelector(`#${pickerId}Search`);
+    const listEl = container.querySelector(`#${pickerId}List`);
+    const hiddenEl = container.querySelector(`#${pickerId}`);
+    const badgeEl = container.querySelector(`#${pickerId}Badge`);
+    if (!searchEl || !listEl || !hiddenEl) return;
+
+    function showList(query) {
+      const q = query.toLowerCase();
+      const matches = accounts.filter(a => !q || a.client.toLowerCase().includes(q)).slice(0, 12);
+      if (!matches.length) { listEl.style.display = "none"; return; }
+      listEl.innerHTML = matches.map(a =>
+        `<div class="asst-acct-opt" data-val="${escAttr(a.client)}">${escHtml(a.client)}${a.clientRanking ? `<span class="asst-acct-rank">${escHtml(a.clientRanking)}</span>` : ""}</div>`
+      ).join("");
+      listEl.style.display = "block";
+      listEl.querySelectorAll(".asst-acct-opt").forEach(opt => {
+        opt.addEventListener("mousedown", e => {
+          e.preventDefault();
+          const val = opt.dataset.val;
+          hiddenEl.value = val;
+          searchEl.value = val;
+          if (badgeEl) { badgeEl.textContent = `✓ ${val}`; badgeEl.style.display = "block"; }
+          listEl.style.display = "none";
+        });
+      });
+    }
+
+    searchEl.addEventListener("input", () => showList(searchEl.value));
+    searchEl.addEventListener("focus", () => showList(searchEl.value));
+    searchEl.addEventListener("blur", () => setTimeout(() => { listEl.style.display = "none"; }, 150));
   }
 
   // Simple markdown → HTML renderer
@@ -63,6 +137,8 @@
   // ── Root render ──────────────────────────────────────────────────
 
   function render(container) {
+    // Don't rebuild the whole UI if already mounted — preserves chat history & state
+    if (container.querySelector(".asst-root")) return;
     container.innerHTML = `
       <div class="asst-root">
         <div class="asst-sidebar">
@@ -218,9 +294,6 @@
   // ── RESEARCH AGENT ───────────────────────────────────────────────
 
   function renderResearch(el) {
-    const accounts = getAccounts();
-    const acctOpts = accounts.map(a => `<option value="${escAttr(a.client || a.name)}">${escHtml(a.client || a.name)}</option>`).join("");
-
     el.innerHTML = `
       <div class="asst-panel">
         <div class="asst-panel-header">
@@ -230,46 +303,27 @@
           </div>
         </div>
         <div class="asst-form">
-          <label class="asst-label">Account</label>
-          <div class="asst-input-row">
-            <select class="asst-select" id="rAcct">
-              <option value="">-- Select Account --</option>
-              ${acctOpts}
-            </select>
-            <span class="asst-or">or</span>
-            <input class="asst-input" id="rAcctCustom" placeholder="Type new account name" />
-          </div>
-
+          ${accountPickerHtml("rAcct")}
           <label class="asst-label">Paste Research Content</label>
           <textarea class="asst-textarea asst-textarea-tall" id="rContent" placeholder="Paste anything here: board agenda, district website text, news article, bond election results, LinkedIn profile, EDGAR filing, etc."></textarea>
-
           <button class="asst-action-btn" id="rSubmit">Generate Intelligence Report</button>
         </div>
         <div class="asst-result" id="rResult"></div>
       </div>
     `;
+    initAccountPicker(el, "rAcct");
 
     el.querySelector("#rSubmit").addEventListener("click", async () => {
-      const selectVal = el.querySelector("#rAcct").value;
-      const customVal = el.querySelector("#rAcctCustom").value.trim();
-      const accountName = customVal || selectVal;
+      const accountName = el.querySelector("#rAcct").value.trim();
       const pastedContent = el.querySelector("#rContent").value.trim();
-
       if (!accountName) return showError(el, "#rResult", "Please select or enter an account name.");
       if (!pastedContent) return showError(el, "#rResult", "Please paste some research content.");
-
       const resultEl = el.querySelector("#rResult");
       resultEl.innerHTML = renderLoading("Analyzing content and building intelligence report...");
-
       try {
         const { result } = await callEdge("research", { accountName, pastedContent });
-        resultEl.innerHTML = `
-          <div class="asst-result-header">
-            <span>Customer Intelligence Report — ${escHtml(accountName)}</span>
-            <button class="asst-copy-btn" onclick="navigator.clipboard.writeText(this.dataset.text)" data-text="${escAttr(result)}">Copy</button>
-          </div>
-          <div class="asst-result-body">${md(result)}</div>
-        `;
+        resultEl.innerHTML = renderResult(`Customer Intelligence Report — ${escHtml(accountName)}`, result);
+        wireResultCopy(resultEl, result);
       } catch (err) {
         resultEl.innerHTML = `<div class="asst-error">Error: ${escHtml(err.message)}</div>`;
       }
@@ -279,9 +333,6 @@
   // ── OUTREACH AGENT ───────────────────────────────────────────────
 
   function renderOutreach(el) {
-    const accounts = getAccounts();
-    const acctOpts = accounts.map(a => `<option value="${escAttr(a.client || a.name)}">${escHtml(a.client || a.name)}</option>`).join("");
-
     el.innerHTML = `
       <div class="asst-panel">
         <div class="asst-panel-header">
@@ -293,12 +344,7 @@
         <div class="asst-form">
           <div class="asst-form-row">
             <div class="asst-form-col">
-              <label class="asst-label">Account</label>
-              <select class="asst-select" id="oAcct">
-                <option value="">-- Select --</option>
-                ${acctOpts}
-              </select>
-              <input class="asst-input asst-mt" id="oAcctCustom" placeholder="Or type account name" />
+              ${accountPickerHtml("oAcct")}
             </div>
             <div class="asst-form-col">
               <label class="asst-label">Contact Name</label>
@@ -307,7 +353,6 @@
               <input class="asst-input" id="oTitle" placeholder="e.g. Director of Facilities" />
             </div>
           </div>
-
           <label class="asst-label">Outreach Type</label>
           <div class="asst-radio-group">
             <label class="asst-radio-label"><input type="radio" name="oType" value="email" checked/> 📧 Cold Email</label>
@@ -316,39 +361,29 @@
             <label class="asst-radio-label"><input type="radio" name="oType" value="followup" /> 🔁 Follow-Up</label>
             <label class="asst-radio-label"><input type="radio" name="oType" value="thankyou" /> 🙏 Thank You</label>
           </div>
-
           <label class="asst-label">Context / Research Notes</label>
           <textarea class="asst-textarea" id="oContext" placeholder="What do you know about this person/account? Paste in research, notes, or anything relevant."></textarea>
-
           <button class="asst-action-btn" id="oSubmit">Generate Outreach</button>
         </div>
         <div class="asst-result" id="oResult"></div>
       </div>
     `;
+    initAccountPicker(el, "oAcct");
 
     el.querySelector("#oSubmit").addEventListener("click", async () => {
-      const accountName = el.querySelector("#oAcctCustom").value.trim() || el.querySelector("#oAcct").value;
+      const accountName = el.querySelector("#oAcct").value.trim();
       const contactName = el.querySelector("#oContact").value.trim();
       const contactTitle = el.querySelector("#oTitle").value.trim();
       const context = el.querySelector("#oContext").value.trim();
       const outreachType = el.querySelector("input[name=oType]:checked")?.value || "email";
-
       if (!accountName || !contactName) return showError(el, "#oResult", "Please fill in Account and Contact Name.");
-
       const resultEl = el.querySelector("#oResult");
       resultEl.innerHTML = renderLoading("Crafting outreach...");
-
       const labels = { email: "Cold Email", linkedin: "LinkedIn Message", call: "Call Script", followup: "Follow-Up Email", thankyou: "Thank You Email" };
-
       try {
         const { result } = await callEdge("outreach", { accountName, contactName, contactTitle, context, outreachType });
-        resultEl.innerHTML = `
-          <div class="asst-result-header">
-            <span>${labels[outreachType] || "Outreach"} — ${escHtml(contactName)} at ${escHtml(accountName)}</span>
-            <button class="asst-copy-btn" onclick="navigator.clipboard.writeText(this.dataset.text)" data-text="${escAttr(result)}">Copy</button>
-          </div>
-          <div class="asst-result-body">${md(result)}</div>
-        `;
+        resultEl.innerHTML = renderResult(`${labels[outreachType] || "Outreach"} — ${escHtml(contactName)} at ${escHtml(accountName)}`, result);
+        wireResultCopy(resultEl, result);
       } catch (err) {
         resultEl.innerHTML = `<div class="asst-error">Error: ${escHtml(err.message)}</div>`;
       }
@@ -358,9 +393,6 @@
   // ── MEETING PREP AGENT ───────────────────────────────────────────
 
   function renderMeetingPrep(el) {
-    const accounts = getAccounts();
-    const acctOpts = accounts.map(a => `<option value="${escAttr(a.client || a.name)}">${escHtml(a.client || a.name)}</option>`).join("");
-
     el.innerHTML = `
       <div class="asst-panel">
         <div class="asst-panel-header">
@@ -372,12 +404,7 @@
         <div class="asst-form">
           <div class="asst-form-row">
             <div class="asst-form-col">
-              <label class="asst-label">Account</label>
-              <select class="asst-select" id="mpAcct">
-                <option value="">-- Select --</option>
-                ${acctOpts}
-              </select>
-              <input class="asst-input asst-mt" id="mpAcctCustom" placeholder="Or type account name" />
+              ${accountPickerHtml("mpAcct")}
             </div>
             <div class="asst-form-col">
               <label class="asst-label">Contacts in Meeting</label>
@@ -386,40 +413,30 @@
               <input class="asst-input" id="mpType" placeholder="e.g. Intro call, Site visit, Proposal review" />
             </div>
           </div>
-
           <label class="asst-label">GRIP Notes / History (optional)</label>
           <textarea class="asst-textarea" id="mpNotes" placeholder="Paste any notes or history from GRIP about this account..."></textarea>
-
           <label class="asst-label">Additional Research (optional)</label>
           <textarea class="asst-textarea" id="mpResearch" placeholder="Paste any additional research, recent news, or context..."></textarea>
-
           <button class="asst-action-btn" id="mpSubmit">Build Briefing Package</button>
         </div>
         <div class="asst-result" id="mpResult"></div>
       </div>
     `;
+    initAccountPicker(el, "mpAcct");
 
     el.querySelector("#mpSubmit").addEventListener("click", async () => {
-      const accountName = el.querySelector("#mpAcctCustom").value.trim() || el.querySelector("#mpAcct").value;
+      const accountName = el.querySelector("#mpAcct").value.trim();
       const contactNames = el.querySelector("#mpContacts").value.trim();
       const meetingType = el.querySelector("#mpType").value.trim();
       const gripNotes = el.querySelector("#mpNotes").value.trim();
       const pastedContent = el.querySelector("#mpResearch").value.trim();
-
       if (!accountName) return showError(el, "#mpResult", "Please select or enter an account.");
-
       const resultEl = el.querySelector("#mpResult");
       resultEl.innerHTML = renderLoading("Building your meeting briefing package...");
-
       try {
         const { result } = await callEdge("meeting_prep", { accountName, contactNames, meetingType, gripNotes, pastedContent });
-        resultEl.innerHTML = `
-          <div class="asst-result-header">
-            <span>Briefing Package — ${escHtml(accountName)}</span>
-            <button class="asst-copy-btn" onclick="navigator.clipboard.writeText(this.dataset.text)" data-text="${escAttr(result)}">Copy</button>
-          </div>
-          <div class="asst-result-body">${md(result)}</div>
-        `;
+        resultEl.innerHTML = renderResult(`Briefing Package — ${escHtml(accountName)}`, result);
+        wireResultCopy(resultEl, result);
       } catch (err) {
         resultEl.innerHTML = `<div class="asst-error">Error: ${escHtml(err.message)}</div>`;
       }
@@ -429,9 +446,6 @@
   // ── OPPORTUNITY SCORING ──────────────────────────────────────────
 
   function renderScore(el) {
-    const accounts = getAccounts();
-    const acctOpts = accounts.map(a => `<option value="${escAttr(a.client || a.name)}">${escHtml(a.client || a.name)}</option>`).join("");
-
     el.innerHTML = `
       <div class="asst-panel">
         <div class="asst-panel-header">
@@ -441,13 +455,7 @@
           </div>
         </div>
         <div class="asst-form">
-          <label class="asst-label">Account</label>
-          <select class="asst-select" id="scAcct">
-            <option value="">-- Select --</option>
-            ${acctOpts}
-          </select>
-          <input class="asst-input asst-mt" id="scAcctCustom" placeholder="Or type account name" />
-
+          ${accountPickerHtml("scAcct")}
           <label class="asst-label">What do you know about this account?</label>
           <div class="asst-checklist">
             <label class="asst-check-label"><input type="checkbox" id="scOmnia" /> OMNIA eligible (public entity — school, city, county, university)</label>
@@ -456,18 +464,17 @@
             <label class="asst-check-label"><input type="checkbox" id="scBond" /> Has bond money or capital budget available</label>
             <label class="asst-check-label"><input type="checkbox" id="scArch" /> Know the architect or consultant on the project</label>
           </div>
-
           <label class="asst-label">Additional Context</label>
           <textarea class="asst-textarea" id="scContext" placeholder="Paste in any notes, research, or intel about this account — roof age, recent projects, contacts, etc."></textarea>
-
           <button class="asst-action-btn" id="scSubmit">Score This Account</button>
         </div>
         <div class="asst-result" id="scResult"></div>
       </div>
     `;
+    initAccountPicker(el, "scAcct");
 
     el.querySelector("#scSubmit").addEventListener("click", async () => {
-      const accountName = el.querySelector("#scAcctCustom").value.trim() || el.querySelector("#scAcct").value;
+      const accountName = el.querySelector("#scAcct").value.trim();
       const context = el.querySelector("#scContext").value.trim();
       const checks = {
         "OMNIA eligible (public entity)": el.querySelector("#scOmnia").checked,
@@ -478,21 +485,13 @@
       };
       const checkStr = Object.entries(checks).map(([k, v]) => `${k}: ${v ? "YES" : "Unknown"}`).join("\n");
       const factors = `${checkStr}\n\nAdditional context:\n${context || "None"}`;
-
       if (!accountName) return showError(el, "#scResult", "Please select or enter an account.");
-
       const resultEl = el.querySelector("#scResult");
       resultEl.innerHTML = renderLoading("Scoring opportunity...");
-
       try {
         const { result } = await callEdge("score", { accountName, factors });
-        resultEl.innerHTML = `
-          <div class="asst-result-header">
-            <span>Opportunity Score — ${escHtml(accountName)}</span>
-            <button class="asst-copy-btn" onclick="navigator.clipboard.writeText(this.dataset.text)" data-text="${escAttr(result)}">Copy</button>
-          </div>
-          <div class="asst-result-body">${md(result)}</div>
-        `;
+        resultEl.innerHTML = renderResult(`Opportunity Score — ${escHtml(accountName)}`, result);
+        wireResultCopy(resultEl, result);
       } catch (err) {
         resultEl.innerHTML = `<div class="asst-error">Error: ${escHtml(err.message)}</div>`;
       }
@@ -502,9 +501,6 @@
   // ── SCHEDULE AGENT ───────────────────────────────────────────────
 
   function renderSchedule(el) {
-    const accounts = getAccounts();
-    const acctOpts = accounts.map(a => `<option value="${escAttr(a.client || a.name)}">${escHtml(a.client || a.name)}</option>`).join("");
-
     el.innerHTML = `
       <div class="asst-panel">
         <div class="asst-panel-header">
@@ -516,12 +512,7 @@
         <div class="asst-form">
           <div class="asst-form-row">
             <div class="asst-form-col">
-              <label class="asst-label">Account / Client</label>
-              <select class="asst-select" id="schAcct">
-                <option value="">-- Select --</option>
-                ${acctOpts}
-              </select>
-              <input class="asst-input asst-mt" id="schAcctCustom" placeholder="Or type name" />
+              ${accountPickerHtml("schAcct", "Account / Client")}
             </div>
             <div class="asst-form-col">
               <label class="asst-label">Contact Name</label>
@@ -537,42 +528,36 @@
               </select>
             </div>
           </div>
-
           <label class="asst-label">Priority</label>
           <div class="asst-radio-group">
             <label class="asst-radio-label"><input type="radio" name="schPri" value="hot" /> 🔴 Hot</label>
             <label class="asst-radio-label"><input type="radio" name="schPri" value="warm" checked /> 🟡 Warm</label>
             <label class="asst-radio-label"><input type="radio" name="schPri" value="cold" /> 🔵 Cold</label>
           </div>
-
           <label class="asst-label">Your Availability This Week</label>
           <textarea class="asst-textarea" id="schAvail" placeholder="e.g. Monday free all day, Tuesday after 2pm, Wednesday morning only, Thursday out of office..."></textarea>
-
           <button class="asst-action-btn" id="schSubmit">Get Meeting Suggestions</button>
         </div>
         <div class="asst-result" id="schResult"></div>
       </div>
     `;
+    initAccountPicker(el, "schAcct");
 
     el.querySelector("#schSubmit").addEventListener("click", async () => {
-      const company = el.querySelector("#schAcctCustom").value.trim() || el.querySelector("#schAcct").value;
+      const company = el.querySelector("#schAcct").value.trim();
       const name = el.querySelector("#schContact").value.trim() || company;
       const meetingType = el.querySelector("#schType").value;
       const priority = el.querySelector("input[name=schPri]:checked")?.value || "warm";
       const availText = el.querySelector("#schAvail").value.trim();
-
       if (!company) return showError(el, "#schResult", "Please select or enter an account.");
-
       const resultEl = el.querySelector("#schResult");
       resultEl.innerHTML = renderLoading("Finding the best meeting times...");
-
       try {
         const { result } = await callEdge("schedule", {
           client: { name, company, priority, timezone: "America/Chicago" },
           meetingType,
           availability: availText ? [{ day: "This week", start: "per notes", end: "", notes: availText }] : [],
         });
-
         if (Array.isArray(result) && result.length) {
           resultEl.innerHTML = `
             <div class="asst-result-header"><span>Meeting Suggestions — ${escHtml(company)}</span></div>
@@ -657,6 +642,26 @@
 
   function renderLoading(msg) {
     return `<div class="asst-loading"><div class="asst-spinner"></div><span>${escHtml(msg)}</span></div>`;
+  }
+
+  function renderResult(title, result) {
+    return `
+      <div class="asst-result-header">
+        <span>${title}</span>
+        <button class="asst-copy-btn" data-copy="1">Copy</button>
+      </div>
+      <div class="asst-result-body">${md(result)}</div>
+    `;
+  }
+
+  function wireResultCopy(resultEl, text) {
+    const btn = resultEl.querySelector("[data-copy]");
+    if (!btn) return;
+    btn.addEventListener("click", async () => {
+      await copyToClipboard(text);
+      btn.textContent = "Copied!";
+      setTimeout(() => { btn.textContent = "Copy"; }, 2000);
+    });
   }
 
   function showError(el, selector, msg) {
