@@ -170,7 +170,7 @@
     `;
   }
 
-  function initAccountPicker(container, pickerId) {
+  function initAccountPicker(container, pickerId, onSelect) {
     const accounts = getAccounts().filter(a => a.client);
     const searchEl = container.querySelector(`#${pickerId}Search`);
     const listEl = container.querySelector(`#${pickerId}List`);
@@ -194,6 +194,7 @@
           searchEl.value = val;
           if (badgeEl) { badgeEl.textContent = `✓ ${val}`; badgeEl.style.display = "block"; }
           listEl.style.display = "none";
+          if (onSelect) onSelect(val);
         });
       });
     }
@@ -239,6 +240,12 @@
     const btn = container.querySelector(`[data-agent="${agent}"]`);
     if (btn) btn.classList.add("active");
     activeAgent = agent;
+    // Refresh due badge live
+    const due = countDueFollowups();
+    container.querySelectorAll(`[data-agent="outreach"]`).forEach(el => {
+      el.innerHTML = el.innerHTML.replace(/\s*<span class="asst-due-badge"[^>]*>[^<]*<\/span>/, "");
+      if (due > 0) el.innerHTML += ` <span class="asst-due-badge">${due}</span>`;
+    });
     renderPanel(container.querySelector("#asstMain"), agent);
   }
 
@@ -560,19 +567,41 @@ Keep it tight — 150 words max. No headers, just clean paragraphs.`;
         <div class="asst-panel-header">
           <div>
             <div class="asst-panel-title">🔍 Prospect Research Agent</div>
-            <div class="asst-panel-sub">Paste in any content — district websites, board agendas, bond programs — and get a full Customer Intelligence Report</div>
+            <div class="asst-panel-sub">Auto-search the web for intel, or paste content — get a full Customer Intelligence Report</div>
           </div>
         </div>
         <div class="asst-form">
           ${accountPickerHtml("rAcct")}
-          <label class="asst-label">Paste Research Content</label>
-          <textarea class="asst-textarea asst-textarea-tall" id="rContent" placeholder="Paste anything here: board agenda, district website text, news article, bond election results, LinkedIn profile, EDGAR filing, etc."></textarea>
+          <div class="asst-web-search-row">
+            <button class="asst-web-search-btn" id="rWebSearch">🌐 Auto-Search Web</button>
+            <span class="asst-web-search-hint">Searches news, bond programs, facilities info for this account</span>
+          </div>
+          <label class="asst-label">Research Content <span class="asst-label-hint">(auto-filled from web search, or paste your own)</span></label>
+          <textarea class="asst-textarea asst-textarea-tall" id="rContent" placeholder="Paste anything here: board agenda, district website text, news article, bond election results, LinkedIn profile — or use Auto-Search above"></textarea>
           <button class="asst-action-btn" id="rSubmit">Generate Intelligence Report</button>
         </div>
         <div class="asst-result" id="rResult"></div>
       </div>
     `;
     initAccountPicker(el, "rAcct");
+
+    el.querySelector("#rWebSearch").addEventListener("click", async () => {
+      const accountName = el.querySelector("#rAcct").value.trim();
+      if (!accountName) return showError(el, "#rResult", "Please select an account first, then search.");
+      const btn = el.querySelector("#rWebSearch");
+      btn.textContent = "🔍 Searching...";
+      btn.disabled = true;
+      try {
+        const { result } = await callEdge("web_search", { accountName });
+        el.querySelector("#rContent").value = result;
+        btn.textContent = "✓ Search complete";
+        setTimeout(() => { btn.textContent = "🌐 Auto-Search Web"; btn.disabled = false; }, 3000);
+      } catch (err) {
+        btn.textContent = "🌐 Auto-Search Web";
+        btn.disabled = false;
+        el.querySelector("#rResult").innerHTML = `<div class="asst-error">Web search failed: ${escHtml(err.message)}</div>`;
+      }
+    });
 
     el.querySelector("#rSubmit").addEventListener("click", async () => {
       const accountName = el.querySelector("#rAcct").value.trim();
@@ -585,6 +614,24 @@ Keep it tight — 150 words max. No headers, just clean paragraphs.`;
         const { result } = await callEdge("research", { accountName, pastedContent });
         resultEl.innerHTML = renderResult(`Customer Intelligence Report — ${escHtml(accountName)}`, result, accountName);
         wireResultCopy(resultEl, result, accountName);
+        // Offer to save key facts to memory
+        resultEl.insertAdjacentHTML("beforeend", `
+          <div class="asst-memory-offer">
+            <div class="asst-memory-offer-text">🧠 Save intelligence to Account Memory?</div>
+            <button class="asst-memory-yes" id="rSaveMem">Save to Memory</button>
+            <button class="asst-memory-no" id="rSkipMem">Skip</button>
+          </div>
+        `);
+        resultEl.querySelector("#rSaveMem").addEventListener("click", () => {
+          // Pull pain points, key people, opportunities from result
+          const lines = result.split("\n").map(l => l.replace(/^[-•*#]+\s*/, "").trim()).filter(l => l.length > 20 && l.length < 200 && !l.startsWith("|"));
+          const facts = lines.slice(0, 10);
+          if (facts.length) saveMemory(accountName, facts);
+          resultEl.querySelector(".asst-memory-offer").innerHTML = `<div class="asst-sequence-done">✓ Intelligence saved to ${escHtml(accountName)}'s memory</div>`;
+        });
+        resultEl.querySelector("#rSkipMem").addEventListener("click", () => {
+          resultEl.querySelector(".asst-memory-offer").remove();
+        });
       } catch (err) {
         resultEl.innerHTML = `<div class="asst-error">Error: ${escHtml(err.message)}</div>`;
       }
@@ -749,7 +796,15 @@ Keep it tight — 150 words max. No headers, just clean paragraphs.`;
         <div class="asst-result" id="mpResult"></div>
       </div>
     `;
-    initAccountPicker(el, "mpAcct");
+    initAccountPicker(el, "mpAcct", (selectedName) => {
+      // Auto-fill GRIP notes when account is picked
+      const acct = getAccounts().find(a => a.client === selectedName);
+      if (acct) {
+        const notesEl = el.querySelector("#mpNotes");
+        const existing = [acct.notes, acct.status, acct.lastContact].filter(Boolean).join("\n");
+        if (existing && !notesEl.value) notesEl.value = existing;
+      }
+    });
 
     el.querySelector("#mpSubmit").addEventListener("click", async () => {
       const accountName = el.querySelector("#mpAcct").value.trim();
@@ -1034,7 +1089,8 @@ Keep it tight — 150 words max. No headers, just clean paragraphs.`;
 
       micBtn.addEventListener("click", () => {
         if (!isRecording) {
-          finalTranscript = transcriptEl.value;
+          // Preserve any typed text but don't double it on restart
+          finalTranscript = transcriptEl.value ? transcriptEl.value.trim() + " " : "";
           recognition.start();
           isRecording = true;
           micBtn.textContent = "⏹ Stop Recording";
@@ -1098,13 +1154,13 @@ Keep it tight — 150 words max. No headers, just clean paragraphs.`;
   function renderTerritory(el) {
     const accounts = getAccounts();
 
-    // Build county breakdown
+    // Group by city (accounts don't have a county field)
     const byCounty = {};
     accounts.forEach(a => {
-      const county = (a.county || a.city || "Unknown").trim();
-      if (!byCounty[county]) byCounty[county] = { count: 0, accounts: [] };
-      byCounty[county].count++;
-      byCounty[county].accounts.push(a.client || a.name || "Unknown");
+      const area = (a.city && a.state ? `${a.city}, ${a.state}` : a.city || a.state || "Unknown").trim();
+      if (!byCounty[area]) byCounty[area] = { count: 0, accounts: [] };
+      byCounty[area].count++;
+      byCounty[area].accounts.push(a.client || a.name || "Unknown");
     });
 
     const countySorted = Object.entries(byCounty).sort((a, b) => b[1].count - a[1].count);
@@ -1131,7 +1187,7 @@ Keep it tight — 150 words max. No headers, just clean paragraphs.`;
           </div>
         </div>
         <div class="asst-territory-map">
-          <div class="asst-territory-title">Accounts by Area (top 20)</div>
+          <div class="asst-territory-title">Accounts by City (top 20)</div>
           ${countyRows}
         </div>
         <div class="asst-form">

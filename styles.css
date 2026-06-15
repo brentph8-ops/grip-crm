@@ -5537,6 +5537,20 @@ textarea {
   .asst-more-item:hover { background: rgba(255,255,255,.08); }
 }
 
+/* ── Web search row ────────────────────────────────────────────── */
+.asst-web-search-row {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+}
+.asst-web-search-btn {
+  background: #0f4c8a; color: #fff; border: none; border-radius: 8px;
+  font-size: 13px; font-weight: 600; padding: 8px 14px; cursor: pointer;
+  white-space: nowrap; transition: background .15s; flex-shrink: 0;
+}
+.asst-web-search-btn:hover { background: #0a3a6e; }
+.asst-web-search-btn:disabled { opacity: .6; cursor: not-allowed; }
+.asst-web-search-hint { font-size: 12px; color: var(--muted); line-height: 1.4; }
+.asst-label-hint { font-size: 11px; color: var(--muted); font-weight: 400; margin-left: 4px; }
+
 /* ── Due badge ─────────────────────────────────────────────────── */
 .asst-due-badge {
   display: inline-flex; align-items: center; justify-content: center;

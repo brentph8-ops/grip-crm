@@ -293,6 +293,38 @@ Subject: [subject line]
 
 [email body]`;
 
+  // ── WEB SEARCH ───────────────────────────────────────────────────
+  } else if (action === "web_search") {
+    const { accountName } = body;
+    const SERPER_KEY = Deno.env.get("SERPER_API_KEY");
+    if (!SERPER_KEY) {
+      return new Response(JSON.stringify({ error: "SERPER_API_KEY not set — add it in Supabase Edge Function secrets" }), {
+        status: 500, headers: { ...CORS, "Content-Type": "application/json" },
+      });
+    }
+    const queries = [
+      `${accountName} Texas roofing facilities bond program`,
+      `${accountName} Texas capital improvement construction 2024 2025`,
+      `${accountName} Texas news superintendent facilities director`,
+    ];
+    const results: string[] = [];
+    for (const q of queries) {
+      const r = await fetch("https://google.serper.dev/search", {
+        method: "POST",
+        headers: { "X-API-KEY": SERPER_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ q, num: 5 }),
+      });
+      const d = await r.json();
+      const snippets = (d.organic || []).map((item: { title: string; snippet: string; link: string }) =>
+        `Source: ${item.title}\n${item.snippet}\nURL: ${item.link}`
+      ).join("\n\n");
+      if (snippets) results.push(snippets);
+    }
+    const combined = results.join("\n\n---\n\n") || "No results found.";
+    return new Response(JSON.stringify({ result: combined }), {
+      headers: { ...CORS, "Content-Type": "application/json" },
+    });
+
   // ── TERRITORY ANALYSIS ───────────────────────────────────────────
   } else if (action === "territory_analysis") {
     const { counties, summary } = body;
@@ -327,17 +359,19 @@ The single highest-leverage action Brent could take this month that he's probabl
   }
 
   // ── Call Anthropic ───────────────────────────────────────────────
+  // System prompt passed as array block to enable prompt caching
+  const systemBlock = [{ type: "text", text: systemPromptWithMemory, cache_control: { type: "ephemeral" } }];
   const requestBody = useMessages
     ? {
         model: "claude-sonnet-4-6",
         max_tokens: 3000,
-        system: systemPromptWithMemory,
+        system: systemBlock,
         messages: messages,
       }
     : {
         model: "claude-sonnet-4-6",
         max_tokens: 3000,
-        system: systemPromptWithMemory,
+        system: systemBlock,
         messages: [{ role: "user", content: prompt }],
       };
 
@@ -346,6 +380,7 @@ The single highest-leverage action Brent could take this month that he's probabl
     headers: {
       "x-api-key": ANTHROPIC_API_KEY,
       "anthropic-version": "2023-06-01",
+      "anthropic-beta": "prompt-caching-2024-07-31",
       "content-type": "application/json",
     },
     body: JSON.stringify(requestBody),
