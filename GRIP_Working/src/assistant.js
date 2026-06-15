@@ -55,8 +55,12 @@ window.GRIPAssistant = (() => {
   // ── Get accounts from GRIP's data layer ─────────────────────────
   function getAccounts() {
     try {
-      const raw = localStorage.getItem("grip_accounts");
-      return raw ? JSON.parse(raw) : (window.gripData?.accounts || []);
+      const raw = localStorage.getItem("garlandCrmData");
+      if (raw) {
+        const data = JSON.parse(raw);
+        return data.accounts || [];
+      }
+      return window.gripData?.accounts || [];
     } catch { return []; }
   }
 
