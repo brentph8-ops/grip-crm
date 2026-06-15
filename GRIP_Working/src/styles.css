@@ -4759,6 +4759,20 @@ textarea {
     display: none;
   }
 
+  #gripSignOutButton {
+    display: none !important;
+  }
+
+  #newTaskButton {
+    width: auto;
+    min-width: 0;
+    padding: 0 10px;
+    font-size: 0.72rem;
+    min-height: 32px;
+    align-self: flex-start;
+    white-space: nowrap;
+  }
+
   .kpi-grid,
   .dashboard-grid,
   .command-list,
