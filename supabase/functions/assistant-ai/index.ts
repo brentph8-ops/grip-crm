@@ -42,7 +42,12 @@ serve(async (req) => {
   }
 
   const body = await req.json();
-  const { action, messages } = body;
+  const { action, messages, accountMemory } = body;
+
+  // Append account memory to system prompt if provided
+  const systemPromptWithMemory = accountMemory
+    ? `${SYSTEM_PROMPT}\n\n── ACCOUNT MEMORY (what Brent has learned about this account) ──\n${accountMemory}\n\nUse this memory to personalize every response. Reference it naturally.`
+    : SYSTEM_PROMPT;
 
   let prompt = "";
   let useMessages = false;
@@ -238,6 +243,83 @@ ${accountSummary}
 Return JSON array: [{ "company": "", "industry": "", "reason": "", "estimatedDealSize": "", "contactTitle": "", "meetingType": "", "website": "" }]
 Return ONLY the JSON array.`;
 
+  // ── VOICE DEBRIEF ────────────────────────────────────────────────
+  } else if (action === "voice_debrief") {
+    const { transcript, accountName } = body;
+    prompt = `You are Brent's AI field assistant. He just finished a meeting with ${accountName} and recorded this voice debrief:
+
+"${transcript}"
+
+Extract and format a structured meeting note:
+
+**Meeting Note — ${accountName}**
+Date: ${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+
+**What happened:**
+2-3 sentences summarizing the meeting.
+
+**Key things they said / care about:**
+Bullet list of direct intel — pain points, priorities, what resonated.
+
+**Next steps:**
+Numbered list of specific actions Brent needs to take, with suggested timing.
+
+**Things to remember about this account:**
+2-3 short facts worth storing as permanent memory about this account or contact (personality, preferences, context).
+
+**Opportunity level after this meeting:** 🔴 Hot / 🟡 Warm / 🔵 Cold — one sentence why.`;
+
+  // ── FOLLOW-UP SEQUENCE ───────────────────────────────────────────
+  } else if (action === "followup_sequence") {
+    const { accountName, contactName, contactTitle, originalEmail, daysOut } = body;
+    prompt = `You are the Appointment Generator Agent. Brent sent an initial outreach email to ${contactName} (${contactTitle}) at ${accountName}. They haven't responded.
+
+Original email:
+${originalEmail}
+
+Write follow-up email #${daysOut === 3 ? "2" : "3"} to send ${daysOut} days after the original.
+
+Rules:
+- Reference the original email subtly but don't copy it
+- Chris Voss style — short, curious, zero pressure
+- Follow-up #2 (day 3): Add one new piece of value or insight specific to their situation
+- Follow-up #3 (day 7): The "permission to close the loop" — give them an easy out while leaving door open
+- 3 paragraphs max, punchy subject line
+- Sign as: Brent Phillips | The Garland Company | Territory Manager
+- Never say: "just checking in", "following up", "circle back", "touch base"
+
+Output format:
+Subject: [subject line]
+
+[email body]`;
+
+  // ── TERRITORY ANALYSIS ───────────────────────────────────────────
+  } else if (action === "territory_analysis") {
+    const { counties, summary } = body;
+    prompt = `You are Brent's Territory Intelligence Agent. Analyze his Texas territory data:
+
+${summary}
+
+Produce a Territory Gap Analysis:
+
+## Territory Health Summary
+Overall assessment in 2 sentences.
+
+## Hot Zones (most active, most opportunity)
+Top 3 counties/areas — what's working and why.
+
+## Cold Zones (needs attention)
+3+ counties with stale or no activity — specific recommendations for each.
+
+## Biggest Untapped Opportunities
+Based on the data, where should Brent focus the next 30 days? Be specific — name account types, districts, or cities.
+
+## Recommended Weekly Routing
+Suggest how to structure a week of territory coverage to maximize coverage and momentum.
+
+## One Bold Move
+The single highest-leverage action Brent could take this month that he's probably not doing.`;
+
   } else {
     return new Response(JSON.stringify({ error: "Unknown action" }), {
       status: 400, headers: { ...CORS, "Content-Type": "application/json" },
@@ -249,13 +331,13 @@ Return ONLY the JSON array.`;
     ? {
         model: "claude-sonnet-4-6",
         max_tokens: 3000,
-        system: SYSTEM_PROMPT,
+        system: systemPromptWithMemory,
         messages: messages,
       }
     : {
         model: "claude-sonnet-4-6",
         max_tokens: 3000,
-        system: SYSTEM_PROMPT,
+        system: systemPromptWithMemory,
         messages: [{ role: "user", content: prompt }],
       };
 

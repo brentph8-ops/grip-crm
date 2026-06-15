@@ -5536,3 +5536,125 @@ textarea {
   }
   .asst-more-item:hover { background: rgba(255,255,255,.08); }
 }
+
+/* ── Due badge ─────────────────────────────────────────────────── */
+.asst-due-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--gold); color: #fff; font-size: 10px; font-weight: 700;
+  border-radius: 999px; min-width: 16px; height: 16px; padding: 0 4px;
+  margin-left: 6px; line-height: 1;
+}
+
+/* ── Follow-up due list ─────────────────────────────────────────── */
+.asst-followup-due {
+  background: #fff8f0; border: 1.5px solid var(--gold); border-radius: 10px;
+  padding: 12px 14px; margin-bottom: 16px;
+}
+.asst-followup-due-title {
+  font-size: 12px; font-weight: 700; color: var(--gold); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .04em;
+}
+.asst-followup-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 8px 0; border-top: 1px solid #fde8cc;
+}
+.asst-followup-item-info { flex: 1; font-size: 13px; color: var(--ink); }
+.asst-followup-day { font-size: 11px; color: var(--muted); margin-left: 6px; }
+.asst-followup-gen-btn {
+  background: var(--gold); color: #fff; border: none; border-radius: 6px;
+  font-size: 12px; font-weight: 600; padding: 5px 10px; cursor: pointer; white-space: nowrap;
+}
+
+/* ── Sequence offer ─────────────────────────────────────────────── */
+.asst-sequence-offer {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  background: #f0f7ff; border: 1.5px solid var(--blue); border-radius: 8px;
+  padding: 10px 12px; margin-top: 10px;
+}
+.asst-sequence-offer-text { font-size: 13px; font-weight: 600; color: var(--ink); flex: 1; }
+.asst-sequence-yes {
+  background: var(--blue); color: #fff; border: none; border-radius: 6px;
+  font-size: 12px; font-weight: 600; padding: 6px 12px; cursor: pointer;
+}
+.asst-sequence-no {
+  background: none; color: var(--muted); border: 1px solid var(--line);
+  border-radius: 6px; font-size: 12px; padding: 6px 12px; cursor: pointer;
+}
+.asst-sequence-done { font-size: 13px; color: #2a7a2a; font-weight: 600; }
+
+/* ── Memory offer ───────────────────────────────────────────────── */
+.asst-memory-offer {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  background: #f3f0ff; border: 1.5px solid #7c5cbf; border-radius: 8px;
+  padding: 10px 12px; margin-top: 10px;
+}
+.asst-memory-offer-text { font-size: 13px; font-weight: 600; color: var(--ink); flex: 1; }
+.asst-memory-yes {
+  background: #7c5cbf; color: #fff; border: none; border-radius: 6px;
+  font-size: 12px; font-weight: 600; padding: 6px 12px; cursor: pointer;
+}
+.asst-memory-no {
+  background: none; color: var(--muted); border: 1px solid var(--line);
+  border-radius: 6px; font-size: 12px; padding: 6px 12px; cursor: pointer;
+}
+
+/* ── Voice debrief ──────────────────────────────────────────────── */
+.asst-voice-controls {
+  display: flex; align-items: center; gap: 12px; margin: 12px 0;
+}
+.asst-voice-btn {
+  background: var(--ink); color: #fff; border: none; border-radius: 8px;
+  font-size: 14px; font-weight: 600; padding: 10px 20px; cursor: pointer;
+  white-space: nowrap; transition: background .15s;
+}
+.asst-voice-btn.asst-voice-active {
+  background: #c0392b; animation: asst-pulse 1.2s ease-in-out infinite;
+}
+@keyframes asst-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .7; }
+}
+.asst-voice-status { font-size: 13px; color: var(--muted); }
+
+/* ── Territory ──────────────────────────────────────────────────── */
+.asst-territory-map {
+  padding: 0 16px 8px; margin-bottom: 4px;
+}
+.asst-territory-title {
+  font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .05em; margin-bottom: 8px; padding-top: 12px;
+}
+.asst-county-row {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-size: 12px;
+}
+.asst-county-name { width: 140px; min-width: 140px; color: var(--ink); truncate: ellipsis; overflow: hidden; white-space: nowrap; }
+.asst-county-bar { flex: 1; background: var(--paper); border-radius: 4px; height: 8px; overflow: hidden; }
+.asst-county-fill { display: block; height: 100%; background: var(--blue); border-radius: 4px; transition: width .4s; }
+.asst-county-count { width: 24px; text-align: right; color: var(--muted); font-weight: 600; }
+
+/* ── Memory bank ─────────────────────────────────────────────────── */
+.asst-memory-search { padding: 8px 16px 0; }
+.asst-mem-list { padding: 0 16px 80px; overflow-y: auto; }
+.asst-memory-empty { padding: 24px 0; text-align: center; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.asst-mem-account {
+  margin-bottom: 14px; border: 1px solid var(--line); border-radius: 10px;
+  overflow: hidden; background: var(--panel);
+}
+.asst-mem-acct-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; background: var(--paper); border-bottom: 1px solid var(--line);
+}
+.asst-mem-acct-name { font-size: 13px; font-weight: 700; color: var(--ink); }
+.asst-mem-acct-date { font-size: 11px; color: var(--muted); }
+.asst-mem-facts { padding: 8px 0; }
+.asst-mem-fact {
+  display: flex; align-items: flex-start; gap: 8px; padding: 7px 14px;
+  border-bottom: 1px solid var(--paper);
+}
+.asst-mem-fact:last-child { border-bottom: none; }
+.asst-mem-fact-text { flex: 1; font-size: 13px; color: var(--ink); line-height: 1.45; }
+.asst-mem-delete {
+  flex-shrink: 0; background: none; border: none; color: var(--muted);
+  font-size: 13px; cursor: pointer; padding: 0 2px; margin-top: 1px;
+  opacity: .5; transition: opacity .15s;
+}
+.asst-mem-delete:hover { opacity: 1; color: var(--red); }

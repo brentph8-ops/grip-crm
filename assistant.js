@@ -22,6 +22,11 @@
     const base = (window.GRIP_SUPABASE_URL || "").replace(/\/$/, "");
     const url = `${base}/functions/v1/assistant-ai`;
     const anon = window.GRIP_SUPABASE_ANON || "";
+    // Auto-inject account memory if accountName is present in payload
+    if (payload.accountName) {
+      const memStr = getMemoryString(payload.accountName);
+      if (memStr) payload.accountMemory = memStr;
+    }
     const res = await fetch(url, {
       method: "POST",
       headers: {
@@ -58,6 +63,81 @@
 
   function getAccountByName(name) {
     return getAccounts().find(a => a.client === name) || null;
+  }
+
+  // ── MEMORY SYSTEM ────────────────────────────────────────────────
+
+  function getMemory(accountName) {
+    try {
+      const raw = localStorage.getItem("grip_ai_memory") || "{}";
+      return JSON.parse(raw)[accountName] || null;
+    } catch { return null; }
+  }
+
+  function saveMemory(accountName, facts) {
+    try {
+      const raw = localStorage.getItem("grip_ai_memory") || "{}";
+      const mem = JSON.parse(raw);
+      if (!mem[accountName]) mem[accountName] = { facts: [], updatedAt: null };
+      // Merge new facts, avoid duplicates
+      facts.forEach(f => {
+        const clean = f.trim();
+        if (clean && !mem[accountName].facts.includes(clean)) mem[accountName].facts.push(clean);
+      });
+      mem[accountName].updatedAt = new Date().toISOString();
+      // Keep last 20 facts per account
+      if (mem[accountName].facts.length > 20) mem[accountName].facts = mem[accountName].facts.slice(-20);
+      localStorage.setItem("grip_ai_memory", JSON.stringify(mem));
+      return true;
+    } catch { return false; }
+  }
+
+  function deleteMemoryFact(accountName, index) {
+    try {
+      const raw = localStorage.getItem("grip_ai_memory") || "{}";
+      const mem = JSON.parse(raw);
+      if (mem[accountName]) mem[accountName].facts.splice(index, 1);
+      localStorage.setItem("grip_ai_memory", JSON.stringify(mem));
+    } catch {}
+  }
+
+  function getMemoryString(accountName) {
+    const m = getMemory(accountName);
+    if (!m || !m.facts.length) return null;
+    return m.facts.map((f, i) => `${i + 1}. ${f}`).join("\n");
+  }
+
+  // ── FOLLOW-UP QUEUE ──────────────────────────────────────────────
+
+  function getFollowupQueue() {
+    try { return JSON.parse(localStorage.getItem("grip_followup_queue") || "[]"); }
+    catch { return []; }
+  }
+
+  function saveFollowupQueue(queue) {
+    localStorage.setItem("grip_followup_queue", JSON.stringify(queue));
+  }
+
+  function addFollowups(accountName, contactName, contactTitle, originalEmail) {
+    const queue = getFollowupQueue();
+    const now = Date.now();
+    const id = `fu_${now}`;
+    queue.push({
+      id, accountName, contactName, contactTitle, originalEmail,
+      status: "pending",
+      followups: [
+        { daysOut: 3, dueAt: now + 3 * 86400000, sent: false, draft: null },
+        { daysOut: 7, dueAt: now + 7 * 86400000, sent: false, draft: null },
+      ],
+      createdAt: new Date().toISOString(),
+    });
+    saveFollowupQueue(queue);
+  }
+
+  function countDueFollowups() {
+    const now = Date.now();
+    return getFollowupQueue().reduce((n, seq) =>
+      n + seq.followups.filter(f => !f.sent && f.dueAt <= now).length, 0);
   }
 
   function saveNoteToGrip(accountName, noteText) {
@@ -164,6 +244,8 @@
 
   function render(container) {
     if (container.querySelector(".asst-root")) return;
+    const due = countDueFollowups();
+    const dueBadge = due > 0 ? `<span class="asst-due-badge">${due}</span>` : "";
     container.innerHTML = `
       <div class="asst-root">
         <div class="asst-sidebar">
@@ -172,24 +254,31 @@
           <button class="asst-agent-btn active" data-agent="chat">💬 Chat</button>
           <div class="asst-agent-label">Agents</div>
           <button class="asst-agent-btn" data-agent="research">🔍 Research</button>
-          <button class="asst-agent-btn" data-agent="outreach">✉️ Outreach</button>
+          <button class="asst-agent-btn" data-agent="outreach">✉️ Outreach ${dueBadge}</button>
           <button class="asst-agent-btn" data-agent="meeting_prep">📋 Meeting Prep</button>
           <button class="asst-agent-btn" data-agent="score">📊 Score Account</button>
           <button class="asst-agent-btn" data-agent="schedule">📅 Schedule</button>
           <button class="asst-agent-btn" data-agent="prospects">🎯 Find Prospects</button>
+          <div class="asst-agent-label">Tools</div>
+          <button class="asst-agent-btn" data-agent="voice">🎙️ Voice Debrief</button>
+          <button class="asst-agent-btn" data-agent="territory">🗺️ Territory</button>
+          <button class="asst-agent-btn" data-agent="memory">🧠 Memory</button>
         </div>
         <div class="asst-main" id="asstMain"></div>
         <div class="asst-bottom-nav">
           <button class="asst-bnav-btn active" data-agent="chat">💬<span>Chat</span></button>
-          <button class="asst-bnav-btn" data-agent="research">🔍<span>Research</span></button>
-          <button class="asst-bnav-btn" data-agent="outreach">✉️<span>Outreach</span></button>
-          <button class="asst-bnav-btn" data-agent="meeting_prep">📋<span>Prep</span></button>
+          <button class="asst-bnav-btn" data-agent="voice">🎙️<span>Debrief</span></button>
+          <button class="asst-bnav-btn" data-agent="outreach">✉️<span>Outreach${due > 0 ? ` (${due})` : ""}</span></button>
+          <button class="asst-bnav-btn" data-agent="territory">🗺️<span>Territory</span></button>
           <button class="asst-bnav-btn" data-agent="more">•••<span>More</span></button>
         </div>
         <div class="asst-more-menu" id="asstMoreMenu" style="display:none">
+          <button class="asst-more-item" data-agent="research">🔍 Research</button>
+          <button class="asst-more-item" data-agent="meeting_prep">📋 Meeting Prep</button>
           <button class="asst-more-item" data-agent="score">📊 Score Account</button>
           <button class="asst-more-item" data-agent="schedule">📅 Schedule</button>
           <button class="asst-more-item" data-agent="prospects">🎯 Find Prospects</button>
+          <button class="asst-more-item" data-agent="memory">🧠 Memory Bank</button>
         </div>
       </div>
     `;
@@ -236,6 +325,9 @@
       score: renderScore,
       schedule: renderSchedule,
       prospects: renderProspects,
+      voice: renderVoiceDebrief,
+      territory: renderTerritory,
+      memory: renderMemoryBank,
     };
     (panels[agent] || renderChat)(el);
   }
@@ -539,6 +631,55 @@ Keep it tight — 150 words max. No headers, just clean paragraphs.`;
     `;
     initAccountPicker(el, "oAcct");
 
+    // Show due follow-ups at top
+    const queue = getFollowupQueue();
+    const now = Date.now();
+    const due = queue.filter(s => s.followups.some(f => !f.sent && f.dueAt <= now));
+    if (due.length) {
+      const dueHtml = `
+        <div class="asst-followup-due">
+          <div class="asst-followup-due-title">🔁 Follow-ups due (${due.length})</div>
+          ${due.map(seq => seq.followups.filter(f => !f.sent && f.dueAt <= now).map(f => `
+            <div class="asst-followup-item">
+              <div class="asst-followup-item-info">
+                <strong>${escHtml(seq.contactName)}</strong> at ${escHtml(seq.accountName)}
+                <span class="asst-followup-day">Day ${f.daysOut} follow-up</span>
+              </div>
+              <button class="asst-followup-gen-btn" data-seq="${escAttr(seq.id)}" data-days="${f.daysOut}">Generate ↗</button>
+            </div>
+          `).join("")).join("")}
+        </div>
+      `;
+      el.querySelector(".asst-form").insertAdjacentHTML("beforebegin", dueHtml);
+
+      el.querySelectorAll(".asst-followup-gen-btn").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const seq = getFollowupQueue().find(s => s.id === btn.dataset.seq);
+          if (!seq) return;
+          const resultEl = el.querySelector("#oResult");
+          resultEl.innerHTML = renderLoading("Generating follow-up email...");
+          try {
+            const { result } = await callEdge("followup_sequence", {
+              accountName: seq.accountName,
+              contactName: seq.contactName,
+              contactTitle: seq.contactTitle,
+              originalEmail: seq.originalEmail,
+              daysOut: parseInt(btn.dataset.days),
+            });
+            resultEl.innerHTML = renderResult(`Day ${btn.dataset.days} Follow-Up — ${escHtml(seq.contactName)} at ${escHtml(seq.accountName)}`, result, seq.accountName);
+            wireResultCopy(resultEl, result, seq.accountName);
+            // Mark as sent
+            const q = getFollowupQueue();
+            const s = q.find(x => x.id === seq.id);
+            if (s) { const fu = s.followups.find(f => f.daysOut === parseInt(btn.dataset.days)); if (fu) fu.sent = true; }
+            saveFollowupQueue(q);
+          } catch (err) {
+            resultEl.innerHTML = `<div class="asst-error">Error: ${escHtml(err.message)}</div>`;
+          }
+        });
+      });
+    }
+
     el.querySelector("#oSubmit").addEventListener("click", async () => {
       const accountName = el.querySelector("#oAcct").value.trim();
       const contactName = el.querySelector("#oContact").value.trim();
@@ -551,8 +692,25 @@ Keep it tight — 150 words max. No headers, just clean paragraphs.`;
       const labels = { email: "Cold Email", linkedin: "LinkedIn Message", call: "Call Script", followup: "Follow-Up Email", thankyou: "Thank You Email" };
       try {
         const { result } = await callEdge("outreach", { accountName, contactName, contactTitle, context, outreachType });
-        resultEl.innerHTML = renderResult(`${labels[outreachType] || "Outreach"} — ${escHtml(contactName)} at ${escHtml(accountName)}`, result);
+        resultEl.innerHTML = renderResult(`${labels[outreachType] || "Outreach"} — ${escHtml(contactName)} at ${escHtml(accountName)}`, result, accountName);
         wireResultCopy(resultEl, result, accountName);
+        // Offer follow-up sequence for cold emails
+        if (outreachType === "email") {
+          resultEl.insertAdjacentHTML("beforeend", `
+            <div class="asst-sequence-offer">
+              <div class="asst-sequence-offer-text">🔁 Queue a 3-email follow-up sequence (day 3 + day 7)?</div>
+              <button class="asst-sequence-yes" id="oQueueSeq">Yes, queue it</button>
+              <button class="asst-sequence-no" id="oSkipSeq">Skip</button>
+            </div>
+          `);
+          resultEl.querySelector("#oQueueSeq").addEventListener("click", () => {
+            addFollowups(accountName, contactName, contactTitle, result);
+            resultEl.querySelector(".asst-sequence-offer").innerHTML = `<div class="asst-sequence-done">✓ Sequence queued — follow-ups will appear here on day 3 and day 7</div>`;
+          });
+          resultEl.querySelector("#oSkipSeq").addEventListener("click", () => {
+            resultEl.querySelector(".asst-sequence-offer").remove();
+          });
+        }
       } catch (err) {
         resultEl.innerHTML = `<div class="asst-error">Error: ${escHtml(err.message)}</div>`;
       }
@@ -803,6 +961,285 @@ Keep it tight — 150 words max. No headers, just clean paragraphs.`;
         }
       } catch (err) {
         resultEl.innerHTML = `<div class="asst-error">Error: ${escHtml(err.message)}</div>`;
+      }
+    });
+  }
+
+  // ── VOICE DEBRIEF ────────────────────────────────────────────────
+
+  function renderVoiceDebrief(el) {
+    el.innerHTML = `
+      <div class="asst-panel">
+        <div class="asst-panel-header">
+          <div>
+            <div class="asst-panel-title">🎙️ Voice Debrief</div>
+            <div class="asst-panel-sub">Record a voice note after a meeting — AI extracts a structured note + key facts to remember</div>
+          </div>
+        </div>
+        <div class="asst-form">
+          ${accountPickerHtml("vdAcct", "Account this meeting was with")}
+          <div class="asst-voice-controls">
+            <button class="asst-voice-btn" id="vdMic">🎙️ Start Recording</button>
+            <div class="asst-voice-status" id="vdStatus">Tap to record your debrief</div>
+          </div>
+          <label class="asst-label" style="margin-top:12px">Or type / paste your notes</label>
+          <textarea class="asst-textarea" id="vdTranscript" placeholder="Type or paste your meeting notes, or use voice recording above..."></textarea>
+          <button class="asst-action-btn" id="vdSubmit">Extract Meeting Note</button>
+        </div>
+        <div class="asst-result" id="vdResult"></div>
+      </div>
+    `;
+    initAccountPicker(el, "vdAcct");
+
+    // Web Speech API
+    let recognition = null;
+    let isRecording = false;
+    const micBtn = el.querySelector("#vdMic");
+    const statusEl = el.querySelector("#vdStatus");
+    const transcriptEl = el.querySelector("#vdTranscript");
+
+    if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SR();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+
+      let finalTranscript = "";
+      recognition.onresult = (e) => {
+        let interim = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const t = e.results[i][0].transcript;
+          if (e.results[i].isFinal) finalTranscript += t + " ";
+          else interim = t;
+        }
+        transcriptEl.value = finalTranscript + interim;
+      };
+
+      recognition.onerror = (e) => {
+        statusEl.textContent = `Error: ${e.error}. Use text box instead.`;
+        isRecording = false;
+        micBtn.textContent = "🎙️ Start Recording";
+        micBtn.classList.remove("asst-voice-active");
+      };
+
+      recognition.onend = () => {
+        if (isRecording) {
+          // Auto-restart if still supposed to be recording (mobile timeout)
+          recognition.start();
+        } else {
+          statusEl.textContent = "Recording stopped. Review transcript then click Extract.";
+        }
+      };
+
+      micBtn.addEventListener("click", () => {
+        if (!isRecording) {
+          finalTranscript = transcriptEl.value;
+          recognition.start();
+          isRecording = true;
+          micBtn.textContent = "⏹ Stop Recording";
+          micBtn.classList.add("asst-voice-active");
+          statusEl.textContent = "Recording... speak naturally about the meeting";
+        } else {
+          recognition.stop();
+          isRecording = false;
+          micBtn.textContent = "🎙️ Start Recording";
+          micBtn.classList.remove("asst-voice-active");
+        }
+      });
+    } else {
+      micBtn.disabled = true;
+      statusEl.textContent = "Voice recording not supported in this browser — type your notes below.";
+    }
+
+    el.querySelector("#vdSubmit").addEventListener("click", async () => {
+      if (isRecording && recognition) { recognition.stop(); isRecording = false; }
+      const accountName = el.querySelector("#vdAcct").value.trim();
+      const transcript = transcriptEl.value.trim();
+      if (!accountName) return showError(el, "#vdResult", "Please select an account.");
+      if (!transcript) return showError(el, "#vdResult", "Please record or type your meeting notes.");
+
+      const resultEl = el.querySelector("#vdResult");
+      resultEl.innerHTML = renderLoading("Extracting meeting note...");
+
+      try {
+        const { result } = await callEdge("voice_debrief", { accountName, transcript });
+        resultEl.innerHTML = renderResult(`Meeting Note — ${escHtml(accountName)}`, result, accountName);
+        wireResultCopy(resultEl, result, accountName);
+
+        // Offer to save key facts to memory
+        resultEl.insertAdjacentHTML("beforeend", `
+          <div class="asst-memory-offer">
+            <div class="asst-memory-offer-text">💾 Save "things to remember" to Account Memory?</div>
+            <button class="asst-memory-yes" id="vdSaveMem">Save to Memory</button>
+            <button class="asst-memory-no" id="vdSkipMem">Skip</button>
+          </div>
+        `);
+
+        resultEl.querySelector("#vdSaveMem").addEventListener("click", () => {
+          // Extract facts after "Things to remember" section
+          const factsMatch = result.match(/\*\*Things to remember[^*]*\*\*([^#]*)/i);
+          const factsText = factsMatch ? factsMatch[1].trim() : result;
+          const facts = factsText.split(/\n/).map(l => l.replace(/^[-•*\d.]+\s*/, "").trim()).filter(Boolean);
+          if (facts.length) saveMemory(accountName, facts);
+          resultEl.querySelector(".asst-memory-offer").innerHTML = `<div class="asst-sequence-done">✓ Key facts saved to ${escHtml(accountName)}'s memory</div>`;
+        });
+        resultEl.querySelector("#vdSkipMem").addEventListener("click", () => {
+          resultEl.querySelector(".asst-memory-offer").remove();
+        });
+      } catch (err) {
+        resultEl.innerHTML = `<div class="asst-error">Error: ${escHtml(err.message)}</div>`;
+      }
+    });
+  }
+
+  // ── TERRITORY GAP ANALYSIS ───────────────────────────────────────
+
+  function renderTerritory(el) {
+    const accounts = getAccounts();
+
+    // Build county breakdown
+    const byCounty = {};
+    accounts.forEach(a => {
+      const county = (a.county || a.city || "Unknown").trim();
+      if (!byCounty[county]) byCounty[county] = { count: 0, accounts: [] };
+      byCounty[county].count++;
+      byCounty[county].accounts.push(a.client || a.name || "Unknown");
+    });
+
+    const countySorted = Object.entries(byCounty).sort((a, b) => b[1].count - a[1].count);
+    const countyRows = countySorted.slice(0, 20).map(([county, data]) =>
+      `<div class="asst-county-row">
+        <span class="asst-county-name">${escHtml(county)}</span>
+        <span class="asst-county-bar">
+          <span class="asst-county-fill" style="width:${Math.min(100, data.count * 8)}%"></span>
+        </span>
+        <span class="asst-county-count">${data.count}</span>
+      </div>`
+    ).join("");
+
+    const summary = countySorted.map(([county, data]) =>
+      `${county}: ${data.count} accounts (${data.accounts.slice(0, 3).join(", ")}${data.accounts.length > 3 ? "..." : ""})`
+    ).join("\n");
+
+    el.innerHTML = `
+      <div class="asst-panel">
+        <div class="asst-panel-header">
+          <div>
+            <div class="asst-panel-title">🗺️ Territory Gap Analysis</div>
+            <div class="asst-panel-sub">${accounts.length} accounts across ${countySorted.length} areas — AI identifies hot zones, cold zones, and your best next move</div>
+          </div>
+        </div>
+        <div class="asst-territory-map">
+          <div class="asst-territory-title">Accounts by Area (top 20)</div>
+          ${countyRows}
+        </div>
+        <div class="asst-form">
+          <label class="asst-label">Any additional context? (optional)</label>
+          <textarea class="asst-textarea" id="terrContext" placeholder="e.g. I've been focusing on DFW, haven't visited West Texas in 6 months, just got a lead in Abilene..."></textarea>
+          <button class="asst-action-btn" id="terrSubmit">Run Territory Analysis</button>
+        </div>
+        <div class="asst-result" id="terrResult"></div>
+      </div>
+    `;
+
+    el.querySelector("#terrSubmit").addEventListener("click", async () => {
+      const extraContext = el.querySelector("#terrContext").value.trim();
+      const fullSummary = `Brent has ${accounts.length} total accounts in Texas.\n\nBreakdown by area:\n${summary}${extraContext ? `\n\nBrent's notes: ${extraContext}` : ""}`;
+
+      const resultEl = el.querySelector("#terrResult");
+      resultEl.innerHTML = renderLoading("Analyzing your territory...");
+
+      try {
+        const { result } = await callEdge("territory_analysis", {
+          counties: countySorted.map(([c]) => c),
+          summary: fullSummary,
+        });
+        resultEl.innerHTML = renderResult("Territory Gap Analysis", result);
+        wireResultCopy(resultEl, result);
+      } catch (err) {
+        resultEl.innerHTML = `<div class="asst-error">Error: ${escHtml(err.message)}</div>`;
+      }
+    });
+  }
+
+  // ── ACCOUNT MEMORY BANK ──────────────────────────────────────────
+
+  function renderMemoryBank(el) {
+    const allMemory = JSON.parse(localStorage.getItem("grip_ai_memory") || "{}");
+    const accountsWithMemory = Object.keys(allMemory).filter(k => allMemory[k]?.facts?.length);
+
+    function renderMemoryList() {
+      if (!accountsWithMemory.length) {
+        return `<div class="asst-memory-empty">No memories saved yet. Use Voice Debrief or the "Save to Memory" button after any AI result to build your memory bank.</div>`;
+      }
+      return accountsWithMemory.map(acct => {
+        const mem = allMemory[acct];
+        const updated = mem.updatedAt ? new Date(mem.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
+        return `
+          <div class="asst-mem-account" data-acct="${escAttr(acct)}">
+            <div class="asst-mem-acct-header">
+              <span class="asst-mem-acct-name">${escHtml(acct)}</span>
+              ${updated ? `<span class="asst-mem-acct-date">Updated ${updated}</span>` : ""}
+            </div>
+            <div class="asst-mem-facts">
+              ${mem.facts.map((fact, i) => `
+                <div class="asst-mem-fact" data-acct="${escAttr(acct)}" data-idx="${i}">
+                  <span class="asst-mem-fact-text">${escHtml(fact)}</span>
+                  <button class="asst-mem-delete" data-acct="${escAttr(acct)}" data-idx="${i}" title="Delete">✕</button>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    el.innerHTML = `
+      <div class="asst-panel">
+        <div class="asst-panel-header">
+          <div>
+            <div class="asst-panel-title">🧠 Account Memory Bank</div>
+            <div class="asst-panel-sub">${accountsWithMemory.length} accounts with stored intelligence — ${accountsWithMemory.reduce((n, k) => n + (allMemory[k]?.facts?.length || 0), 0)} total facts</div>
+          </div>
+        </div>
+        <div class="asst-memory-search">
+          <input class="asst-input" id="memSearch" placeholder="Filter accounts..." />
+        </div>
+        <div class="asst-mem-list" id="memList">
+          ${renderMemoryList()}
+        </div>
+      </div>
+    `;
+
+    // Filter search
+    el.querySelector("#memSearch").addEventListener("input", (e) => {
+      const q = e.target.value.toLowerCase();
+      el.querySelectorAll(".asst-mem-account").forEach(card => {
+        card.style.display = card.dataset.acct.toLowerCase().includes(q) ? "" : "none";
+      });
+    });
+
+    // Delete fact handler
+    el.querySelector("#memList").addEventListener("click", (e) => {
+      const btn = e.target.closest(".asst-mem-delete");
+      if (!btn) return;
+      const acct = btn.dataset.acct;
+      const idx = parseInt(btn.dataset.idx);
+      deleteMemoryFact(acct, idx);
+      // Re-read and re-render just this account's facts
+      const updatedMem = JSON.parse(localStorage.getItem("grip_ai_memory") || "{}");
+      const factsEl = btn.closest(".asst-mem-account").querySelector(".asst-mem-facts");
+      const facts = updatedMem[acct]?.facts || [];
+      if (!facts.length) {
+        btn.closest(".asst-mem-account").remove();
+      } else {
+        factsEl.innerHTML = facts.map((fact, i) => `
+          <div class="asst-mem-fact" data-acct="${escAttr(acct)}" data-idx="${i}">
+            <span class="asst-mem-fact-text">${escHtml(fact)}</span>
+            <button class="asst-mem-delete" data-acct="${escAttr(acct)}" data-idx="${i}" title="Delete">✕</button>
+          </div>
+        `).join("");
       }
     });
   }
