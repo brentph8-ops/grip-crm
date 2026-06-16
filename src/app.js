@@ -10417,6 +10417,9 @@ function bindEvents() {
     }
   });
   byId("projectForm").addEventListener("submit", handleProjectSubmit);
+  byId("projectForm").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && e.target.tagName !== "BUTTON" && e.target.tagName !== "TEXTAREA") e.preventDefault();
+  });
   byId("cancelProjectChecklistButton").addEventListener("click", () => byId("projectChecklistDialog").close());
   byId("printProjectChecklistButton").addEventListener("click", printProjectChecklist);
   byId("clearProjectChecklistButton").addEventListener("click", () => clearProjectChecklist(byId("projectChecklistProjectId").value));
@@ -10454,6 +10457,9 @@ function bindEvents() {
     }
   });
   byId("proposalForm").addEventListener("submit", handleProposalSubmit);
+  byId("proposalForm").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && e.target.tagName !== "BUTTON" && e.target.tagName !== "TEXTAREA") e.preventDefault();
+  });
   byId("cancelSupportContactButton").addEventListener("click", () => byId("supportContactDialog").close());
   byId("clearSupportContactButton").addEventListener("click", () => byId("supportContactForm").reset());
   byId("supportContactForm").addEventListener("submit", (event) => {
