@@ -420,7 +420,7 @@
       sendBtn.disabled = true;
 
       try {
-        const { result } = await callEdge("chat", { messages: chatMessages });
+        const { result } = await callEdge("chat", { messages: chatMessages.slice(-20) });
         chatMessages.push({ role: "assistant", content: result });
         chatWindow.innerHTML = chatMessages.map(renderChatBubble).join("");
         wireInlineDraftButtons(chatWindow, el);
@@ -493,7 +493,7 @@ Keep it tight — 150 words max. No headers, just clean paragraphs.`;
     if (sendBtn) sendBtn.disabled = true;
 
     try {
-      const { result } = await callEdge("chat", { messages: chatMessages });
+      const { result } = await callEdge("chat", { messages: chatMessages.slice(-20) });
       chatMessages.push({ role: "assistant", content: result });
       chatWindow.innerHTML = chatMessages.map(renderChatBubble).join("");
     } catch {
@@ -1179,11 +1179,12 @@ Keep it tight — 150 words max. No headers, just clean paragraphs.`;
     });
 
     const countySorted = Object.entries(byCounty).sort((a, b) => b[1].count - a[1].count);
+    const maxCount = countySorted[0]?.[1].count || 1;
     const countyRows = countySorted.slice(0, 20).map(([county, data]) =>
       `<div class="asst-county-row">
         <span class="asst-county-name">${escHtml(county)}</span>
         <span class="asst-county-bar">
-          <span class="asst-county-fill" style="width:${Math.min(100, data.count * 8)}%"></span>
+          <span class="asst-county-fill" style="width:${Math.round(data.count / maxCount * 100)}%"></span>
         </span>
         <span class="asst-county-count">${data.count}</span>
       </div>`

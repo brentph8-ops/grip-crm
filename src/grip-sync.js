@@ -22,6 +22,8 @@
     "garlandActivities",
     "garlandCallLists",
     "garlandTakeoffManualProducts",
+    "grip_ai_memory",
+    "grip_followup_queue",
   ]);
 
   // ── Helpers ──────────────────────────────────────────────────────

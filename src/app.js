@@ -10015,7 +10015,7 @@ function bindEvents() {
   // ── Supabase auth bindings ──────────────────────────────────────
   byId("gripGoogleSignInButton")?.addEventListener("click", () => {
     const btn = byId("gripGoogleSignInButton");
-    if (btn) btn.textContent = "Opening Google sign-in…";
+    if (btn) { btn.textContent = "Opening Google sign-in…"; btn.disabled = true; }
     window.gripSync?.signInWithGoogle();
   });
   byId("gripContinueLocalButton")?.addEventListener("click", () => window.gripSync?.continueLocal());
