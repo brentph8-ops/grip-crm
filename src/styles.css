@@ -956,6 +956,21 @@ textarea {
   justify-content: center;
 }
 
+/* ── Task form sections ─────────────────────────────────────────── */
+.task-section {
+  border-top: 1px solid var(--line);
+  padding: 16px 0 4px;
+}
+
+.task-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
 .task-template-strip,
 .task-date-buttons {
   display: flex;

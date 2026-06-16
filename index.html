@@ -1599,6 +1599,7 @@
           <button class="icon-button" id="cancelTaskButton" type="button" aria-label="Close">×</button>
         </div>
         <input id="taskIdInput" name="task_id" type="hidden" />
+        <!-- ── Section 1: Quick templates ── -->
         <section class="task-template-strip" aria-label="Quick task templates">
           <button type="button" data-task-template="Follow Up on Proposal">Follow Up on Proposal</button>
           <button type="button" data-task-template="Schedule Roof Walk">Schedule Roof Walk</button>
@@ -1610,113 +1611,132 @@
           <button type="button" data-task-template="Project Site Visit">Project Site Visit</button>
           <button type="button" data-task-template="Capital Planning Follow-Up">Capital Planning Follow-Up</button>
         </section>
-        <div class="form-grid task-form-grid">
-          <label class="full-field">
-            <span>Task Title</span>
-            <input id="taskTitleInput" name="title" placeholder="Type task and press save" required />
-          </label>
-          <label class="full-field">
-            <span>Description / Notes</span>
-            <textarea name="description" placeholder="Notes, context, links, or field instructions"></textarea>
-          </label>
-          <fieldset class="full-field task-account-mode">
-            <legend>Account</legend>
-            <label><input type="radio" name="accountMode" value="unassigned" checked /> Unassigned</label>
-            <label><input type="radio" name="accountMode" value="existing" /> Existing Account</label>
-            <label><input type="radio" name="accountMode" value="new" /> New Account</label>
-          </fieldset>
-          <label class="task-account-search" data-task-existing-account hidden>
-            <span>Search Account</span>
-            <input id="taskAccountSearchInput" name="account_name" list="clientOptions" placeholder="Start typing account name" />
-          </label>
-          <div class="new-client-fields task-new-account-fields full-field" data-task-new-account hidden>
-            <label>
-              <span>New Account Name</span>
-              <input name="newAccountName" placeholder="Client / account name" />
+
+        <!-- ── Section 2: What ── -->
+        <div class="task-section">
+          <div class="task-section-label">What</div>
+          <div class="form-grid task-form-grid">
+            <label class="full-field">
+              <span>Task Title</span>
+              <input id="taskTitleInput" name="title" placeholder="Type task and press save" required />
+            </label>
+            <label class="full-field">
+              <span>Description / Notes</span>
+              <textarea name="description" placeholder="Notes, context, links, or field instructions"></textarea>
             </label>
             <label>
-              <span>Entity</span>
-              <select id="taskNewAccountEntity" name="newAccountEntity"></select>
+              <span>Priority</span>
+              <select id="taskPriorityInput" name="priority"></select>
             </label>
             <label>
-              <span>County</span>
-              <select id="taskNewAccountCounty" name="newAccountCounty"></select>
+              <span>Task Type</span>
+              <select id="taskTypeInput" name="task_type"></select>
             </label>
             <label>
-              <span>Point of Contact</span>
-              <input name="newAccountPoc" />
+              <span>Next Action</span>
+              <input id="taskNextActionInput" name="next_action" list="taskNextActionOptions" placeholder="Choose or type your own" />
+              <datalist id="taskNextActionOptions"></datalist>
             </label>
             <label>
-              <span>Phone</span>
-              <input name="newAccountPhone" type="tel" />
-            </label>
-            <label>
-              <span>Email</span>
-              <input name="newAccountEmail" type="email" />
+              <span>Status</span>
+              <select id="taskStatusInput" name="status"></select>
             </label>
           </div>
-          <label>
-            <span>Related Opportunity / Project</span>
-            <select id="taskProjectInput" name="related_project_id"></select>
-          </label>
-          <label>
-            <span>Due Date</span>
-            <input id="taskDueDateInput" name="due_date" type="date" required />
-          </label>
-          <label>
-            <span>Optional Time</span>
-            <input name="due_time" type="time" />
-          </label>
-          <div class="task-date-buttons full-field" aria-label="Quick due dates">
-            <button type="button" data-task-due="today">Today</button>
-            <button type="button" data-task-due="tomorrow">Tomorrow</button>
-            <button type="button" data-task-due="7">+7 Days Out</button>
-            <button type="button" data-task-due="choose">Choose Date</button>
+        </div>
+
+        <!-- ── Section 3: Who & When ── -->
+        <div class="task-section">
+          <div class="task-section-label">Who &amp; When</div>
+          <div class="form-grid task-form-grid">
+            <fieldset class="full-field task-account-mode">
+              <legend>Account</legend>
+              <label><input type="radio" name="accountMode" value="unassigned" checked /> Unassigned</label>
+              <label><input type="radio" name="accountMode" value="existing" /> Existing Account</label>
+              <label><input type="radio" name="accountMode" value="new" /> New Account</label>
+            </fieldset>
+            <label class="task-account-search" data-task-existing-account hidden>
+              <span>Search Account</span>
+              <input id="taskAccountSearchInput" name="account_name" list="clientOptions" placeholder="Start typing account name" />
+            </label>
+            <div class="new-client-fields task-new-account-fields full-field" data-task-new-account hidden>
+              <label>
+                <span>New Account Name</span>
+                <input name="newAccountName" placeholder="Client / account name" />
+              </label>
+              <label>
+                <span>Entity</span>
+                <select id="taskNewAccountEntity" name="newAccountEntity"></select>
+              </label>
+              <label>
+                <span>County</span>
+                <select id="taskNewAccountCounty" name="newAccountCounty"></select>
+              </label>
+              <label>
+                <span>Point of Contact</span>
+                <input name="newAccountPoc" />
+              </label>
+              <label>
+                <span>Phone</span>
+                <input name="newAccountPhone" type="tel" />
+              </label>
+              <label>
+                <span>Email</span>
+                <input name="newAccountEmail" type="email" />
+              </label>
+            </div>
+            <label>
+              <span>Related Opportunity / Project</span>
+              <select id="taskProjectInput" name="related_project_id"></select>
+            </label>
+            <label>
+              <span>Assigned User</span>
+              <input name="assigned_user" placeholder="Defaults to territory rep" />
+            </label>
+            <label>
+              <span>Due Date</span>
+              <input id="taskDueDateInput" name="due_date" type="date" required />
+            </label>
+            <label>
+              <span>Optional Time</span>
+              <input name="due_time" type="time" />
+            </label>
+            <div class="task-date-buttons full-field" aria-label="Quick due dates">
+              <button type="button" data-task-due="today">Today</button>
+              <button type="button" data-task-due="tomorrow">Tomorrow</button>
+              <button type="button" data-task-due="7">+7 Days Out</button>
+              <button type="button" data-task-due="choose">Choose Date</button>
+            </div>
           </div>
-          <label>
-            <span>Priority</span>
-            <select id="taskPriorityInput" name="priority"></select>
-          </label>
-          <label>
-            <span>Task Type</span>
-            <select id="taskTypeInput" name="task_type"></select>
-          </label>
-          <label>
-            <span>Next Action</span>
-            <input id="taskNextActionInput" name="next_action" list="taskNextActionOptions" placeholder="Choose or type your own" />
-            <datalist id="taskNextActionOptions"></datalist>
-          </label>
-          <label>
-            <span>Reminder</span>
-            <select id="taskReminderInput" name="reminder_type"></select>
-          </label>
-          <label>
-            <span>Custom Reminder</span>
-            <input name="reminder_custom" type="datetime-local" />
-          </label>
-          <label>
-            <span>Recurring Schedule</span>
-            <select id="taskRecurringInput" name="recurring_type"></select>
-          </label>
-          <label>
-            <span>Status</span>
-            <select id="taskStatusInput" name="status"></select>
-          </label>
-          <label>
-            <span>Assigned User</span>
-            <input name="assigned_user" placeholder="Defaults to territory rep" />
-          </label>
-          <label>
-            <span>Completed Outcome</span>
-            <input id="taskOutcomeInput" name="completed_outcome" list="taskOutcomeOptions" placeholder="Prompted when completed" />
-            <datalist id="taskOutcomeOptions"></datalist>
-          </label>
-          <label class="full-field task-drop-zone" data-task-drop-zone>
-            <span>Attachments / Photo Capture</span>
-            <input id="taskAttachmentInput" name="attachments" type="file" accept="image/*,video/*,audio/*,application/pdf,.doc,.docx,.xls,.xlsx" capture="environment" multiple />
-            <small>Upload from device, take pictures/videos on mobile, or drag files here.</small>
-          </label>
-          <div id="taskAttachmentPreview" class="task-attachment-preview full-field"></div>
+        </div>
+
+        <!-- ── Section 4: Reminders & Outcome ── -->
+        <div class="task-section">
+          <div class="task-section-label">Reminders &amp; Outcome</div>
+          <div class="form-grid task-form-grid">
+            <label>
+              <span>Reminder</span>
+              <select id="taskReminderInput" name="reminder_type"></select>
+            </label>
+            <label>
+              <span>Custom Reminder</span>
+              <input name="reminder_custom" type="datetime-local" />
+            </label>
+            <label>
+              <span>Recurring Schedule</span>
+              <select id="taskRecurringInput" name="recurring_type"></select>
+            </label>
+            <label>
+              <span>Completed Outcome</span>
+              <input id="taskOutcomeInput" name="completed_outcome" list="taskOutcomeOptions" placeholder="Prompted when completed" />
+              <datalist id="taskOutcomeOptions"></datalist>
+            </label>
+            <label class="full-field task-drop-zone" data-task-drop-zone>
+              <span>Attachments / Photo Capture</span>
+              <input id="taskAttachmentInput" name="attachments" type="file" accept="image/*,video/*,audio/*,application/pdf,.doc,.docx,.xls,.xlsx" capture="environment" multiple />
+              <small>Upload from device, take pictures/videos on mobile, or drag files here.</small>
+            </label>
+            <div id="taskAttachmentPreview" class="task-attachment-preview full-field"></div>
+          </div>
         </div>
         <div class="modal-actions sticky-actions">
           <button class="secondary-button" id="clearTaskButton" type="button">Clear</button>
