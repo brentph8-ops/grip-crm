@@ -1041,10 +1041,7 @@ textarea {
 }
 
 .form-grid .task-account-mode input[type="radio"] {
-  height: 14px;
-  margin: 0;
-  min-height: 0;
-  width: 14px;
+  display: none;
 }
 
 .task-account-search {
