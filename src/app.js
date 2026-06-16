@@ -10013,8 +10013,13 @@ function bindEvents() {
   byId("releaseNotesButton").addEventListener("click", () => openDialog("releaseNotesDialog"));
 
   // ── Supabase auth bindings ──────────────────────────────────────
-  byId("gripGoogleSignInButton")?.addEventListener("click", () => window.gripSync?.signInWithGoogle());
+  byId("gripGoogleSignInButton")?.addEventListener("click", () => {
+    const btn = byId("gripGoogleSignInButton");
+    if (btn) btn.textContent = "Opening Google sign-in…";
+    window.gripSync?.signInWithGoogle();
+  });
   byId("gripContinueLocalButton")?.addEventListener("click", () => window.gripSync?.continueLocal());
+  byId("gripClearSessionButton")?.addEventListener("click", () => window.gripSync?.clearSessionAndRetry());
   byId("gripSignOutButton")?.addEventListener("click", () => {
     if (confirm("Sign out of GRIP cloud sync? Your local data stays on this device.")) window.gripSync?.signOut();
   });

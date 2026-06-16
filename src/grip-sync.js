@@ -252,9 +252,11 @@
           showAuthOverlay(true);
           const errEl = document.getElementById("gripAuthError");
           if (errEl) {
-            errEl.textContent = `Access denied — this app is authorized for ${authorizedEmail} only.`;
+            errEl.textContent = `Access denied — signed in as ${user?.email || "unknown"}, but this app requires ${authorizedEmail}. Try signing out of all Google accounts first.`;
             errEl.hidden = false;
           }
+          const btn = document.getElementById("gripGoogleSignInButton");
+          if (btn) btn.textContent = "Sign in with Garland Google Account";
           return;
         }
         // ── Authorized ───────────────────────────────────────────
@@ -309,15 +311,19 @@
     signInWithGoogle() {
       const client = getClient();
       if (!client) return;
-      // hd hint pre-selects the authorized Google Workspace domain
-      // in the account chooser. The email guard above is the real lock.
+      // Clear any stale PKCE verifiers that would block the OAuth exchange
+      try {
+        Object.keys(localStorage).filter(k => k.includes("supabase") || k.includes("pkce") || k.includes("code_verifier")).forEach(k => localStorage.removeItem(k));
+      } catch (_) {}
       const hd = window.GRIP_AUTHORIZED_EMAIL
         ? window.GRIP_AUTHORIZED_EMAIL.split("@")[1]
         : undefined;
+      // Use the base URL without query params/hash to avoid redirect mismatch
+      const redirectTo = window.location.origin + window.location.pathname;
       client.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: window.location.href,
+          redirectTo,
           queryParams: hd ? { hd } : {},
         },
       });
@@ -332,6 +338,23 @@
     continueLocal() {
       showAuthOverlay(false);
       updateSyncIndicator("local");
+    },
+
+    clearSessionAndRetry() {
+      // Wipe all Supabase auth keys so a stale session can't block sign-in
+      try {
+        Object.keys(localStorage)
+          .filter(k => k.startsWith("sb-") || k.includes("supabase") || k.includes("pkce"))
+          .forEach(k => localStorage.removeItem(k));
+        sessionStorage.clear();
+      } catch (_) {}
+      // Reset error state and re-init
+      const errEl = document.getElementById("gripAuthError");
+      if (errEl) { errEl.hidden = true; errEl.textContent = ""; }
+      const btn = document.getElementById("gripGoogleSignInButton");
+      if (btn) btn.textContent = "Sign in with Garland Google Account";
+      window._gripSupabaseClient = null; // Force client re-creation
+      init();
     },
   };
 
