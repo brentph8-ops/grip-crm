@@ -497,7 +497,7 @@ Keep it tight — 150 words max. No headers, just clean paragraphs.`;
       chatMessages.push({ role: "assistant", content: result });
       chatWindow.innerHTML = chatMessages.map(renderChatBubble).join("");
     } catch {
-      chatMessages = [];
+      chatMessages.pop(); // remove the failed brief prompt, don't nuke the whole history
       chatWindow.innerHTML = renderChatWelcome();
     }
     if (sendBtn) sendBtn.disabled = false;
@@ -509,27 +509,29 @@ Keep it tight — 150 words max. No headers, just clean paragraphs.`;
       if (bubble.querySelector(".asst-inline-draft")) return;
       const text = bubble.textContent || "";
       const accounts = getAccounts().filter(a => a.client);
-      const mentioned = accounts.find(a => text.includes(a.client));
-      if (!mentioned) return;
-      const btn = document.createElement("button");
-      btn.className = "asst-inline-draft";
-      btn.textContent = `✉️ Draft email for ${mentioned.client}`;
-      btn.addEventListener("click", () => {
-        const root = panelEl.closest(".asst-root");
-        if (root) {
-          const container = root.parentElement;
-          switchAgent(container, "outreach");
-          setTimeout(() => {
-            const search = container.querySelector("#oAcctSearch");
-            const hidden = container.querySelector("#oAcct");
-            if (search && hidden) {
-              search.value = mentioned.client;
-              hidden.value = mentioned.client;
-            }
-          }, 100);
-        }
+      const mentioned = accounts.filter(a => text.includes(a.client));
+      if (!mentioned.length) return;
+      mentioned.forEach(acct => {
+        const btn = document.createElement("button");
+        btn.className = "asst-inline-draft";
+        btn.textContent = `✉️ Draft email for ${acct.client}`;
+        btn.addEventListener("click", () => {
+          const root = panelEl.closest(".asst-root");
+          if (root) {
+            const container = root.parentElement;
+            switchAgent(container, "outreach");
+            setTimeout(() => {
+              const search = container.querySelector("#oAcctSearch");
+              const hidden = container.querySelector("#oAcct");
+              if (search && hidden) {
+                search.value = acct.client;
+                hidden.value = acct.client;
+              }
+            }, 100);
+          }
+        });
+        bubble.appendChild(btn);
       });
-      bubble.appendChild(btn);
     });
   }
 
@@ -1115,12 +1117,12 @@ Keep it tight — 150 words max. No headers, just clean paragraphs.`;
     el.querySelector("#vdSubmit").addEventListener("click", async () => {
       // Stop recording and wait for onend to flush final results before reading transcript
       if (isRecording && recognition) {
+        isRecording = false; // Set false BEFORE stop so onend auto-restart guard doesn't fire
+        micBtn.textContent = "🎙️ Start Recording";
+        micBtn.classList.remove("asst-voice-active");
         await new Promise(resolve => {
           recognition.onend = () => { statusEl.textContent = "Recording stopped."; resolve(); };
           recognition.stop();
-          isRecording = false;
-          micBtn.textContent = "🎙️ Start Recording";
-          micBtn.classList.remove("asst-voice-active");
         });
       }
       const accountName = el.querySelector("#vdAcct").value.trim();
