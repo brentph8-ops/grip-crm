@@ -354,7 +354,7 @@
       const errEl = document.getElementById("gripAuthError");
       if (errEl) { errEl.hidden = true; errEl.textContent = ""; }
       const btn = document.getElementById("gripGoogleSignInButton");
-      if (btn) btn.textContent = "Sign in with Garland Google Account";
+      if (btn) { btn.textContent = "Sign in with Garland Google Account"; btn.disabled = false; }
       window._gripSupabaseClient = null; // Force client re-creation
       init();
     },
