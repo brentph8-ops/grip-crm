@@ -2123,6 +2123,26 @@
       </div>
     </dialog>
 
+    <!-- Inline confirm dialog -->
+    <dialog id="gripConfirmDialog" class="grip-modal-dialog">
+      <p id="gripConfirmMessage" class="grip-modal-message"></p>
+      <div class="grip-modal-actions">
+        <button id="gripConfirmNo" class="secondary-button" type="button">Cancel</button>
+        <button id="gripConfirmYes" class="delete-button" type="button">OK</button>
+      </div>
+    </dialog>
+    <!-- Inline prompt dialog -->
+    <dialog id="gripPromptDialog" class="grip-modal-dialog">
+      <p id="gripPromptMessage" class="grip-modal-message"></p>
+      <textarea id="gripPromptInput" class="note-box grip-modal-input" rows="3"></textarea>
+      <div class="grip-modal-actions">
+        <button id="gripPromptCancel" class="secondary-button" type="button">Cancel</button>
+        <button id="gripPromptOk" class="primary-button" type="button">Save</button>
+      </div>
+    </dialog>
+    <!-- Offline banner -->
+    <div id="gripOfflineBanner" class="grip-offline-banner" hidden>⚠ You're offline — changes are saved locally and will sync when you reconnect.</div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="src/data.js"></script>
     <script src="src/grip-sync.js"></script>

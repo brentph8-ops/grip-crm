@@ -916,6 +916,38 @@ if (!state.attachments || Array.isArray(state.attachments)) state.attachments = 
 if (!state.callLists || Array.isArray(state.callLists)) state.callLists = { rules: [], completed: {} };
 
 const byId = (id) => document.getElementById(id);
+
+// ── Inline modal helpers (replace native alert/confirm/prompt) ────
+function gripConfirm(message, yesLabel = "OK", noLabel = "Cancel") {
+  return new Promise((resolve) => {
+    const d = byId("gripConfirmDialog");
+    byId("gripConfirmMessage").textContent = message;
+    byId("gripConfirmYes").textContent = yesLabel;
+    byId("gripConfirmNo").textContent = noLabel;
+    const cleanup = (val) => { d.close(); resolve(val); };
+    byId("gripConfirmYes").onclick = () => cleanup(true);
+    byId("gripConfirmNo").onclick  = () => cleanup(false);
+    d.oncancel = () => cleanup(false);
+    d.showModal();
+  });
+}
+
+function gripPrompt(message, defaultValue = "", placeholder = "") {
+  return new Promise((resolve) => {
+    const d = byId("gripPromptDialog");
+    byId("gripPromptMessage").textContent = message;
+    const inp = byId("gripPromptInput");
+    inp.value = defaultValue;
+    inp.placeholder = placeholder;
+    const cleanup = (val) => { d.close(); resolve(val); };
+    byId("gripPromptOk").onclick     = () => cleanup(inp.value.trim() || null);
+    byId("gripPromptCancel").onclick = () => cleanup(null);
+    d.oncancel = () => cleanup(null);
+    d.showModal();
+    setTimeout(() => inp.focus(), 50);
+  });
+}
+
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const moneyWithCents = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const today = new Date();
@@ -1040,6 +1072,13 @@ function standardizeAbcScoreLabels() {
 function includesSearch(record) {
   if (!state.search) return true;
   return normalize(Object.values(record).join(" ")).includes(normalize(state.search));
+}
+
+function taskMatchesGlobalSearch(task) {
+  if (!state.search) return true;
+  const q = normalize(state.search);
+  return [task.title, task.description, task.account_name, task.next_action, task.task_type, task.assigned_user]
+    .filter(Boolean).some((v) => normalize(v).includes(q));
 }
 
 function isArchivedRecord(id) {
@@ -3137,6 +3176,7 @@ function relatedFor(client) {
     accounts: cleanAccounts().filter((item) => clientKey(item) === key),
     projects: cleanProjects().filter((item) => clientKey(item) === key),
     proposals: cleanProposals().filter((item) => clientKey(item) === key),
+    tasks: state.tasks.filter((t) => normalize(t.account_name || "") === key),
   };
 }
 
@@ -3730,6 +3770,22 @@ function accountProposalMiniRecord(proposal) {
     proposal.biddingContractors ? `${bidCount} bids received` : "",
   ].filter(Boolean);
   return miniRecord(proposal, proposal.project || proposal.client || "Proposal", pieces.join(" | "), "proposal");
+}
+
+function accountTaskMiniRecord(task) {
+  const done = ["Completed", "Cancelled"].includes(task.status);
+  const dueLevel = taskDueLevel(task);
+  const dueLbl = taskDueLabel(task);
+  return `
+    <article class="mini-record task-mini-record ${done ? "task-mini-done" : ""} ${dueLevel}" data-type="task" data-id="${escapeHtml(task.task_id)}">
+      <label class="task-mini-check" onclick="event.stopPropagation()">
+        <input type="checkbox" data-complete-task="${escapeHtml(task.task_id)}" ${done ? "checked" : ""} />
+      </label>
+      <div class="task-mini-body">
+        <div class="task-mini-title">${escapeHtml(task.title || "Task")}</div>
+        <div class="task-mini-meta">${escapeHtml([task.task_type, dueLbl].filter(Boolean).join(" · "))}</div>
+      </div>
+    </article>`;
 }
 
 function accountCard(item) {
@@ -6148,6 +6204,7 @@ function showAccountDetail(record) {
     ${quickActionSection("account", record)}
     ${accountRelationshipMap(record)}
 
+    ${relatedSection("Tasks", related.tasks.filter(t => !["Completed","Cancelled"].includes(t.status)), accountTaskMiniRecord)}
     ${relatedSection("Projects", related.projects, accountProjectMiniRecord)}
     ${relatedSection("Proposals", related.proposals, accountProposalMiniRecord)}
 
@@ -6411,21 +6468,21 @@ function accountForRecordActivity(type, id) {
   return findAccountByName(record.client || record.clientName || record.project || "");
 }
 
-function logRecordActivity(type, id) {
+async function logRecordActivity(type, id) {
   const account = accountForRecordActivity(type, id);
   if (!account) return alert("I could not find a linked account for this record. Open the account and log the activity there.");
-  const note = prompt("Log activity", "");
+  const note = await gripPrompt("Log activity", "", "What happened or what's next?");
   if (!String(note || "").trim()) return;
   addAccountActivity(account.id, note, false, { source: type === "account" ? "Account" : type === "project" ? "Project" : "Proposal" });
   render();
   showDetail("account", account.id);
 }
 
-function editActivity(accountId, activityId) {
+async function editActivity(accountId, activityId) {
   const entries = state.activities[accountId] || [];
   const entry = entries.find((item) => item.id === activityId);
   if (!entry) return;
-  const updated = prompt("Edit activity", entry.note || "");
+  const updated = await gripPrompt("Edit activity", entry.note || "");
   if (updated === null) return;
   const cleaned = String(updated).trim();
   if (!cleaned) return;
@@ -6438,8 +6495,8 @@ function editActivity(accountId, activityId) {
   if (account && byId("detailContent").textContent.includes(account.client || "")) showAccountDetail(account);
 }
 
-function deleteActivity(accountId, activityId) {
-  if (!confirm("Delete this activity?")) return;
+async function deleteActivity(accountId, activityId) {
+  if (!await gripConfirm("Delete this activity?", "Delete", "Cancel")) return;
   state.activities[accountId] = (state.activities[accountId] || []).filter((entry) => entry.id !== activityId);
   saveActivities();
   renderAccounts();
@@ -7049,11 +7106,11 @@ function saveAccountFromDialog(form) {
   if (state.view === "accounts" && state.accountMode === "browse") showDetail("account", accountId);
 }
 
-function renameAccount(accountId) {
+async function renameAccount(accountId) {
   const account = findRecord("account", accountId);
   if (!account) return alert("I could not find that account.");
   const oldName = account.client || "";
-  const nextName = prompt("Rename account", oldName);
+  const nextName = await gripPrompt("Rename account", oldName);
   const cleaned = String(nextName || "").trim();
   if (!cleaned || cleaned === oldName) return;
   const oldKey = normalize(oldName);
@@ -9867,6 +9924,14 @@ function proposalTrackingControls(record) {
   </section>`;
 }
 
+function renderNavBadges() {
+  const overdue = followUpQueueRecords().filter((item) => ["overdue", "today"].includes(item.urgency)).length;
+  document.querySelectorAll('[data-view="followUpQueue"]').forEach((btn) => {
+    btn.querySelectorAll(".nav-due-badge").forEach((b) => b.remove());
+    if (overdue > 0) btn.insertAdjacentHTML("beforeend", `<span class="nav-due-badge">${overdue}</span>`);
+  });
+}
+
 function render() {
   applyPhoneModeDefaults();
   syncMobilePreviewButton();
@@ -9886,6 +9951,7 @@ function render() {
   renderContractors();
   renderCallList();
   renderNoteTaker();
+  renderNavBadges();
 }
 
 function clearDetailDrawer() {
@@ -10034,8 +10100,8 @@ function bindEvents() {
   });
   byId("gripContinueLocalButton")?.addEventListener("click", () => window.gripSync?.continueLocal());
   byId("gripClearSessionButton")?.addEventListener("click", () => window.gripSync?.clearSessionAndRetry());
-  byId("gripSignOutButton")?.addEventListener("click", () => {
-    if (confirm("Sign out of GRIP cloud sync? Your local data stays on this device.")) window.gripSync?.signOut();
+  byId("gripSignOutButton")?.addEventListener("click", async () => {
+    if (await gripConfirm("Sign out of GRIP cloud sync? Your local data stays on this device.", "Sign Out", "Cancel")) window.gripSync?.signOut();
   });
   byId("cancelReleaseNotesButton").addEventListener("click", () => byId("releaseNotesDialog").close());
   byId("cancelProposalDueTodayButton").addEventListener("click", () => {
@@ -10373,9 +10439,9 @@ function bindEvents() {
     if (id) openAccountDialog(id);
     else byId("accountForm").reset();
   });
-  byId("deleteAccountDialogButton").addEventListener("click", () => {
+  byId("deleteAccountDialogButton").addEventListener("click", async () => {
     const id = byId("accountIdInput").value;
-    if (id && confirm("Delete this account from the CRM?")) {
+    if (id && await gripConfirm("Delete this account from the CRM?", "Delete", "Cancel")) {
       deleteRecord("account", id);
       byId("accountDialog").close();
     }
@@ -10515,7 +10581,7 @@ function bindEvents() {
     event.preventDefault();
     saveNoteTakerEntry(event.currentTarget);
   });
-  document.body.addEventListener("click", (event) => {
+  document.body.addEventListener("click", async (event) => {
     const toggleChecklistNa = event.target.closest("[data-toggle-checklist-na]");
     if (toggleChecklistNa) {
       event.preventDefault();
@@ -10644,7 +10710,7 @@ function bindEvents() {
     }
     const deleteFavorite = event.target.closest("[data-delete-favorite-system]");
     if (deleteFavorite) {
-      if (confirm("Delete this saved system?")) deleteFavoriteSystem(deleteFavorite.dataset.deleteFavoriteSystem);
+      if (await gripConfirm("Delete this saved system?", "Delete", "Cancel")) deleteFavoriteSystem(deleteFavorite.dataset.deleteFavoriteSystem);
       return;
     }
     const dashboardRow = event.target.closest("[data-dashboard-view]");
@@ -10749,7 +10815,7 @@ function bindEvents() {
     }
     const deleteTaskButton = event.target.closest("[data-delete-task]");
     if (deleteTaskButton) {
-      if (confirm("Delete this task?")) deleteRecord("task", deleteTaskButton.dataset.deleteTask);
+      if (await gripConfirm("Delete this task?", "Delete", "Cancel")) deleteRecord("task", deleteTaskButton.dataset.deleteTask);
       return;
     }
     const generateContractorLinkButton = event.target.closest("[data-generate-contractor-link]");
@@ -10844,21 +10910,21 @@ function bindEvents() {
     }
     const deletePunchButton = event.target.closest("[data-delete-punch-list]");
     if (deletePunchButton) {
-      if (confirm("Delete this punch list?")) deleteRecord("punchList", deletePunchButton.dataset.deletePunchList);
+      if (await gripConfirm("Delete this punch list?", "Delete", "Cancel")) deleteRecord("punchList", deletePunchButton.dataset.deletePunchList);
       return;
     }
     const deleteRecordButton = event.target.closest("[data-delete-record]");
     if (deleteRecordButton) {
       const type = deleteRecordButton.dataset.deleteRecord;
       const id = deleteRecordButton.dataset.deleteId;
-      if (confirm(`Delete this ${type} from the CRM?`)) deleteRecord(type, id);
+      if (await gripConfirm(`Delete this ${type} from the CRM?`, "Delete", "Cancel")) deleteRecord(type, id);
       return;
     }
     const archiveRecordButton = event.target.closest("[data-archive-record]");
     if (archiveRecordButton) {
       const type = archiveRecordButton.dataset.archiveRecord;
       const id = archiveRecordButton.dataset.archiveId;
-      if (confirm(`Archive this ${type} from active views?`)) archiveRecord(type, id);
+      if (await gripConfirm(`Archive this ${type} from active views?`, "Archive", "Cancel")) archiveRecord(type, id);
       return;
     }
     const editActivityButton = event.target.closest("[data-edit-activity]");
@@ -10961,12 +11027,12 @@ function bindEvents() {
     }
     const deleteTakeoff = event.target.closest("[data-delete-takeoff-estimate]");
     if (deleteTakeoff) {
-      if (confirm("Delete this saved takeoff estimate?")) deleteTakeoffEstimate(deleteTakeoff.dataset.deleteTakeoffEstimate);
+      if (await gripConfirm("Delete this saved takeoff estimate?", "Delete", "Cancel")) deleteTakeoffEstimate(deleteTakeoff.dataset.deleteTakeoffEstimate);
       return;
     }
     const deletePriceBookButton = event.target.closest("[data-delete-price-book]");
     if (deletePriceBookButton) {
-      if (confirm("Delete this price book reference?")) deletePriceBook(deletePriceBookButton.dataset.deletePriceBook);
+      if (await gripConfirm("Delete this price book reference?", "Delete", "Cancel")) deletePriceBook(deletePriceBookButton.dataset.deletePriceBook);
       return;
     }
     const record = event.target.closest("[data-type][data-id]");
@@ -11237,7 +11303,12 @@ renderInchFractionOptions();
 resetProjectForm();
 resetProposalForm();
 render();
+renderNavBadges();
 bindEvents();
+
+// ── Offline banner ────────────────────────────────────────────────
+window.addEventListener("offline", () => { const b = byId("gripOfflineBanner"); if (b) b.hidden = false; });
+window.addEventListener("online",  () => { const b = byId("gripOfflineBanner"); if (b) b.hidden = true; });
 setDetailsHidden(false);
 showDueTodayProposalDialog();
 showTaskDailyAlertDialog();

@@ -5718,3 +5718,91 @@ textarea {
   opacity: .5; transition: opacity .15s;
 }
 .asst-mem-delete:hover { opacity: 1; color: var(--red); }
+
+/* ── Inline modal dialogs ─────────────────────────────────────── */
+.grip-modal-dialog {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 8px 40px rgba(0,0,0,.18);
+  padding: 24px;
+  width: min(90vw, 360px);
+  background: var(--panel);
+}
+.grip-modal-dialog::backdrop {
+  background: rgba(0,0,0,.35);
+}
+.grip-modal-message {
+  font-size: 0.92rem;
+  color: var(--ink);
+  margin: 0 0 16px;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+.grip-modal-input {
+  width: 100%;
+  margin-bottom: 16px;
+  box-sizing: border-box;
+}
+.grip-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ── Offline banner ───────────────────────────────────────────── */
+.grip-offline-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #92400e;
+  color: #fff;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 8px 16px;
+  z-index: 9999;
+}
+
+/* ── Follow-up queue nav badge ────────────────────────────────── */
+.nav-due-badge {
+  display: inline-block;
+  background: #dc2626;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  border-radius: 999px;
+  padding: 1px 5px;
+  margin-left: 4px;
+  vertical-align: middle;
+  line-height: 1.4;
+}
+
+/* ── Last synced label ────────────────────────────────────────── */
+.grip-sync-time {
+  font-size: 10px;
+  color: var(--muted);
+  margin-left: 4px;
+}
+
+/* ── Task mini records in account detail ──────────────────────── */
+.task-mini-record {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+.task-mini-record:last-child { border-bottom: none; }
+.task-mini-record.task-mini-done .task-mini-title {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+.task-mini-record.overdue .task-mini-title { color: #dc2626; }
+.task-mini-record.today  .task-mini-title { color: #d97706; }
+.task-mini-check { display: flex; align-items: center; padding-top: 1px; }
+.task-mini-check input { margin: 0; width: 16px; height: 16px; cursor: pointer; }
+.task-mini-body { flex: 1; min-width: 0; }
+.task-mini-title { font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+.task-mini-meta  { font-size: 11px; color: var(--muted); }

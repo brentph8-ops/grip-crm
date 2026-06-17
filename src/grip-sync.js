@@ -162,6 +162,8 @@
     if (overlay) overlay.hidden = !show;
   }
 
+  let lastSyncedAt = null;
+
   function updateSyncIndicator(state) {
     const el = document.getElementById("gripSyncStatus");
     if (!el) return;
@@ -172,9 +174,21 @@
       local:   { text: "Local only", cls: "sync-local"   },
     };
     const s = states[state] || states.local;
-    el.textContent = s.text;
+    if (state === "saved") lastSyncedAt = new Date();
+    const timeLabel = lastSyncedAt && state !== "syncing"
+      ? `<span class="grip-sync-time">${formatSyncTime(lastSyncedAt)}</span>`
+      : "";
+    el.innerHTML = s.text + timeLabel;
     el.className = `grip-sync-status ${s.cls}`;
     if (state === "saved") setTimeout(() => updateSyncIndicator("ready"), 3000);
+  }
+
+  function formatSyncTime(date) {
+    const mins = Math.round((Date.now() - date.getTime()) / 60000);
+    if (mins < 1) return "just now";
+    if (mins === 1) return "1 min ago";
+    if (mins < 60) return `${mins} min ago`;
+    return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
   }
 
   function updateUserDisplay(user) {
