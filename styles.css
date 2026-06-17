@@ -2176,6 +2176,18 @@ textarea {
   padding: 0 14px;
 }
 
+#newTaskButton,
+[data-add-task-account] {
+  background: #16a34a;
+  border-color: #15803d;
+  color: #fff;
+  font-weight: 700;
+}
+#newTaskButton:hover,
+[data-add-task-account]:hover {
+  background: #15803d;
+}
+
 .mini-button {
   min-height: 28px;
   border: 1px solid var(--line);
