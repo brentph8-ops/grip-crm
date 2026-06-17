@@ -2902,8 +2902,13 @@ function resetTaskForm(task = null) {
   renderTaskAttachmentPreview(task?.attachments || []);
 }
 
-function openTaskDialog(taskId = "") {
+function openTaskDialog(taskId = "", prefillAccount = "") {
   resetTaskForm(taskId ? findTask(taskId) : null);
+  if (prefillAccount && !taskId) {
+    byId("taskForm").elements.accountMode.value = "existing";
+    byId("taskAccountSearchInput").value = prefillAccount;
+    syncTaskAccountMode();
+  }
   openDialog("taskDialog");
   byId("taskTitleInput")?.focus();
 }
@@ -6114,7 +6119,16 @@ function showAccountDetail(record) {
   const proposalCounts = accountProposalCounts(record);
 
   byId("detailContent").innerHTML = `
-    ${detailHeader("account", record.id, `<span class="activity-dot ${activity.level}"></span>${escapeHtml(record.client)}`, latest ? activity.label : "No activity logged yet")}
+    <div class="detail-actions">
+      <div>
+        <h3><span class="activity-dot ${activity.level}"></span>${escapeHtml(record.client)}</h3>
+        ${latest ? `<p>${escapeHtml(activity.label)}</p>` : "<p>No activity logged yet.</p>"}
+      </div>
+      <div class="detail-header-actions">
+        <button class="mini-button" data-add-task-account="${escapeHtml(record.client)}" type="button">+ Task</button>
+        <button class="edit-button" data-edit-record="account" data-edit-id="${escapeHtml(record.id)}" type="button">Edit</button>
+      </div>
+    </div>
     <div class="field-grid">
       ${field("Open Proposal Count", proposalCounts.open)}
       ${field("Won Proposal Count", proposalCounts.won)}
@@ -10690,6 +10704,11 @@ function bindEvents() {
     const editTerritory = event.target.closest("[data-edit-territory]");
     if (editTerritory) {
       editTerritoryValue(editTerritory.dataset.editTerritory, editTerritory.dataset.territoryValue);
+      return;
+    }
+    const addTaskAccount = event.target.closest("[data-add-task-account]");
+    if (addTaskAccount) {
+      openTaskDialog("", addTaskAccount.dataset.addTaskAccount);
       return;
     }
     const editRecord = event.target.closest("[data-edit-record]");
