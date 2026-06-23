@@ -1703,7 +1703,8 @@ function repInitials(name) {
 }
 
 function renderBrand() {
-  byId("brandMark").textContent = repInitials(territorySettings.rep?.name);
+  const el = byId("brandMark");
+  if (el) el.innerHTML = '<img src="icons/icon-192.png" alt="GRIP" />';
 }
 
 function saveScopeDatabase() {
