@@ -32,6 +32,8 @@
   let _importSelections = new Set();
   let _searchTerm = "";
   let _statusFilter = "all";
+  let _importFilterCounty = "";
+  let _importFilterEntity = "";
 
   // ── Data I/O ─────────────────────────────────────────────────────
 
@@ -574,6 +576,42 @@ ${s.assistantName}`;
     }).join("") || `<p class="empty-state">No campaigns yet.</p>`;
   }
 
+  function accountAreas() {
+    if (typeof window.cleanAccounts !== "function") return [];
+    return [...new Set(window.cleanAccounts().map(a => a.county).filter(Boolean))].sort();
+  }
+
+  function accountEntities() {
+    if (typeof window.cleanAccounts !== "function") return [];
+    return [...new Set(window.cleanAccounts().map(a => a.entity).filter(Boolean))].sort();
+  }
+
+  function populateImportFilters() {
+    const countyEl = document.getElementById("importFilterCounty");
+    const entityEl = document.getElementById("importFilterEntity");
+    if (countyEl) {
+      const current = countyEl.value;
+      countyEl.innerHTML = `<option value="">All Areas / Counties</option>` +
+        accountAreas().map(c => `<option value="${escHtml(c)}" ${c === current ? "selected" : ""}>${escHtml(c)}</option>`).join("");
+      if (!current && _importFilterCounty) countyEl.value = _importFilterCounty;
+    }
+    if (entityEl) {
+      const current = entityEl.value;
+      entityEl.innerHTML = `<option value="">All Entity Types</option>` +
+        accountEntities().map(e => `<option value="${escHtml(e)}" ${e === current ? "selected" : ""}>${escHtml(e)}</option>`).join("");
+      if (!current && _importFilterEntity) entityEl.value = _importFilterEntity;
+    }
+  }
+
+  function populateCampaignAreaDropdown() {
+    const sel = document.getElementById("campaignAreaSelect");
+    if (!sel) return;
+    const areas = accountAreas();
+    sel.innerHTML = `<option value="">-- Select from your accounts --</option>` +
+      areas.map(a => `<option value="${escHtml(a)}">${escHtml(a)}</option>`).join("") +
+      `<option value="__other__">Other (type custom)...</option>`;
+  }
+
   function renderImportList() {
     const el = document.getElementById("importGripList");
     if (!el || typeof window.cleanAccounts !== "function") return;
@@ -581,10 +619,15 @@ ${s.assistantName}`;
     const existing = new Set(_data.contacts.filter(c => c.campaignId === _activeCampaignId).map(c => c.email.toLowerCase()));
     const accounts = window.cleanAccounts()
       .filter(a => a.email && !existing.has(a.email.toLowerCase()))
-      .filter(a => !search || [a.client, a.email, a.poc, a.county].join(" ").toLowerCase().includes(search));
+      .filter(a => !_importFilterCounty || (a.county || "").toLowerCase() === _importFilterCounty.toLowerCase())
+      .filter(a => !_importFilterEntity || (a.entity || "").toLowerCase() === _importFilterEntity.toLowerCase())
+      .filter(a => !search || [a.client, a.email, a.poc, a.county, a.entity].join(" ").toLowerCase().includes(search));
+
+    const countEl = document.getElementById("importGripCount");
+    if (countEl) countEl.textContent = accounts.length ? `${accounts.length} account${accounts.length === 1 ? "" : "s"}` : "";
 
     if (!accounts.length) {
-      el.innerHTML = `<p class="empty-state">No accounts with email addresses found (or all already imported).</p>`;
+      el.innerHTML = `<p class="empty-state">No matching accounts found.</p>`;
       return;
     }
     el.innerHTML = accounts.map(a => `
@@ -593,7 +636,10 @@ ${s.assistantName}`;
         <div>
           <strong>${escHtml(a.client)}</strong>
           <span>${escHtml(a.poc || "")}${a.poc ? " · " : ""}${escHtml(a.email)}</span>
-          ${a.county ? `<span class="muted-note">${escHtml(a.county)}</span>` : ""}
+          <span class="import-grip-meta">
+            ${a.county ? `<span class="import-tag">${escHtml(a.county)}</span>` : ""}
+            ${a.entity ? `<span class="import-tag import-tag-entity">${escHtml(a.entity)}</span>` : ""}
+          </span>
         </div>
       </label>`).join("");
   }
@@ -704,6 +750,8 @@ ${s.assistantName}`;
     // New campaign
     document.getElementById("newCampaignButton")?.addEventListener("click", () => {
       document.getElementById("newCampaignForm")?.reset();
+      document.getElementById("campaignCustomCity")?.closest(".campaign-custom-city-row")?.classList.add("hidden");
+      populateCampaignAreaDropdown();
       document.getElementById("newCampaignDialog")?.showModal();
     });
     document.getElementById("cancelNewCampaignButton")?.addEventListener("click", () =>
@@ -711,10 +759,23 @@ ${s.assistantName}`;
     document.getElementById("closeNewCampaignDialog")?.addEventListener("click", () =>
       document.getElementById("newCampaignDialog")?.close());
 
+    document.getElementById("campaignAreaSelect")?.addEventListener("change", (e) => {
+      const customRow = document.getElementById("campaignCustomCity")?.closest(".campaign-custom-city-row");
+      if (e.target.value === "__other__") {
+        customRow?.classList.remove("hidden");
+        document.getElementById("campaignCustomCity")?.focus();
+      } else {
+        customRow?.classList.add("hidden");
+      }
+    });
+
     document.getElementById("newCampaignForm")?.addEventListener("submit", (e) => {
       e.preventDefault();
       const form = new FormData(e.currentTarget);
-      createCampaign(form.get("city"), form.get("state"), form.get("visitDate"));
+      const area = form.get("campaignArea") || "";
+      const city = area === "__other__" ? (form.get("campaignCustomCity") || "").trim() : area;
+      if (!city) { (window.showToast || alert)("Please select or enter an area.", "warning"); return; }
+      createCampaign(city, form.get("state"), form.get("visitDate"));
       document.getElementById("newCampaignDialog")?.close();
     });
 
@@ -755,6 +816,10 @@ ${s.assistantName}`;
         return;
       }
       _importSelections.clear();
+      // Pre-select the active campaign's area
+      _importFilterCounty = activeCampaign()?.city || "";
+      _importFilterEntity = "";
+      populateImportFilters();
       renderImportList();
       document.getElementById("importFromGripDialog")?.showModal();
     });
@@ -764,6 +829,14 @@ ${s.assistantName}`;
       document.getElementById("importFromGripDialog")?.close());
 
     document.getElementById("importGripSearch")?.addEventListener("input", renderImportList);
+    document.getElementById("importFilterCounty")?.addEventListener("change", (e) => {
+      _importFilterCounty = e.target.value;
+      renderImportList();
+    });
+    document.getElementById("importFilterEntity")?.addEventListener("change", (e) => {
+      _importFilterEntity = e.target.value;
+      renderImportList();
+    });
 
     document.getElementById("importGripList")?.addEventListener("change", (e) => {
       const cb = e.target.closest("input[type=checkbox]");

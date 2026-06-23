@@ -1075,7 +1075,14 @@
           <button id="closeNewCampaignDialog" class="modal-close" type="button" aria-label="Close">×</button>
         </div>
         <form id="newCampaignForm" class="modal-form">
-          <label class="form-label">City <input name="city" class="form-input" required placeholder="e.g. Dallas" /></label>
+          <label class="form-label">Area / County
+            <select id="campaignAreaSelect" name="campaignArea" class="form-input" required>
+              <option value="">Loading areas…</option>
+            </select>
+          </label>
+          <div class="campaign-custom-city-row hidden">
+            <label class="form-label">Custom Area Name <input id="campaignCustomCity" name="campaignCustomCity" class="form-input" placeholder="e.g. Austin Metro" /></label>
+          </div>
           <label class="form-label">State <input name="state" class="form-input" placeholder="e.g. TX" /></label>
           <label class="form-label">Visit Date <input name="visitDate" class="form-input" type="date" required /></label>
           <div class="modal-footer">
@@ -1114,7 +1121,16 @@
           <button id="closeImportFromGripDialog" class="modal-close" type="button" aria-label="Close">×</button>
         </div>
         <div class="modal-body">
-          <input id="importGripSearch" class="search-input" type="search" placeholder="Search accounts…" autocomplete="off" />
+          <div class="import-grip-filters">
+            <select id="importFilterCounty" class="select-sm">
+              <option value="">All Areas / Counties</option>
+            </select>
+            <select id="importFilterEntity" class="select-sm">
+              <option value="">All Entity Types</option>
+            </select>
+            <input id="importGripSearch" class="search-input" type="search" placeholder="Search…" autocomplete="off" />
+            <span id="importGripCount" class="muted-note"></span>
+          </div>
           <div id="importGripList" class="import-grip-list"></div>
         </div>
         <div class="modal-footer">
