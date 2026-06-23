@@ -20,7 +20,7 @@
     <div id="gripAuthOverlay" class="auth-overlay" hidden>
       <div class="auth-card">
         <div class="auth-brand">
-          <div class="brand-mark">G</div>
+          <div class="brand-mark"><img src="icons/icon-192.png" alt="GRIP" /></div>
           <div>
             <h1>GRIP</h1>
             <p>Garland Relationship Intelligence Platform</p>
@@ -42,7 +42,7 @@
     <div class="app-shell" id="appShell">
       <aside class="sidebar">
         <div class="brand">
-          <div class="brand-mark" id="brandMark">BP</div>
+          <div class="brand-mark" id="brandMark"><img src="icons/icon-192.png" alt="GRIP" /></div>
           <div>
             <h1>GRIP</h1>
             <p>Garland Relationship Intelligence Platform</p>
@@ -183,6 +183,10 @@
             <span aria-hidden="true">✎</span>
             Notes
           </button>
+          <button class="nav-button" data-view="outreach" type="button">
+            <span aria-hidden="true">✉</span>
+            Outreach
+          </button>
         </div>
 
         <div class="external-links">
@@ -212,11 +216,8 @@
               <p class="eyebrow">Live working copy</p>
               <h2 id="viewTitle">Dashboard</h2>
             </div>
-            <button class="mobile-version-button" id="mobileVersionButton" type="button" title="Mobile Version" aria-label="Mobile Version">
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M8 2h8c1.1 0 2 .9 2 2v16c0 1.1-.9 2-2 2H8c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2Zm0 3v14h8V5H8Zm3 15h2v1h-2v-1Z" />
-              </svg>
-              <span>Mobile</span>
+            <button class="mobile-version-button" id="mobileVersionButton" type="button" title="Toggle Mobile View" aria-label="Toggle Mobile View">
+              <img src="icons/icon-192.png" alt="GRIP" class="topbar-logo" />
             </button>
           </div>
           <div class="search">
@@ -1020,7 +1021,162 @@
             </section>
           </div>
         </section>
+
+        <!-- ── Outreach / Payton View ────────────────────────────── -->
+        <section id="outreachView" class="view">
+          <div class="outreach-header">
+            <div class="outreach-header-top">
+              <div id="outreachCampaignInfo" class="outreach-campaign-info"></div>
+              <div class="outreach-header-actions">
+                <span id="outreachGmailStatus" class="outreach-gmail-status"></span>
+                <button id="outreachConnectGmailButton" class="secondary-button" type="button">Connect Gmail</button>
+                <button id="outreachSettingsButton" class="secondary-button" type="button" title="Outreach settings">⚙ Settings</button>
+              </div>
+            </div>
+            <div class="outreach-toolbar">
+              <button id="newCampaignButton" class="primary-button" type="button">+ New Campaign</button>
+              <button id="addProspectButton" class="secondary-button" type="button">+ Add Prospect</button>
+              <button id="importFromGripButton" class="secondary-button" type="button">Import from GRIP</button>
+              <button id="generateRecapButton" class="secondary-button" type="button">Daily Recap</button>
+              <input id="outreachSearch" class="search-input" type="search" placeholder="Search prospects…" autocomplete="off" />
+              <select id="outreachStatusFilter" class="select-sm">
+                <option value="all">All statuses</option>
+                <option value="Cold">Cold</option>
+                <option value="Contacted">Contacted</option>
+                <option value="Replied">Replied</option>
+                <option value="Warm">Warm</option>
+                <option value="Qualified">Qualified</option>
+                <option value="Meeting Set">Meeting Set</option>
+                <option value="Unsubscribed">Unsubscribed</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="outreach-body">
+            <div class="outreach-panel">
+              <h3 class="outreach-panel-title">Prospects</h3>
+              <div id="outreachProspectList" class="outreach-prospect-list"></div>
+            </div>
+            <div class="outreach-panel outreach-panel-side">
+              <h3 class="outreach-panel-title">Follow-Ups Due</h3>
+              <div id="outreachFollowUpQueue" class="outreach-fup-list"></div>
+            </div>
+          </div>
+        </section>
       </main>
+
+      <!-- ── Outreach Dialogs ──────────────────────────────────── -->
+
+      <!-- New Campaign -->
+      <dialog id="newCampaignDialog" class="modal-dialog">
+        <div class="modal-header">
+          <h3>New Campaign</h3>
+          <button id="closeNewCampaignDialog" class="modal-close" type="button" aria-label="Close">×</button>
+        </div>
+        <form id="newCampaignForm" class="modal-form">
+          <label class="form-label">City <input name="city" class="form-input" required placeholder="e.g. Dallas" /></label>
+          <label class="form-label">State <input name="state" class="form-input" placeholder="e.g. TX" /></label>
+          <label class="form-label">Visit Date <input name="visitDate" class="form-input" type="date" required /></label>
+          <div class="modal-footer">
+            <button id="cancelNewCampaignButton" class="secondary-button" type="button">Cancel</button>
+            <button class="primary-button" type="submit">Create Campaign</button>
+          </div>
+        </form>
+      </dialog>
+
+      <!-- Add Prospect -->
+      <dialog id="addProspectDialog" class="modal-dialog">
+        <div class="modal-header">
+          <h3>Add Prospect</h3>
+          <button id="closeAddProspectDialog" class="modal-close" type="button" aria-label="Close">×</button>
+        </div>
+        <form id="addProspectForm" class="modal-form">
+          <div class="form-row">
+            <label class="form-label">First Name <input name="firstName" class="form-input" placeholder="First" /></label>
+            <label class="form-label">Last Name <input name="lastName" class="form-input" placeholder="Last" /></label>
+          </div>
+          <label class="form-label">Company <input name="company" class="form-input" required placeholder="Company name" /></label>
+          <label class="form-label">Title <input name="title" class="form-input" placeholder="e.g. Facilities Manager" /></label>
+          <label class="form-label">Email <input name="email" class="form-input" type="email" required placeholder="email@company.com" /></label>
+          <label class="form-label">Phone <input name="phone" class="form-input" type="tel" placeholder="(optional)" /></label>
+          <div class="modal-footer">
+            <button id="cancelAddProspectButton" class="secondary-button" type="button">Cancel</button>
+            <button class="primary-button" type="submit">Add Prospect</button>
+          </div>
+        </form>
+      </dialog>
+
+      <!-- Import from GRIP accounts -->
+      <dialog id="importFromGripDialog" class="modal-dialog modal-dialog-wide">
+        <div class="modal-header">
+          <h3>Import from GRIP Accounts</h3>
+          <button id="closeImportFromGripDialog" class="modal-close" type="button" aria-label="Close">×</button>
+        </div>
+        <div class="modal-body">
+          <input id="importGripSearch" class="search-input" type="search" placeholder="Search accounts…" autocomplete="off" />
+          <div id="importGripList" class="import-grip-list"></div>
+        </div>
+        <div class="modal-footer">
+          <button id="cancelImportGripButton" class="secondary-button" type="button">Cancel</button>
+          <button id="confirmImportGripButton" class="primary-button" type="button">Import Selected</button>
+        </div>
+      </dialog>
+
+      <!-- Switch Campaign -->
+      <dialog id="switchCampaignDialog" class="modal-dialog">
+        <div class="modal-header">
+          <h3>Campaigns</h3>
+          <button id="closeSwitchCampaignDialog" class="modal-close" type="button" aria-label="Close">×</button>
+        </div>
+        <div class="modal-body">
+          <div id="switchCampaignList"></div>
+        </div>
+      </dialog>
+
+      <!-- Email Compose Dialog -->
+      <dialog id="outreachEmailDialog" class="modal-dialog modal-dialog-wide">
+        <div class="modal-header">
+          <h3 id="outreachEmailDialogTitle">Email</h3>
+          <button id="closeOutreachEmailDialog" class="modal-close" type="button" aria-label="Close">×</button>
+        </div>
+        <div class="modal-body outreach-email-modal-body">
+          <label class="form-label">To <input id="outreachEmailTo" class="form-input" type="email" /></label>
+          <label class="form-label">Subject <input id="outreachEmailSubject" class="form-input" /></label>
+          <label class="form-label">Body
+            <textarea id="outreachEmailBody" class="form-textarea outreach-email-body" rows="16"></textarea>
+          </label>
+          <p id="outreachEmailFromNote" class="muted-note"></p>
+        </div>
+        <div class="modal-footer">
+          <button id="markSentButton" class="secondary-button" type="button">Mark as Sent</button>
+          <button id="copyOutreachEmailButton" class="secondary-button" type="button">Copy to Clipboard</button>
+          <button id="sendOutreachEmailButton" class="primary-button" type="button" disabled>Send via Gmail</button>
+        </div>
+      </dialog>
+
+      <!-- Outreach Settings -->
+      <dialog id="outreachSettingsDialog" class="modal-dialog">
+        <div class="modal-header">
+          <h3>Outreach Settings</h3>
+          <button id="closeOutreachSettingsDialog" class="modal-close" type="button" aria-label="Close">×</button>
+        </div>
+        <form id="outreachSettingsForm" class="modal-form">
+          <label class="form-label">Assistant Name <input name="assistantName" class="form-input" placeholder="Payton" /></label>
+          <label class="form-label">Your Name (Rep) <input name="repName" class="form-input" placeholder="Brent Phillips" /></label>
+          <label class="form-label">Your State <input name="repState" class="form-input" placeholder="Texas" /></label>
+          <label class="form-label">Daily Recap Email <input name="recapEmail" class="form-input" type="email" /></label>
+          <label class="form-label">
+            Google OAuth Client ID
+            <small class="form-hint">Create a Client ID in Google Cloud Console with Gmail API scope and your GitHub Pages URL as an authorized JavaScript origin.</small>
+            <input name="googleClientId" class="form-input" placeholder="123456789.apps.googleusercontent.com" />
+          </label>
+          <p id="outreachGmailSetupStatus" class="muted-note"></p>
+          <div class="modal-footer">
+            <button id="cancelOutreachSettingsButton" class="secondary-button" type="button">Cancel</button>
+            <button class="primary-button" type="submit">Save Settings</button>
+          </div>
+        </form>
+      </dialog>
 
       <aside class="detail-drawer" id="detailDrawer" aria-live="polite">
         <button class="drawer-close" id="drawerClose" type="button" aria-label="Close details">×</button>
@@ -2148,5 +2304,7 @@
     <script src="src/grip-sync.js"></script>
     <script src="src/app.js"></script>
     <script src="src/assistant.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="src/outreach.js"></script>
   </body>
 </html>

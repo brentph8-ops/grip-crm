@@ -185,30 +185,31 @@ textarea {
 
 .mobile-version-button {
   flex: 0 0 auto;
-  min-height: 28px;
-  width: auto;
-  border: 1px solid var(--orange);
-  border-radius: 6px;
-  background: var(--orange);
-  color: #ffffff;
+  width: 38px;
+  height: 38px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 0 9px;
-  font-size: 0.74rem;
-  font-weight: 800;
-}
-
-.mobile-version-button svg {
-  width: 14px;
-  height: 14px;
-  fill: currentColor;
+  justify-content: center;
+  padding: 0;
+  overflow: hidden;
+  opacity: 0.9;
+  transition: opacity .15s;
 }
 
 .mobile-version-button:hover {
-  background: var(--blue);
-  border-color: var(--blue);
+  opacity: 1;
+}
+
+.topbar-logo {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  display: block;
+  object-fit: cover;
 }
 
 .brand-mark {
@@ -221,6 +222,14 @@ textarea {
   color: #ffffff;
   font-weight: 800;
   flex: 0 0 46px;
+  overflow: hidden;
+  padding: 0;
+}
+.brand-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .brand h1,
@@ -5806,3 +5815,223 @@ textarea {
 .task-mini-body { flex: 1; min-width: 0; }
 .task-mini-title { font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
 .task-mini-meta  { font-size: 11px; color: var(--muted); }
+
+/* ── Outreach / Payton ───────────────────────────────────────────── */
+#outreachView { display: none; flex-direction: column; height: 100%; overflow: hidden; }
+#outreachView.is-active { display: flex; }
+
+.outreach-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  padding: 14px 16px 10px;
+  flex-shrink: 0;
+}
+.outreach-header-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.outreach-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.outreach-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.outreach-campaign-info { flex: 1; min-width: 0; }
+.outreach-campaign-title { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.outreach-campaign-title strong { font-size: 16px; color: var(--ink); }
+.outreach-visit-date { font-size: 13px; color: var(--muted); }
+.outreach-no-campaign { font-size: 14px; color: var(--muted); font-style: italic; }
+.outreach-campaign-stats {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 5px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.outreach-campaign-stats .stat-highlight { color: #059669; font-weight: 600; }
+.outreach-campaign-stats .stat-alert { color: #d97706; font-weight: 600; }
+.outreach-active-label { font-size: 12px; color: #059669; font-weight: 600; }
+
+.outreach-gmail-status { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.outreach-gmail-status.connected { color: #059669; font-weight: 600; }
+
+.outreach-body {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 0;
+  flex: 1;
+  overflow: hidden;
+}
+@media (max-width: 768px) {
+  .outreach-body { grid-template-columns: 1fr; }
+  .outreach-panel-side { display: none; }
+}
+
+.outreach-panel {
+  overflow-y: auto;
+  border-right: 1px solid var(--line);
+}
+.outreach-panel-side { border-right: none; background: var(--bg); }
+.outreach-panel-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  padding: 10px 14px 6px;
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 1;
+}
+.outreach-panel-side .outreach-panel-title { background: var(--bg); }
+
+.outreach-prospect-list, .outreach-fup-list { padding: 0; }
+
+.outreach-contact-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.outreach-contact-row:last-child { border-bottom: none; }
+.outreach-contact-info {
+  flex: 1;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.outreach-contact-name { font-size: 14px; font-weight: 600; color: var(--ink); }
+.outreach-contact-company { font-size: 12px; color: var(--muted); }
+.outreach-contact-title { font-size: 11px; color: var(--muted); font-style: italic; }
+.outreach-contact-email { font-size: 12px; color: var(--accent); text-decoration: none; }
+.outreach-contact-email:hover { text-decoration: underline; }
+.outreach-contact-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  min-width: 100px;
+}
+.outreach-contact-sent { font-size: 11px; color: var(--muted); }
+.outreach-followup-due {
+  font-size: 11px;
+  font-weight: 600;
+  color: #d97706;
+  background: #fef3c7;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.outreach-contact-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.outreach-fup-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.outreach-fup-row:last-child { border-bottom: none; }
+.outreach-fup-type {
+  font-size: 11px;
+  font-weight: 700;
+  color: #d97706;
+  white-space: nowrap;
+}
+
+/* Status badges */
+.outreach-status-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+.status-cold       { background: #f1f5f9; color: #475569; }
+.status-contacted  { background: #dbeafe; color: #1d4ed8; }
+.status-replied    { background: #e0e7ff; color: #4338ca; }
+.status-warm       { background: #fef9c3; color: #92400e; }
+.status-qualified  { background: #d1fae5; color: #065f46; }
+.status-meeting    { background: #bbf7d0; color: #15803d; font-weight: 700; }
+.status-unsub      { background: #fee2e2; color: #991b1b; }
+
+/* Campaign switcher dialog */
+.outreach-campaign-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.outreach-campaign-item:last-child { border-bottom: none; }
+.outreach-campaign-item strong { font-size: 14px; color: var(--ink); display: block; }
+.outreach-campaign-item.is-active { opacity: 0.8; }
+
+/* Import list */
+.import-grip-list { max-height: 360px; overflow-y: auto; margin-top: 10px; }
+.import-grip-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  font-size: 13px;
+}
+.import-grip-item:last-child { border-bottom: none; }
+.import-grip-item strong { display: block; color: var(--ink); }
+.import-grip-item span { color: var(--muted); font-size: 12px; }
+
+/* Email compose body */
+.outreach-email-modal-body { display: flex; flex-direction: column; gap: 10px; }
+.outreach-email-body { font-family: monospace; font-size: 13px; line-height: 1.6; resize: vertical; }
+
+/* Compact buttons */
+.btn-sm { font-size: 12px !important; padding: 4px 10px !important; }
+.btn-danger-sm {
+  font-size: 12px;
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: #dc2626;
+  cursor: pointer;
+  line-height: 1;
+}
+.btn-danger-sm:hover { background: #fee2e2; }
+.select-sm {
+  font-size: 12px;
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+/* Form hint */
+.form-hint { display: block; font-size: 11px; color: var(--muted); margin: 2px 0 5px; }

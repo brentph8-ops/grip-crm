@@ -9982,7 +9982,7 @@ function setView(view) {
     const isProjectParent = button.dataset.view === "projects" && projectSubViews.includes(view) && !button.classList.contains("nav-sub-button");
     button.classList.toggle("is-active", isMatch || isProjectParent);
   });
-  const overflowViews = ["punchList", "takeoffEstimator", "warrantySummary", "followUpQueue", "tasks", "noteTaker", "activityLog", "scopeDatabase", "contractors", "newsReport"];
+  const overflowViews = ["punchList", "takeoffEstimator", "warrantySummary", "followUpQueue", "tasks", "noteTaker", "activityLog", "scopeDatabase", "contractors", "newsReport", "outreach"];
   byId("mobileMoreButton")?.classList.toggle("is-active", overflowViews.includes(view));
   document.querySelectorAll(".view").forEach((section) => section.classList.toggle("is-active", section.id === `${view}View`));
   if (view === "newsReport") renderNewsReport();
@@ -9992,7 +9992,8 @@ function setView(view) {
   if (view === "warrantySummary") renderWarrantySummaryChart();
   if (view === "noteTaker") renderNoteTaker();
   if (view === "assistant") { const el = byId("assistantViewContent"); if (el && window.GRIPAssistant) window.GRIPAssistant.render(el); }
-  byId("viewTitle").textContent = { dashboard: "Dashboard", accounts: "Accounts", projects: "Projects", punchList: "Punch List", takeoffEstimator: "Takeoff Estimator", warrantySummary: "Warranty Summary Chart", proposals: "Proposals", scopeDatabase: "Scope of Work", tasks: "Tasks", callList: "Call List", followUpQueue: "Follow-Up Queue", activityLog: "Activity Log", newsReport: "Your News Report", contractors: "Contractors", noteTaker: "Note Taker", assistant: "Assistant" }[view] || view;
+  if (view === "outreach") { if (window.gripOutreach) window.gripOutreach.render(); }
+  byId("viewTitle").textContent = { dashboard: "Dashboard", accounts: "Accounts", projects: "Projects", punchList: "Punch List", takeoffEstimator: "Takeoff Estimator", warrantySummary: "Warranty Summary Chart", proposals: "Proposals", scopeDatabase: "Scope of Work", tasks: "Tasks", callList: "Call List", followUpQueue: "Follow-Up Queue", activityLog: "Activity Log", newsReport: "Your News Report", contractors: "Contractors", noteTaker: "Note Taker", assistant: "Assistant", outreach: "Payton · Outreach" }[view] || view;
   if (view === "dashboard") {
     showDueTodayProposalDialog();
     showTaskDailyAlertDialog();
