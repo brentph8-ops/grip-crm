@@ -120,17 +120,11 @@
         body:
 `Hey ${first},
 
-My name is ${a}. I am ${rep}'s assistant with The Garland Company here in ${state}.
+My name is ${a}. I help ${rep} with The Garland Company out of ${state}.
 
-I wanted to touch base because on paper Garland tends to be a good fit for groups like yours. Are you involved with maintaining the roofing or building envelope for your facilities?
+${rep} is a building envelope representative, so ${he} covers everything that keeps water and air out of a building. ${HeUc} will be in ${locationPhrase} on ${visitDate} and I am putting together a short list of stops for ${him} while ${he} is in the area.
 
-Garland works on everything on the exterior of the building that keeps out wind and rain. We help teams with roof evaluations, long term planning, and solving issues before they turn into expensive problems.
-
-${rep} will be in ${locationPhrase} on ${visitDate} and I am helping line up a few quick stops for ${him} while ${he} is in the area. ${HeUc} would be the one stopping in.
-
-If you would be open to a quick 10 to 15 minute intro while ${he} is there, I can coordinate a time that works best for you.
-
-Appreciate it either way, ${first}.
+Are you the right person to talk to about roofing or exterior maintenance at your facility? Even a quick 10 to 15 minutes while ${he} is nearby could be worth your time.
 
 ${a}`,
       };
@@ -140,7 +134,7 @@ ${a}`,
       return {
         subject: "Re: Quick question on your roofing",
         body:
-`Just wanted to bump this. ${rep}'s schedule is filling up for ${visitDate}.
+`Just bumping this up. ${rep}'s schedule in the area on ${visitDate} is starting to fill in.
 
 ${a}`,
       };
@@ -150,7 +144,7 @@ ${a}`,
       return {
         subject: "Re: Quick question on your roofing",
         body:
-`Not sure if this is relevant right now but figured I would reach out while ${he} is in the area.
+`Still have a couple of openings left for ${visitDate}. Wanted to give you a heads up before ${he} is fully booked.
 
 ${a}`,
       };
@@ -160,7 +154,21 @@ ${a}`,
       return {
         subject: "Re: Quick question on your roofing",
         body:
-`I will leave you alone after this. But if a second set of eyes on your roof ever helps, just let me know.
+`Last one from me. If the timing ever works out down the road, feel free to reach out and I will get something on the calendar.
+
+${a}`,
+      };
+    }
+
+    if (type === "warmCheckin") {
+      return {
+        subject: "Checking in",
+        body:
+`Hey ${first},
+
+This is ${a}, ${rep}'s assistant. ${rep} has been meaning to reconnect and asked me to reach out.
+
+${HeUc} will be in ${locationPhrase} on ${visitDate} and thought it might be a good chance to stop by and catch up. Would you have 15 or 20 minutes while ${he} is around?
 
 ${a}`,
       };
@@ -243,7 +251,8 @@ ${a}`,
     c.emailHistory.push({ type, subject, body, sentAt: now });
     c.lastContactedAt = now;
     if (type === "initial" && c.status === "Cold") c.status = "Contacted";
-    // Schedule follow-ups based on sent date
+    if (type === "warmCheckin" && ["Cold", "Contacted"].includes(c.status)) c.status = "Warm";
+    // Schedule cold outreach follow-ups from initial send date
     if (type === "initial") {
       c.followUp.day3Due  = c.followUp.day3Due  || addDays(now.slice(0, 10), 3);
       c.followUp.day7Due  = c.followUp.day7Due  || addDays(now.slice(0, 10), 7);
@@ -528,8 +537,9 @@ ${s.assistantName}`;
           </div>
           <div class="outreach-contact-actions">
             <button class="secondary-button btn-sm" type="button" data-open-email="${escHtml(c.id)}" data-email-type="initial">
-              ${hasSent ? "View Draft" : "Draft Email"}
+              ${hasSent ? "Re-draft" : "Cold Outreach"}
             </button>
+            <button class="secondary-button btn-sm" type="button" data-open-email="${escHtml(c.id)}" data-email-type="warmCheckin">Warm Check-In</button>
             ${fup ? `<button class="secondary-button btn-sm" type="button" data-open-email="${escHtml(c.id)}" data-email-type="${fup}">Follow Up</button>` : ""}
             <select class="select-sm" data-status-contact="${escHtml(c.id)}" title="Change status">
               ${STATUSES.map(s => `<option ${s === c.status ? "selected" : ""}>${escHtml(s)}</option>`).join("")}
@@ -672,10 +682,11 @@ ${s.assistantName}`;
     const prev = contact.emailHistory.find(h => h.type === type);
 
     const typeLabel = {
-      initial:  "Initial Email",
-      followup1: "Follow-Up 1 (Day 3)",
-      followup2: "Follow-Up 2 (Day 7)",
-      final:     "Final Follow-Up (Day 14)",
+      initial:    "Cold Outreach",
+      followup1:  "Follow-Up 1 (Day 3)",
+      followup2:  "Follow-Up 2 (Day 7)",
+      final:      "Final Follow-Up (Day 14)",
+      warmCheckin: "Warm Check-In",
     }[type] || type;
 
     document.getElementById("outreachEmailDialogTitle").textContent =
