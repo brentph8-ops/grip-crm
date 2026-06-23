@@ -106,12 +106,7 @@
     const him = himOrHer();
     const his = hisOrHer();
 
-    // Use the account's own county from GRIP if linked, otherwise generic
-    const acct = contact.accountId && typeof window.cleanAccounts === "function"
-      ? window.cleanAccounts().find(a => a.id === contact.accountId)
-      : null;
-    const acctCounty = acct?.county || "";
-    const locationPhrase = acctCounty ? `the ${acctCounty} area` : "the area";
+    const locationPhrase = "the area";
     const HeUc = he.charAt(0).toUpperCase() + he.slice(1);
 
     if (type === "initial") {
@@ -264,7 +259,24 @@ ${a}`,
     saveData();
     renderContactList();
     renderFollowUpQueue();
-    showToast("Marked as sent.", "success");
+    // Log to GRIP account activity if this contact is linked to an account
+    if (c.accountId && typeof window.addAccountActivity === "function") {
+      const typeLabel = {
+        initial:     "Cold Outreach",
+        followup1:   "Follow-Up 1",
+        followup2:   "Follow-Up 2",
+        final:       "Final Follow-Up",
+        warmCheckin: "Warm Check-In",
+      }[type] || type;
+      const name = [c.firstName, c.lastName].filter(Boolean).join(" ") || c.company;
+      window.addAccountActivity(
+        c.accountId,
+        `Payton sent ${typeLabel} email to ${name} (${c.email}).`,
+        false,
+        { source: "Outreach" }
+      );
+    }
+    (window.showToast || alert)("Marked as sent.", "success");
   }
 
   function deleteContact(id) {
