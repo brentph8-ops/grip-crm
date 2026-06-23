@@ -5816,61 +5816,68 @@ textarea {
 .task-mini-title { font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
 .task-mini-meta  { font-size: 11px; color: var(--muted); }
 
-/* ── Outreach / Payton ───────────────────────────────────────────── */
-#outreachView { display: none; flex-direction: column; height: 100%; overflow: hidden; }
+/* ── Outreach / Payton — modern redesign ─────────────────────────── */
+#outreachView { display: none; flex-direction: column; height: 100%; overflow: hidden; background: var(--bg); }
 #outreachView.is-active { display: flex; }
 
+/* ── Outreach header & toolbar ───────────────────────────────────── */
 .outreach-header {
   background: var(--surface);
   border-bottom: 1px solid var(--line);
-  padding: 14px 16px 10px;
+  padding: 12px 16px 10px;
   flex-shrink: 0;
 }
 .outreach-header-top {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
   margin-bottom: 10px;
 }
-.outreach-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-  flex-wrap: wrap;
-}
-.outreach-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
+.outreach-header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.outreach-toolbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .outreach-campaign-info { flex: 1; min-width: 0; }
-.outreach-campaign-title { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.outreach-campaign-title strong { font-size: 16px; color: var(--ink); }
-.outreach-visit-date { font-size: 13px; color: var(--muted); }
-.outreach-no-campaign { font-size: 14px; color: var(--muted); font-style: italic; }
-.outreach-campaign-stats {
-  display: flex;
-  gap: 14px;
-  flex-wrap: wrap;
-  margin-top: 5px;
-  font-size: 12px;
-  color: var(--muted);
-}
-.outreach-campaign-stats .stat-highlight { color: #059669; font-weight: 600; }
-.outreach-campaign-stats .stat-alert { color: #d97706; font-weight: 600; }
-.outreach-active-label { font-size: 12px; color: #059669; font-weight: 600; }
 
 .outreach-gmail-status { font-size: 12px; color: var(--muted); white-space: nowrap; }
 .outreach-gmail-status.connected { color: #059669; font-weight: 600; }
 
+/* ── Campaign card ───────────────────────────────────────────────── */
+.payton-empty-campaign { font-size: 14px; color: var(--muted); padding: 4px 0; }
+.payton-campaign-card {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: var(--surface);
+  flex-wrap: wrap;
+}
+.payton-campaign-left { min-width: 0; }
+.payton-campaign-name { font-size: 17px; font-weight: 700; color: var(--ink); line-height: 1.2; }
+.payton-campaign-date { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.payton-stat-row { display: flex; gap: 16px; flex-wrap: wrap; }
+.payton-stat { display: flex; flex-direction: column; align-items: center; min-width: 48px; }
+.payton-stat-num { font-size: 22px; font-weight: 800; color: var(--ink); line-height: 1; }
+.payton-stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
+.payton-stat-accent { color: #059669; }
+.payton-stat-warn .payton-stat-num { color: #d97706; }
+.payton-stat-warn .payton-stat-label { color: #d97706; }
+.payton-switch-btn {
+  font-size: 11px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.payton-switch-btn:hover { background: var(--line); color: var(--ink); }
+
+/* ── Body layout ─────────────────────────────────────────────────── */
 .outreach-body {
   display: grid;
-  grid-template-columns: 1fr 280px;
-  gap: 0;
+  grid-template-columns: 1fr 260px;
   flex: 1;
   overflow: hidden;
 }
@@ -5878,19 +5885,15 @@ textarea {
   .outreach-body { grid-template-columns: 1fr; }
   .outreach-panel-side { display: none; }
 }
-
-.outreach-panel {
-  overflow-y: auto;
-  border-right: 1px solid var(--line);
-}
+.outreach-panel { overflow-y: auto; border-right: 1px solid var(--line); }
 .outreach-panel-side { border-right: none; background: var(--bg); }
 .outreach-panel-title {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   color: var(--muted);
-  padding: 10px 14px 6px;
+  padding: 10px 16px 6px;
   border-bottom: 1px solid var(--line);
   position: sticky;
   top: 0;
@@ -5898,87 +5901,138 @@ textarea {
   z-index: 1;
 }
 .outreach-panel-side .outreach-panel-title { background: var(--bg); }
+.outreach-prospect-list { padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; }
+.outreach-fup-list { padding: 8px; display: flex; flex-direction: column; gap: 6px; }
 
-.outreach-prospect-list, .outreach-fup-list { padding: 0; }
-
-.outreach-contact-row {
+/* ── Prospect cards ──────────────────────────────────────────────── */
+.prospect-card {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--line);
-  flex-wrap: wrap;
+  padding: 11px 14px;
+  background: var(--surface);
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  transition: box-shadow 0.15s, border-color 0.15s;
 }
-.outreach-contact-row:last-child { border-bottom: none; }
-.outreach-contact-info {
-  flex: 1;
-  min-width: 160px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.outreach-contact-name { font-size: 14px; font-weight: 600; color: var(--ink); }
-.outreach-contact-company { font-size: 12px; color: var(--muted); }
-.outreach-contact-title { font-size: 11px; color: var(--muted); font-style: italic; }
-.outreach-contact-email { font-size: 12px; color: var(--accent); text-decoration: none; }
-.outreach-contact-email:hover { text-decoration: underline; }
-.outreach-contact-meta {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  min-width: 100px;
-}
-.outreach-contact-sent { font-size: 11px; color: var(--muted); }
-.outreach-followup-due {
-  font-size: 11px;
-  font-weight: 600;
-  color: #d97706;
-  background: #fef3c7;
-  padding: 1px 6px;
-  border-radius: 4px;
-}
-.outreach-contact-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
+.prospect-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); border-color: var(--accent); }
+.prospect-card--due { border-left: 3px solid #d97706; }
 
-.outreach-fup-row {
+.prospect-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 13px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  letter-spacing: 0.03em;
+}
+.avatar-cold      { background: #e2e8f0; color: #475569; }
+.avatar-contacted { background: #dbeafe; color: #1d4ed8; }
+.avatar-replied   { background: #e0e7ff; color: #4338ca; }
+.avatar-warm      { background: #fef9c3; color: #92400e; }
+.avatar-qualified { background: #d1fae5; color: #065f46; }
+.avatar-meeting   { background: #bbf7d0; color: #15803d; }
+.avatar-unsub     { background: #fee2e2; color: #991b1b; }
+
+.prospect-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.prospect-name-row { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.prospect-name { font-size: 14px; font-weight: 600; color: var(--ink); }
+.prospect-due-dot { color: #d97706; font-size: 10px; }
+.prospect-meta { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prospect-email { font-size: 12px; color: var(--accent); text-decoration: none; }
+.prospect-email:hover { text-decoration: underline; }
+
+.prospect-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+.prospect-last { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.prospect-actions { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; justify-content: flex-end; }
+
+/* ── Follow-up queue cards ───────────────────────────────────────── */
+.fup-card {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--line);
-  flex-wrap: wrap;
+  gap: 8px;
+  padding: 9px 10px;
+  background: var(--surface);
+  border-radius: 8px;
+  border: 1px solid var(--line);
 }
-.outreach-fup-row:last-child { border-bottom: none; }
-.outreach-fup-type {
-  font-size: 11px;
+.fup-card-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.fup-card-name { font-size: 13px; font-weight: 600; color: var(--ink); }
+.fup-card-company { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fup-card-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.fup-type-badge {
+  font-size: 10px;
   font-weight: 700;
-  color: #d97706;
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: #fef3c7;
+  color: #92400e;
   white-space: nowrap;
 }
 
-/* Status badges */
+/* ── Payton micro-buttons ────────────────────────────────────────── */
+.payton-btn {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, border-color 0.12s;
+}
+.payton-btn:hover { background: var(--bg); border-color: var(--accent); color: var(--accent); }
+.payton-btn--accent {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.payton-btn--accent:hover { opacity: 0.88; }
+.payton-select {
+  font-size: 11px;
+  padding: 3px 5px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+.payton-remove {
+  font-size: 12px;
+  padding: 2px 6px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 4px;
+  line-height: 1;
+}
+.payton-remove:hover { background: #fee2e2; color: #dc2626; }
+
+/* ── Status badges ───────────────────────────────────────────────── */
 .outreach-status-badge {
   display: inline-block;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
   white-space: nowrap;
+  letter-spacing: 0.03em;
 }
-.status-cold       { background: #f1f5f9; color: #475569; }
+.status-cold       { background: #f1f5f9; color: #64748b; }
 .status-contacted  { background: #dbeafe; color: #1d4ed8; }
 .status-replied    { background: #e0e7ff; color: #4338ca; }
 .status-warm       { background: #fef9c3; color: #92400e; }
 .status-qualified  { background: #d1fae5; color: #065f46; }
-.status-meeting    { background: #bbf7d0; color: #15803d; font-weight: 700; }
-.status-unsub      { background: #fee2e2; color: #991b1b; }
+.status-meeting    { background: #bbf7d0; color: #15803d; }
+.status-unsub      { background: #f1f5f9; color: #94a3b8; }
 
-/* Campaign switcher dialog */
+/* ── Campaign switcher ───────────────────────────────────────────── */
 .outreach-campaign-item {
   display: flex;
   align-items: center;
@@ -5989,9 +6043,10 @@ textarea {
 }
 .outreach-campaign-item:last-child { border-bottom: none; }
 .outreach-campaign-item strong { font-size: 14px; color: var(--ink); display: block; }
-.outreach-campaign-item.is-active { opacity: 0.8; }
+.outreach-campaign-item.is-active { opacity: 0.7; }
+.outreach-active-label { font-size: 12px; color: #059669; font-weight: 600; }
 
-/* Import list */
+/* ── Import list ─────────────────────────────────────────────────── */
 .import-grip-list { max-height: 360px; overflow-y: auto; margin-top: 10px; }
 .import-grip-item {
   display: flex;
@@ -6006,57 +6061,23 @@ textarea {
 .import-grip-item strong { display: block; color: var(--ink); }
 .import-grip-item span { color: var(--muted); font-size: 12px; }
 
-/* Email compose body */
+/* Import filters */
+.import-grip-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.import-grip-filters .search-input { flex: 1; min-width: 120px; }
+.import-grip-meta { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px; }
+.import-tag { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: #e2e8f0; color: #475569; white-space: nowrap; }
+.import-tag-entity { background: #dbeafe; color: #1d4ed8; }
+
+/* ── Email compose ───────────────────────────────────────────────── */
 .outreach-email-modal-body { display: flex; flex-direction: column; gap: 10px; }
 .outreach-email-body { font-family: monospace; font-size: 13px; line-height: 1.6; resize: vertical; }
 
-/* Compact buttons */
+/* ── Misc ────────────────────────────────────────────────────────── */
 .btn-sm { font-size: 12px !important; padding: 4px 10px !important; }
-.btn-danger-sm {
-  font-size: 12px;
-  padding: 2px 7px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: transparent;
-  color: #dc2626;
-  cursor: pointer;
-  line-height: 1;
-}
-.btn-danger-sm:hover { background: #fee2e2; }
-.select-sm {
-  font-size: 12px;
-  padding: 3px 6px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--ink);
-  cursor: pointer;
-}
-
-/* Form hint */
+.select-sm { font-size: 12px; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); cursor: pointer; }
 .form-hint { display: block; font-size: 11px; color: var(--muted); margin: 2px 0 5px; }
-
-/* Import filters row */
-.import-grip-filters {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-}
-.import-grip-filters .search-input { flex: 1; min-width: 120px; }
-
-/* Import tags */
-.import-grip-meta { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px; }
-.import-tag {
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 8px;
-  background: #e2e8f0;
-  color: #475569;
-  white-space: nowrap;
-}
-.import-tag-entity { background: #dbeafe; color: #1d4ed8; }
-
-/* Campaign custom city row */
 .campaign-custom-city-row.hidden { display: none; }
+
+/* Sync button clickable */
+button#gripSyncStatus { cursor: pointer; background: none; border: none; padding: 0; }
+button#gripSyncStatus:hover { opacity: 0.75; }

@@ -464,29 +464,41 @@ ${s.assistantName}`;
     return `<span class="outreach-status-badge ${map[status] || ""}">${escHtml(status)}</span>`;
   }
 
+  function avatarInitials(contact) {
+    const name = [contact.firstName, contact.lastName].filter(Boolean).join(" ") || contact.company || "?";
+    return name.trim().split(/\s+/).slice(0, 2).map(w => w[0].toUpperCase()).join("");
+  }
+
   function renderCampaignBar() {
     const el = document.getElementById("outreachCampaignInfo");
     if (!el) return;
     const campaign = activeCampaign();
     if (!campaign) {
-      el.innerHTML = `<span class="outreach-no-campaign">No active campaign — create one to get started.</span>`;
+      el.innerHTML = `<div class="payton-empty-campaign">No active campaign — <button class="link-button" id="startFirstCampaignBtn" type="button">create one to get started</button></div>`;
+      document.getElementById("startFirstCampaignBtn")?.addEventListener("click", () => {
+        document.getElementById("newCampaignForm")?.reset();
+        populateCampaignAreaDropdown();
+        document.getElementById("newCampaignDialog")?.showModal();
+      });
       return;
     }
     const stats = campaignStats(campaign.id);
     const due = followUpsDue().length;
     el.innerHTML = `
-      <div class="outreach-campaign-title">
-        <strong>${escHtml(campaign.city)}${campaign.state ? `, ${escHtml(campaign.state)}` : ""}</strong>
-        <span class="outreach-visit-date">Visit: ${fmtDate(campaign.visitDate)}</span>
+      <div class="payton-campaign-card">
+        <div class="payton-campaign-left">
+          <div class="payton-campaign-name">${escHtml(campaign.city)}${campaign.state ? `, ${escHtml(campaign.state)}` : ""}</div>
+          <div class="payton-campaign-date">Visit · ${fmtDate(campaign.visitDate)}</div>
+        </div>
+        <div class="payton-stat-row">
+          <div class="payton-stat"><span class="payton-stat-num">${stats.total}</span><span class="payton-stat-label">Prospects</span></div>
+          <div class="payton-stat"><span class="payton-stat-num">${stats.contacted}</span><span class="payton-stat-label">Contacted</span></div>
+          <div class="payton-stat"><span class="payton-stat-num">${stats.replied}</span><span class="payton-stat-label">Replied</span></div>
+          <div class="payton-stat"><span class="payton-stat-num ${stats.meetings ? "payton-stat-accent" : ""}">${stats.meetings}</span><span class="payton-stat-label">Meetings</span></div>
+          ${due ? `<div class="payton-stat payton-stat-warn"><span class="payton-stat-num">${due}</span><span class="payton-stat-label">Due Today</span></div>` : ""}
+        </div>
+        ${_data.campaigns.length > 1 ? `<button class="payton-switch-btn" id="switchCampaignBtn" type="button">Switch</button>` : ""}
       </div>
-      <div class="outreach-campaign-stats">
-        <span>${stats.total} prospects</span>
-        <span>${stats.contacted} contacted</span>
-        <span>${stats.replied} replied</span>
-        ${stats.meetings ? `<span class="stat-highlight">🗓 ${stats.meetings} meeting${stats.meetings === 1 ? "" : "s"} booked</span>` : ""}
-        ${due ? `<span class="stat-alert">⚑ ${due} follow-up${due === 1 ? "" : "s"} due</span>` : ""}
-      </div>
-      ${_data.campaigns.length > 1 ? `<button class="link-button" id="switchCampaignBtn" type="button">Switch campaign</button>` : ""}
     `;
     document.getElementById("switchCampaignBtn")?.addEventListener("click", openSwitchCampaign);
   }
@@ -531,32 +543,34 @@ ${s.assistantName}`;
 
     el.innerHTML = contacts.map(c => {
       const daysAgo = c.lastContactedAt ? daysSince(c.lastContactedAt) : null;
-      const contacted = daysAgo !== null ? `${daysAgo}d ago` : "Not yet";
+      const contacted = daysAgo !== null ? `${daysAgo}d ago` : "—";
       const hasSent = c.emailHistory.length > 0;
       const fup = nextFollowUpType(c);
+      const initials = avatarInitials(c);
+      const avatarClass = { "Meeting Set": "avatar-meeting", Qualified: "avatar-qualified", Warm: "avatar-warm", Replied: "avatar-replied", Contacted: "avatar-contacted", Cold: "avatar-cold", Unsubscribed: "avatar-unsub" }[c.status] || "avatar-cold";
       return `
-        <div class="outreach-contact-row" data-contact-id="${escHtml(c.id)}">
-          <div class="outreach-contact-info">
-            <strong class="outreach-contact-name">${escHtml(c.firstName)} ${escHtml(c.lastName)}</strong>
-            <span class="outreach-contact-company">${escHtml(c.company)}</span>
-            ${c.title ? `<span class="outreach-contact-title">${escHtml(c.title)}</span>` : ""}
-            <a class="outreach-contact-email" href="mailto:${escHtml(c.email)}">${escHtml(c.email)}</a>
+        <div class="prospect-card${fup ? " prospect-card--due" : ""}" data-contact-id="${escHtml(c.id)}">
+          <div class="prospect-avatar ${avatarClass}">${escHtml(initials)}</div>
+          <div class="prospect-body">
+            <div class="prospect-name-row">
+              <span class="prospect-name">${escHtml(c.firstName)} ${escHtml(c.lastName)}</span>
+              ${statusBadge(c.status)}
+              ${fup ? `<span class="prospect-due-dot" title="Follow-up due">●</span>` : ""}
+            </div>
+            <span class="prospect-meta">${escHtml(c.company)}${c.title ? ` · ${escHtml(c.title)}` : ""}</span>
+            <a class="prospect-email" href="mailto:${escHtml(c.email)}">${escHtml(c.email)}</a>
           </div>
-          <div class="outreach-contact-meta">
-            ${statusBadge(c.status)}
-            <span class="outreach-contact-sent">Last contact: ${contacted}</span>
-            ${fup ? `<span class="outreach-followup-due">Follow-up due</span>` : ""}
-          </div>
-          <div class="outreach-contact-actions">
-            <button class="secondary-button btn-sm" type="button" data-open-email="${escHtml(c.id)}" data-email-type="initial">
-              ${hasSent ? "Re-draft" : "Cold Outreach"}
-            </button>
-            <button class="secondary-button btn-sm" type="button" data-open-email="${escHtml(c.id)}" data-email-type="warmCheckin">Warm Check-In</button>
-            ${fup ? `<button class="secondary-button btn-sm" type="button" data-open-email="${escHtml(c.id)}" data-email-type="${fup}">Follow Up</button>` : ""}
-            <select class="select-sm" data-status-contact="${escHtml(c.id)}" title="Change status">
-              ${STATUSES.map(s => `<option ${s === c.status ? "selected" : ""}>${escHtml(s)}</option>`).join("")}
-            </select>
-            <button class="icon-button btn-danger-sm" type="button" data-delete-contact="${escHtml(c.id)}" title="Remove prospect">✕</button>
+          <div class="prospect-right">
+            <span class="prospect-last">${contacted}</span>
+            <div class="prospect-actions">
+              <button class="payton-btn" type="button" data-open-email="${escHtml(c.id)}" data-email-type="initial">${hasSent ? "Re-draft" : "Cold"}</button>
+              <button class="payton-btn" type="button" data-open-email="${escHtml(c.id)}" data-email-type="warmCheckin">Check-In</button>
+              ${fup ? `<button class="payton-btn payton-btn--accent" type="button" data-open-email="${escHtml(c.id)}" data-email-type="${fup}">Follow Up</button>` : ""}
+              <select class="payton-select" data-status-contact="${escHtml(c.id)}" title="Change status">
+                ${STATUSES.map(s => `<option ${s === c.status ? "selected" : ""}>${escHtml(s)}</option>`).join("")}
+              </select>
+              <button class="payton-remove" type="button" data-delete-contact="${escHtml(c.id)}" title="Remove">✕</button>
+            </div>
           </div>
         </div>`;
     }).join("");
@@ -573,16 +587,18 @@ ${s.assistantName}`;
     const campaign = activeCampaign();
     el.innerHTML = due.map(c => {
       const type = nextFollowUpType(c);
-      const typeLabel = { followup1: "Day 3", followup2: "Day 7", final: "Day 14 (Final)" }[type] || type;
+      const typeLabel = { followup1: "Day 3", followup2: "Day 7", final: "Final" }[type] || type;
+      const initials = avatarInitials(c);
       return `
-        <div class="outreach-fup-row">
-          <div class="outreach-contact-info">
-            <strong>${escHtml(c.firstName)} ${escHtml(c.lastName)}</strong>
-            <span>${escHtml(c.company)}</span>
+        <div class="fup-card">
+          <div class="prospect-avatar avatar-contacted" style="width:32px;height:32px;font-size:11px">${escHtml(initials)}</div>
+          <div class="fup-card-body">
+            <span class="fup-card-name">${escHtml(c.firstName)} ${escHtml(c.lastName)}</span>
+            <span class="fup-card-company">${escHtml(c.company)}</span>
           </div>
-          <span class="outreach-fup-type">${typeLabel}</span>
-          <div class="outreach-contact-actions">
-            <button class="secondary-button btn-sm" type="button" data-open-email="${escHtml(c.id)}" data-email-type="${type}">Draft Follow-Up</button>
+          <div class="fup-card-right">
+            <span class="fup-type-badge">${typeLabel}</span>
+            <button class="payton-btn payton-btn--accent" type="button" data-open-email="${escHtml(c.id)}" data-email-type="${type}">Draft</button>
           </div>
         </div>`;
     }).join("");

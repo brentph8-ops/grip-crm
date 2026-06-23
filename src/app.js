@@ -10101,6 +10101,7 @@ function bindEvents() {
   });
   byId("gripContinueLocalButton")?.addEventListener("click", () => window.gripSync?.continueLocal());
   byId("gripClearSessionButton")?.addEventListener("click", () => window.gripSync?.clearSessionAndRetry());
+  byId("gripSyncStatus")?.addEventListener("click", () => window.gripSync?.forceSync());
   byId("gripSignOutButton")?.addEventListener("click", async () => {
     if (await gripConfirm("Sign out of GRIP cloud sync? Your local data stays on this device.", "Sign Out", "Cancel")) window.gripSync?.signOut();
   });

@@ -357,6 +357,19 @@
       updateSyncIndicator("local");
     },
 
+    async forceSync() {
+      const user = await getUser();
+      if (!user) { updateSyncIndicator("error"); return; }
+      updateSyncIndicator("syncing");
+      const hadCloud = await pullAll();
+      if (hadCloud) {
+        updateSyncIndicator("saved");
+        if (typeof window.render === "function") window.render();
+      } else {
+        await pushAllLocalData();
+      }
+    },
+
     clearSessionAndRetry() {
       // Wipe all Supabase auth keys so a stale session can't block sign-in
       try {
