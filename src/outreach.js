@@ -100,12 +100,19 @@
     const a = s.assistantName;
     const rep = s.repName;
     const state = s.repState;
-    const city = campaign?.city || "[City]";
     const visitDate = campaign?.visitDate ? fmtDate(campaign.visitDate) : "[Date]";
     const first = contact.firstName || contact.company || "[First Name]";
     const he = heOrShe();
     const him = himOrHer();
     const his = hisOrHer();
+
+    // Use the account's own county from GRIP if linked, otherwise generic
+    const acct = contact.accountId && typeof window.cleanAccounts === "function"
+      ? window.cleanAccounts().find(a => a.id === contact.accountId)
+      : null;
+    const acctCounty = acct?.county || "";
+    const locationPhrase = acctCounty ? `the ${acctCounty} area` : "the area";
+    const HeUc = he.charAt(0).toUpperCase() + he.slice(1);
 
     if (type === "initial") {
       return {
@@ -119,7 +126,7 @@ I wanted to touch base because on paper Garland tends to be a good fit for group
 
 Garland works on everything on the exterior of the building that keeps out wind and rain. We help teams with roof evaluations, long term planning, and solving issues before they turn into expensive problems.
 
-${rep} will be in ${city} on ${visitDate} and I am helping line up a few quick stops for ${him} while ${he} is in town. ${he.charAt(0).toUpperCase() + he.slice(1)} would be the one stopping in.
+${rep} will be in ${locationPhrase} on ${visitDate} and I am helping line up a few quick stops for ${him} while ${he} is in the area. ${HeUc} would be the one stopping in.
 
 If you would be open to a quick 10 to 15 minute intro while ${he} is there, I can coordinate a time that works best for you.
 
@@ -133,7 +140,7 @@ ${a}`,
       return {
         subject: "Re: Quick question on your roofing",
         body:
-`Just wanted to bump this. ${rep}'s schedule in ${city} is filling up for ${visitDate}.
+`Just wanted to bump this. ${rep}'s schedule is filling up for ${visitDate}.
 
 ${a}`,
       };
