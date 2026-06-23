@@ -9992,7 +9992,7 @@ function setView(view) {
   if (view === "warrantySummary") renderWarrantySummaryChart();
   if (view === "noteTaker") renderNoteTaker();
   if (view === "outreach") { if (window.gripOutreach) window.gripOutreach.render(); }
-  byId("viewTitle").textContent = { dashboard: "Dashboard", accounts: "Accounts", projects: "Projects", punchList: "Punch List", takeoffEstimator: "Takeoff Estimator", warrantySummary: "Warranty Summary Chart", proposals: "Proposals", scopeDatabase: "Scope of Work", tasks: "Tasks", callList: "Call List", followUpQueue: "Follow-Up Queue", activityLog: "Activity Log", newsReport: "Your News Report", contractors: "Contractors", noteTaker: "Note Taker", outreach: "Payton · Outreach" }[view] || view;
+  byId("viewTitle").textContent = { dashboard: "Dashboard", accounts: "Accounts", projects: "Projects", punchList: "Punch List", takeoffEstimator: "Takeoff Estimator", warrantySummary: "Warranty Summary Chart", proposals: "Proposals", scopeDatabase: "Scope of Work", tasks: "Tasks", callList: "Call List", followUpQueue: "Follow-Up Queue", activityLog: "Activity Log", newsReport: "Your News Report", contractors: "Contractors", noteTaker: "Note Taker", outreach: "Assistant" }[view] || view;
   if (view === "dashboard") {
     showDueTodayProposalDialog();
     showTaskDailyAlertDialog();
