@@ -13,6 +13,7 @@
     repState: "Texas",
     repGender: "male",
     recapEmail: "brentph8@gmail.com",
+    ccEmail: "brentph8@gmail.com",
     googleClientId: "",
     gmailToken: null,
     gmailEmail: "",
@@ -337,15 +338,19 @@ ${a}`,
     }
     const s = _data.settings;
     const from = `${s.assistantName} <${s.gmailEmail}>`;
-    const msg = [
+    const headers = [
       `From: ${from}`,
       `To: ${to}`,
+    ];
+    if (s.ccEmail) headers.push(`Cc: ${s.ccEmail}`);
+    headers.push(
       `Subject: ${subject}`,
       `Content-Type: text/plain; charset=utf-8`,
       `MIME-Version: 1.0`,
       ``,
       body,
-    ].join("\r\n");
+    );
+    const msg = headers.join("\r\n");
 
     const encoded = btoa(unescape(encodeURIComponent(msg)))
       .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -649,6 +654,7 @@ ${s.assistantName}`;
     form.elements.repName.value       = s.repName;
     form.elements.repState.value      = s.repState;
     form.elements.recapEmail.value    = s.recapEmail;
+    form.elements.ccEmail.value       = s.ccEmail || "";
     form.elements.googleClientId.value = s.googleClientId;
     const statusEl = document.getElementById("outreachGmailSetupStatus");
     if (statusEl) {
@@ -687,6 +693,7 @@ ${s.assistantName}`;
       _data.settings.repName        = String(form.get("repName") || "").trim();
       _data.settings.repState       = String(form.get("repState") || "").trim();
       _data.settings.recapEmail     = String(form.get("recapEmail") || "").trim();
+      _data.settings.ccEmail        = String(form.get("ccEmail") || "").trim();
       _data.settings.googleClientId = String(form.get("googleClientId") || "").trim();
       saveData();
       document.getElementById("outreachSettingsDialog")?.close();
