@@ -3897,6 +3897,7 @@ function syncMobilePreviewButton() {
   const shell = byId("appShell");
   const button = byId("mobileVersionButton");
   const toggleBtn = byId("mobileHeaderToggle");
+  const compactBar = byId("mobileCompactBar");
   shell?.classList.toggle("mobile-preview", state.mobilePreview);
   if (button) {
     const label = state.mobilePreview ? "Desktop" : "Mobile";
@@ -3907,6 +3908,28 @@ function syncMobilePreviewButton() {
     button.setAttribute("title", fullLabel);
   }
   if (toggleBtn) toggleBtn.hidden = !state.mobilePreview;
+  if (compactBar) compactBar.hidden = !state.mobilePreview;
+  if (!state.mobilePreview) closeMobileFullMenu();
+}
+
+function closeMobileFullMenu() {
+  const menu = byId("mobileFullMenu");
+  const btn = byId("mobileCompactMenuBtn");
+  if (menu) { menu.classList.remove("is-open"); menu.hidden = !state.mobilePreview || true; }
+  if (btn) btn.setAttribute("aria-expanded", "false");
+}
+
+function toggleMobileFullMenu() {
+  const menu = byId("mobileFullMenu");
+  const btn = byId("mobileCompactMenuBtn");
+  if (!menu) return;
+  const open = menu.classList.toggle("is-open");
+  if (btn) btn.setAttribute("aria-expanded", String(open));
+}
+
+function updateMobileViewLabel(viewTitle) {
+  const label = byId("mobileCompactViewLabel");
+  if (label) label.textContent = viewTitle;
 }
 
 function toggleMobilePreview() {
@@ -10153,7 +10176,11 @@ function setView(view) {
   if (view === "today")     { if (window.gripToday)    window.gripToday.render(); }
   if (view === "pipeline")  { if (window.gripPipeline) window.gripPipeline.render(); }
   if (view === "territory") { if (window.gripTerritory) window.gripTerritory.render(); }
-  byId("viewTitle").textContent = { today: "Today", dashboard: "Dashboard", pipeline: "Pipeline", territory: "Territory", accounts: "Accounts", projects: "Projects", punchList: "Punch List", takeoffEstimator: "Takeoff Estimator", warrantySummary: "Warranty Summary Chart", proposals: "Proposals", scopeDatabase: "Scope of Work", tasks: "Tasks", callList: "Call List", followUpQueue: "Follow-Up Queue", activityLog: "Activity Log", newsReport: "Your News Report", contractors: "Contractors", noteTaker: "Note Taker", outreach: "Assistant" }[view] || view;
+  const _viewTitles = { today: "Today", dashboard: "Dashboard", pipeline: "Pipeline", territory: "Territory", accounts: "Accounts", projects: "Projects", punchList: "Punch List", takeoffEstimator: "Takeoff Estimator", warrantySummary: "Warranty Summary Chart", proposals: "Proposals", scopeDatabase: "Scope of Work", tasks: "Tasks", callList: "Call List", followUpQueue: "Follow-Up Queue", activityLog: "Activity Log", newsReport: "Your News Report", contractors: "Contractors", noteTaker: "Note Taker", outreach: "Assistant" };
+  const _resolvedTitle = _viewTitles[view] || view;
+  byId("viewTitle").textContent = _resolvedTitle;
+  updateMobileViewLabel(_resolvedTitle);
+  closeMobileFullMenu();
   if (view === "dashboard") {
     showDueTodayProposalDialog();
     showTaskDailyAlertDialog();
@@ -10165,10 +10192,9 @@ window.showDetail = showDetail;
 function closeMobileMoreMenu() {
   const menu = byId("mobileMoreMenu");
   const button = byId("mobileMoreButton");
-  if (!menu || !button) return;
-  menu.hidden = true;
-  menu.classList.remove("is-open");
-  button.setAttribute("aria-expanded", "false");
+  if (menu) { menu.hidden = true; menu.classList.remove("is-open"); }
+  if (button) button.setAttribute("aria-expanded", "false");
+  closeMobileFullMenu();
 }
 
 function toggleMobileMoreMenu() {
@@ -10313,6 +10339,18 @@ function bindEvents() {
   byId("territorySettingsButton").addEventListener("click", openTerritorySettings);
   byId("mobileVersionButton").addEventListener("click", toggleMobilePreview);
   byId("mobileHeaderToggle")?.addEventListener("click", toggleMobileHeader);
+  byId("mobileCompactMenuBtn")?.addEventListener("click", toggleMobileFullMenu);
+  byId("mobileFullMenu")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-view]");
+    if (btn) closeMobileFullMenu();
+  });
+  document.addEventListener("click", (e) => {
+    const bar = byId("mobileCompactBar");
+    const menu = byId("mobileFullMenu");
+    if (menu?.classList.contains("is-open") && !bar?.contains(e.target) && !menu?.contains(e.target)) {
+      closeMobileFullMenu();
+    }
+  });
   byId("exportBackupButton").addEventListener("click", exportBackup);
   byId("importBackupButton").addEventListener("click", () => byId("backupImportInput").click());
   byId("backupImportInput").addEventListener("change", (event) => {

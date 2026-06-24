@@ -4452,7 +4452,9 @@ textarea {
   inset: auto auto 0 50%;
   z-index: 40;
   width: min(430px, 100vw);
+  height: auto;
   min-height: 0;
+  overflow-y: visible;
   transform: translateX(-50%);
   padding: 8px;
   border-top: 1px solid rgba(255, 255, 255, 0.22);
@@ -4491,66 +4493,93 @@ textarea {
   display: none;
 }
 
-.app-shell.mobile-preview .nav {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
-  overflow: visible;
-  padding: 0;
-}
-
-.app-shell.mobile-preview .nav-button {
-  min-width: 0;
-  min-height: 54px;
-  justify-content: center;
-  align-items: center;
-  gap: 4px;
-  border-radius: 8px;
-  padding: 6px 3px;
-  text-align: center;
-  flex-direction: column;
-  font-size: 0.62rem;
-  line-height: 1.12;
-}
-
-.app-shell.mobile-preview .nav > .nav-button:not([data-view="dashboard"]):not([data-view="accounts"]):not([data-view="projects"]):not([data-view="tasks"]):not([data-view="callList"]):not(.nav-more-button) {
-  display: none;
-}
-
-.app-shell.mobile-preview .nav-sub-button,
-.app-shell.mobile-preview .nav-projects-group .nav-sub-button {
-  display: none;
-}
-
-.app-shell.mobile-preview .nav-more-button {
-  display: flex;
-}
-
+/* In mobile-preview, hide the sidebar nav entirely — compact bar takes over */
+.app-shell.mobile-preview .nav,
 .app-shell.mobile-preview .mobile-more-menu {
+  display: none !important;
+}
+
+/* ── Compact mobile bottom bar ─────────────────────────────── */
+.mobile-compact-bar {
+  display: none;
+}
+
+.app-shell.mobile-preview .mobile-compact-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px 10px;
+}
+
+.mobile-compact-view {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mobile-compact-menu-btn {
+  flex: 0 0 auto;
+  border: 1px solid rgba(255,255,255,0.35);
+  border-radius: 20px;
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 6px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s;
+}
+
+.mobile-compact-menu-btn:hover,
+.mobile-compact-menu-btn[aria-expanded="true"] {
+  background: rgba(255,255,255,0.22);
+}
+
+/* ── Full nav overlay (all views grid) ─────────────────────── */
+.mobile-full-menu {
+  display: none;
+}
+
+.app-shell.mobile-preview .mobile-full-menu {
   position: fixed;
   left: 50%;
-  right: auto;
-  bottom: 70px;
+  bottom: 62px;
   z-index: 45;
   width: min(414px, calc(100vw - 16px));
   transform: translateX(-50%);
   display: none;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-  padding: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 12px;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid rgba(255,255,255,0.22);
+  border-radius: 14px 14px 0 0;
   background: var(--blue);
-  box-shadow: 0 -10px 28px rgba(0, 37, 86, 0.22);
+  box-shadow: 0 -12px 32px rgba(0,37,86,0.28);
+  max-height: 70vh;
+  overflow-y: auto;
 }
 
-.app-shell.mobile-preview .mobile-more-menu.is-open {
+.app-shell.mobile-preview .mobile-full-menu.is-open {
   display: grid;
 }
 
-.app-shell.mobile-preview .mobile-more-menu .nav-button {
+.app-shell.mobile-preview .mobile-full-menu .nav-button {
   display: flex;
-  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 52px;
+  font-size: 0.6rem;
+  line-height: 1.15;
+  border-radius: 8px;
+  padding: 6px 3px;
+  text-align: center;
 }
 
 .app-shell.mobile-preview .workspace {

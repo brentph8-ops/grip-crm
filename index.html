@@ -154,59 +154,49 @@
           </button>
         </nav>
 
+        <!-- Compact mobile nav bar: shown only in mobile-preview mode -->
+        <div class="mobile-compact-bar" id="mobileCompactBar" hidden>
+          <span class="mobile-compact-view" id="mobileCompactViewLabel">Today</span>
+          <button class="mobile-compact-menu-btn" id="mobileCompactMenuBtn" type="button" aria-expanded="false" aria-controls="mobileFullMenu">
+            ☰ Menu
+          </button>
+        </div>
+
+        <!-- Full nav overlay shown when "Menu" is tapped -->
+        <div class="mobile-full-menu" id="mobileFullMenu" hidden>
+          <button class="nav-button" data-view="today" type="button"><span aria-hidden="true">☀</span>Today</button>
+          <button class="nav-button" data-view="dashboard" type="button"><span aria-hidden="true">⌂</span>Dashboard</button>
+          <button class="nav-button" data-view="pipeline" type="button"><span aria-hidden="true">◈</span>Pipeline</button>
+          <button class="nav-button" data-view="territory" type="button"><span aria-hidden="true">⊙</span>Territory</button>
+          <button class="nav-button" data-view="accounts" type="button"><span aria-hidden="true">◎</span>Accounts</button>
+          <button class="nav-button" data-view="projects" type="button"><span aria-hidden="true">▦</span>Projects</button>
+          <button class="nav-button" data-view="proposals" type="button"><span aria-hidden="true">◥</span>Proposals</button>
+          <button class="nav-button" data-view="tasks" type="button"><span aria-hidden="true">☑</span>Tasks</button>
+          <button class="nav-button" data-view="callList" type="button"><span aria-hidden="true">☏</span>Calls</button>
+          <button class="nav-button" data-view="activityLog" type="button"><span aria-hidden="true">☷</span>Activity</button>
+          <button class="nav-button" data-view="followUpQueue" type="button"><span aria-hidden="true">✓</span>Follow-Up</button>
+          <button class="nav-button" data-view="outreach" type="button"><span aria-hidden="true">✉</span>Assistant</button>
+          <button class="nav-button" data-view="noteTaker" type="button"><span aria-hidden="true">✎</span>Notes</button>
+          <button class="nav-button" data-view="newsReport" type="button"><span aria-hidden="true">◫</span>News</button>
+          <button class="nav-button" data-view="punchList" type="button"><span aria-hidden="true">☒</span>Punch</button>
+          <button class="nav-button" data-view="scopeDatabase" type="button"><span class="nav-letter-icon nav-letter-icon-wide">SOW</span>Scope</button>
+          <button class="nav-button" data-view="contractors" type="button"><span aria-hidden="true">⚙</span>Contractors</button>
+          <button class="nav-button" data-view="takeoffEstimator" type="button"><span aria-hidden="true">📐</span>Takeoff</button>
+          <button class="nav-button" data-view="warrantySummary" type="button"><span class="nav-letter-icon">WS</span>Warranty</button>
+        </div>
+
         <div class="mobile-more-menu" id="mobileMoreMenu" hidden>
-          <button class="nav-button" data-view="punchList" type="button">
-            <span aria-hidden="true">☒</span>
-            Punch
-          </button>
-          <button class="nav-button" data-view="takeoffEstimator" type="button">
-            <span class="nav-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false">
-                <path d="M4 6.5C4 4 6 2 8.5 2S13 4 13 6.5 11 11 8.5 11 4 9 4 6.5Zm3 0C7 7.3 7.7 8 8.5 8S10 7.3 10 6.5 9.3 5 8.5 5 7 5.7 7 6.5ZM6 13h14c1.1 0 2 .9 2 2v5c0 1.1-.9 2-2 2H6c-1.1 0-2-.9-2-2v-5c0-1.1.9-2 2-2Zm1 3v3h2v-2h2v2h2v-3h2v2h2v-2h2v-1H7v1Z" />
-              </svg>
-            </span>
-            Takeoff
-          </button>
-          <button class="nav-button" data-view="warrantySummary" type="button">
-            <span class="nav-icon nav-letter-icon" aria-hidden="true">WS</span>
-            Warranty
-          </button>
-          <button class="nav-button" data-view="tasks" type="button">
-            <span aria-hidden="true">☑</span>
-            Tasks
-          </button>
-          <button class="nav-button" data-view="followUpQueue" type="button">
-            <span aria-hidden="true">✓</span>
-            Follow-Up
-          </button>
-          <button class="nav-button" data-view="activityLog" type="button">
-            <span aria-hidden="true">☷</span>
-            Activity
-          </button>
-          <button class="nav-button" data-view="scopeDatabase" type="button">
-            <span class="nav-icon nav-letter-icon nav-letter-icon-wide" aria-hidden="true">SOW</span>
-            Scope
-          </button>
-          <button class="nav-button" data-view="contractors" type="button">
-            <span class="nav-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false">
-                <path d="M5 12a7 7 0 0 1 4-6.3V10h2V5.1a7.9 7.9 0 0 1 2 0V10h2V5.7A7 7 0 0 1 19 12h1.5c.8 0 1.5.7 1.5 1.5S21.3 15 20.5 15h-17C2.7 15 2 14.3 2 13.5S2.7 12 3.5 12H5Zm1.2 5h11.6l-1.1 3H7.3l-1.1-3Z" />
-              </svg>
-            </span>
-            Contractors
-          </button>
-          <button class="nav-button" data-view="newsReport" type="button">
-            <span aria-hidden="true">◫</span>
-            News
-          </button>
-          <button class="nav-button" data-view="noteTaker" type="button">
-            <span aria-hidden="true">✎</span>
-            Notes
-          </button>
-          <button class="nav-button" data-view="outreach" type="button">
-            <span aria-hidden="true">✉</span>
-            Assistant
-          </button>
+          <button class="nav-button" data-view="punchList" type="button"><span aria-hidden="true">☒</span>Punch</button>
+          <button class="nav-button" data-view="takeoffEstimator" type="button"><span aria-hidden="true">📐</span>Takeoff</button>
+          <button class="nav-button" data-view="warrantySummary" type="button"><span class="nav-letter-icon">WS</span>Warranty</button>
+          <button class="nav-button" data-view="tasks" type="button"><span aria-hidden="true">☑</span>Tasks</button>
+          <button class="nav-button" data-view="followUpQueue" type="button"><span aria-hidden="true">✓</span>Follow-Up</button>
+          <button class="nav-button" data-view="activityLog" type="button"><span aria-hidden="true">☷</span>Activity</button>
+          <button class="nav-button" data-view="scopeDatabase" type="button"><span class="nav-letter-icon nav-letter-icon-wide">SOW</span>Scope</button>
+          <button class="nav-button" data-view="contractors" type="button"><span aria-hidden="true">⚙</span>Contractors</button>
+          <button class="nav-button" data-view="newsReport" type="button"><span aria-hidden="true">◫</span>News</button>
+          <button class="nav-button" data-view="noteTaker" type="button"><span aria-hidden="true">✎</span>Notes</button>
+          <button class="nav-button" data-view="outreach" type="button"><span aria-hidden="true">✉</span>Assistant</button>
         </div>
 
         <div class="external-links">
