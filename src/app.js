@@ -3915,7 +3915,7 @@ function syncMobilePreviewButton() {
 function closeMobileFullMenu() {
   const menu = byId("mobileFullMenu");
   const btn = byId("mobileCompactMenuBtn");
-  if (menu) { menu.classList.remove("is-open"); menu.hidden = !state.mobilePreview || true; }
+  if (menu) menu.classList.remove("is-open");
   if (btn) btn.setAttribute("aria-expanded", "false");
 }
 

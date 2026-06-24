@@ -4704,6 +4704,11 @@ textarea {
 .app-shell.mobile-preview.header-collapsed .mobile-quick-add {
   display: none !important;
 }
+/* Search always visible in mobile regardless of collapse state */
+.app-shell.mobile-preview .search,
+.app-shell.mobile-preview.header-collapsed .search {
+  display: flex !important;
+}
 
 .app-shell.mobile-preview .mobile-quick-add {
   display: grid;
