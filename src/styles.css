@@ -5821,10 +5821,11 @@ textarea {
 #outreachView.is-active { display: flex; }
 
 /* ── Outreach header & toolbar ───────────────────────────────────── */
+/* ── Outreach header ─────────────────────────────────────────────── */
 .outreach-header {
   background: var(--surface);
   border-bottom: 1px solid var(--line);
-  padding: 12px 16px 10px;
+  padding: 14px 18px 12px;
   flex-shrink: 0;
 }
 .outreach-header-top {
@@ -5833,52 +5834,113 @@ textarea {
   justify-content: space-between;
   gap: 10px;
   flex-wrap: wrap;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
-.outreach-header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.outreach-toolbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.outreach-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.outreach-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
 .outreach-campaign-info { flex: 1; min-width: 0; }
 
-.outreach-gmail-status { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.outreach-gmail-status {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
 .outreach-gmail-status.connected { color: #059669; font-weight: 600; }
-.outreach-gmail-status.expiring { color: #d97706; font-weight: 600; }
+.outreach-gmail-status.expiring  { color: #d97706; font-weight: 600; }
 
 /* ── Campaign card ───────────────────────────────────────────────── */
-.payton-empty-campaign { font-size: 14px; color: var(--muted); padding: 4px 0; }
+.payton-empty-campaign {
+  font-size: 14px;
+  color: var(--muted);
+  padding: 4px 0;
+}
 .payton-campaign-card {
   display: flex;
   align-items: center;
-  gap: 20px;
-  background: var(--surface);
+  gap: 24px;
+  padding: 14px 18px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
   flex-wrap: wrap;
 }
 .payton-campaign-left { min-width: 0; }
-.payton-campaign-name { font-size: 17px; font-weight: 700; color: var(--ink); line-height: 1.2; }
-.payton-campaign-date { font-size: 12px; color: var(--muted); margin-top: 2px; }
-.payton-stat-row { display: flex; gap: 16px; flex-wrap: wrap; }
-.payton-stat { display: flex; flex-direction: column; align-items: center; min-width: 48px; }
-.payton-stat-num { font-size: 22px; font-weight: 800; color: var(--ink); line-height: 1; }
-.payton-stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
+.payton-campaign-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+.payton-campaign-date {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.payton-stat-row {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 4px 6px;
+}
+.payton-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 14px;
+  border-right: 1px solid var(--line);
+}
+.payton-stat:last-child { border-right: none; }
+.payton-stat-num {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--ink);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.payton-stat-label {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 3px;
+  white-space: nowrap;
+}
 .payton-stat-accent { color: #059669; }
-.payton-stat-warn .payton-stat-num { color: #d97706; }
+.payton-stat-warn .payton-stat-num  { color: #d97706; }
 .payton-stat-warn .payton-stat-label { color: #d97706; }
 .payton-switch-btn {
   font-size: 11px;
-  padding: 4px 10px;
+  font-weight: 600;
+  padding: 5px 14px;
   border: 1px solid var(--line);
   border-radius: 20px;
-  background: transparent;
+  background: var(--surface);
   color: var(--muted);
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  margin-left: auto;
 }
-.payton-switch-btn:hover { background: var(--line); color: var(--ink); }
+.payton-switch-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
 
 /* ── Body layout ─────────────────────────────────────────────────── */
 .outreach-body {
   display: grid;
-  grid-template-columns: 1fr 260px;
+  grid-template-columns: 1fr 270px;
   flex: 1;
   overflow: hidden;
 }
@@ -5889,12 +5951,12 @@ textarea {
 .outreach-panel { overflow-y: auto; border-right: 1px solid var(--line); }
 .outreach-panel-side { border-right: none; background: var(--bg); }
 .outreach-panel-title {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   color: var(--muted);
-  padding: 10px 16px 6px;
+  padding: 10px 16px 8px;
   border-bottom: 1px solid var(--line);
   position: sticky;
   top: 0;
@@ -5902,26 +5964,40 @@ textarea {
   z-index: 1;
 }
 .outreach-panel-side .outreach-panel-title { background: var(--bg); }
-.outreach-prospect-list { padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; }
-.outreach-fup-list { padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+.outreach-prospect-list {
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.outreach-fup-list {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 
 /* ── Prospect cards ──────────────────────────────────────────────── */
 .prospect-card {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 11px 14px;
+  gap: 13px;
+  padding: 12px 14px;
   background: var(--surface);
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid var(--line);
-  transition: box-shadow 0.15s, border-color 0.15s;
+  transition: box-shadow 0.15s, border-color 0.15s, transform 0.1s;
 }
-.prospect-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); border-color: var(--accent); }
+.prospect-card:hover {
+  box-shadow: 0 3px 12px rgba(0,0,0,.07);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
 .prospect-card--due { border-left: 3px solid #d97706; }
 
 .prospect-avatar {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   font-weight: 700;
   font-size: 13px;
@@ -5930,7 +6006,7 @@ textarea {
   flex-shrink: 0;
   letter-spacing: 0.03em;
 }
-.avatar-cold      { background: #e2e8f0; color: #475569; }
+.avatar-cold      { background: #f1f5f9; color: #64748b; }
 .avatar-contacted { background: #dbeafe; color: #1d4ed8; }
 .avatar-replied   { background: #e0e7ff; color: #4338ca; }
 .avatar-warm      { background: #fef9c3; color: #92400e; }
@@ -5938,80 +6014,146 @@ textarea {
 .avatar-meeting   { background: #bbf7d0; color: #15803d; }
 .avatar-unsub     { background: #fee2e2; color: #991b1b; }
 
-.prospect-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.prospect-name-row { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
-.prospect-name { font-size: 14px; font-weight: 600; color: var(--ink); }
+.prospect-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.prospect-name-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.prospect-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
 .prospect-due-dot { color: #d97706; font-size: 10px; }
-.prospect-meta { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.prospect-email { font-size: 12px; color: var(--accent); text-decoration: none; }
-.prospect-email:hover { text-decoration: underline; }
+.prospect-meta {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.prospect-email {
+  font-size: 11px;
+  color: var(--accent);
+  text-decoration: none;
+  opacity: 0.8;
+}
+.prospect-email:hover { text-decoration: underline; opacity: 1; }
 
-.prospect-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
-.prospect-last { font-size: 11px; color: var(--muted); white-space: nowrap; }
-.prospect-actions { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; justify-content: flex-end; }
+.prospect-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 7px;
+  flex-shrink: 0;
+}
+.prospect-last {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.prospect-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
 
 /* ── Follow-up queue cards ───────────────────────────────────────── */
 .fup-card {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 9px 10px;
+  gap: 9px;
+  padding: 10px 11px;
   background: var(--surface);
-  border-radius: 8px;
+  border-radius: 10px;
   border: 1px solid var(--line);
+  transition: box-shadow 0.12s;
 }
-.fup-card-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.fup-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.07); }
+.fup-card-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 .fup-card-name { font-size: 13px; font-weight: 600; color: var(--ink); }
-.fup-card-company { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.fup-card-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.fup-card-company {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fup-card-right { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
 .fup-type-badge {
   font-size: 10px;
   font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 8px;
+  padding: 2px 8px;
+  border-radius: 10px;
   background: #fef3c7;
   color: #92400e;
   white-space: nowrap;
+  letter-spacing: 0.02em;
 }
 
 /* ── Payton micro-buttons ────────────────────────────────────────── */
 .payton-btn {
   font-size: 11px;
   font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 6px;
+  padding: 4px 11px;
+  border-radius: 7px;
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--ink);
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.12s, border-color 0.12s;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
 }
-.payton-btn:hover { background: var(--bg); border-color: var(--accent); color: var(--accent); }
+.payton-btn:hover {
+  background: var(--bg);
+  border-color: var(--accent);
+  color: var(--accent);
+}
 .payton-btn--accent {
   background: var(--accent);
   color: #fff;
   border-color: var(--accent);
 }
-.payton-btn--accent:hover { opacity: 0.88; }
+.payton-btn--accent:hover { opacity: 0.85; }
 .payton-select {
   font-size: 11px;
-  padding: 3px 5px;
+  padding: 3px 6px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 7px;
   background: var(--surface);
   color: var(--ink);
   cursor: pointer;
 }
 .payton-remove {
-  font-size: 12px;
-  padding: 2px 6px;
+  font-size: 13px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
   border: none;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 6px;
   line-height: 1;
+  transition: background 0.12s, color 0.12s;
 }
 .payton-remove:hover { background: #fee2e2; color: #dc2626; }
 
@@ -6020,7 +6162,7 @@ textarea {
   display: inline-block;
   font-size: 10px;
   font-weight: 700;
-  padding: 2px 8px;
+  padding: 2px 9px;
   border-radius: 20px;
   white-space: nowrap;
   letter-spacing: 0.03em;
@@ -6039,13 +6181,13 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 10px 0;
+  padding: 11px 0;
   border-bottom: 1px solid var(--line);
 }
 .outreach-campaign-item:last-child { border-bottom: none; }
-.outreach-campaign-item strong { font-size: 14px; color: var(--ink); display: block; }
-.outreach-campaign-item.is-active { opacity: 0.7; }
-.outreach-active-label { font-size: 12px; color: #059669; font-weight: 600; }
+.outreach-campaign-item strong { font-size: 14px; color: var(--ink); display: block; font-weight: 600; }
+.outreach-campaign-item.is-active { opacity: 0.65; }
+.outreach-active-label { font-size: 11px; color: #059669; font-weight: 700; }
 
 /* ── Import list ─────────────────────────────────────────────────── */
 .import-grip-list { max-height: 360px; overflow-y: auto; margin-top: 10px; }
@@ -6053,29 +6195,98 @@ textarea {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 8px 0;
+  padding: 9px 4px;
   border-bottom: 1px solid var(--line);
   cursor: pointer;
   font-size: 13px;
+  transition: background 0.1s;
+  border-radius: 6px;
 }
+.import-grip-item:hover { background: var(--bg); }
 .import-grip-item:last-child { border-bottom: none; }
-.import-grip-item strong { display: block; color: var(--ink); }
+.import-grip-item strong { display: block; color: var(--ink); font-weight: 600; }
 .import-grip-item span { color: var(--muted); font-size: 12px; }
 
 /* Import filters */
-.import-grip-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.import-grip-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
 .import-grip-filters .search-input { flex: 1; min-width: 120px; }
 .import-grip-meta { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px; }
-.import-tag { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: #e2e8f0; color: #475569; white-space: nowrap; }
+.import-tag {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 8px;
+  background: #e2e8f0;
+  color: #475569;
+  white-space: nowrap;
+  font-weight: 600;
+}
 .import-tag-entity { background: #dbeafe; color: #1d4ed8; }
 
 /* ── Email compose ───────────────────────────────────────────────── */
-.outreach-email-modal-body { display: flex; flex-direction: column; gap: 10px; }
-.outreach-email-body { font-family: monospace; font-size: 13px; line-height: 1.6; resize: vertical; }
+.outreach-email-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.outreach-email-field {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.outreach-email-field-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  width: 52px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.outreach-email-field input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  color: var(--ink);
+  padding: 0;
+}
+.outreach-email-body-wrap {
+  padding: 14px 0 4px;
+}
+.outreach-email-body {
+  width: 100%;
+  min-height: 260px;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--ink);
+  resize: vertical;
+  padding: 0;
+}
 
 /* ── Misc ────────────────────────────────────────────────────────── */
 .btn-sm { font-size: 12px !important; padding: 4px 10px !important; }
-.select-sm { font-size: 12px; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); cursor: pointer; }
+.select-sm {
+  font-size: 12px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
 .form-hint { display: block; font-size: 11px; color: var(--muted); margin: 2px 0 5px; }
 .campaign-custom-city-row.hidden { display: none; }
 

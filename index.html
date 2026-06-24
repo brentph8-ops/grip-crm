@@ -1161,16 +1161,22 @@
           <button id="closeOutreachEmailDialog" class="modal-close" type="button" aria-label="Close">×</button>
         </div>
         <div class="modal-body outreach-email-modal-body">
-          <label class="form-label">To <input id="outreachEmailTo" class="form-input" type="email" /></label>
-          <label class="form-label">Subject <input id="outreachEmailSubject" class="form-input" /></label>
-          <label class="form-label">Body
-            <textarea id="outreachEmailBody" class="form-textarea outreach-email-body" rows="16"></textarea>
-          </label>
-          <p id="outreachEmailFromNote" class="muted-note"></p>
+          <div class="outreach-email-field">
+            <span class="outreach-email-field-label">To</span>
+            <input id="outreachEmailTo" type="email" autocomplete="off" />
+          </div>
+          <div class="outreach-email-field">
+            <span class="outreach-email-field-label">Subject</span>
+            <input id="outreachEmailSubject" autocomplete="off" />
+          </div>
+          <div class="outreach-email-body-wrap">
+            <textarea id="outreachEmailBody" class="outreach-email-body"></textarea>
+          </div>
+          <p id="outreachEmailFromNote" class="muted-note" style="margin-top:6px;font-size:11px;"></p>
         </div>
         <div class="modal-footer">
           <button id="markSentButton" class="secondary-button" type="button">Mark as Sent</button>
-          <button id="copyOutreachEmailButton" class="secondary-button" type="button">Copy to Clipboard</button>
+          <button id="copyOutreachEmailButton" class="secondary-button" type="button">Copy</button>
           <button id="sendOutreachEmailButton" class="primary-button" type="button" disabled>Send via Gmail</button>
         </div>
       </dialog>
