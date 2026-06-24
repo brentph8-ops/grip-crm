@@ -3923,6 +3923,7 @@ function toggleMobileFullMenu() {
   const menu = byId("mobileFullMenu");
   const btn = byId("mobileCompactMenuBtn");
   if (!menu) return;
+  menu.removeAttribute("hidden");
   const open = menu.classList.toggle("is-open");
   if (btn) btn.setAttribute("aria-expanded", String(open));
 }
