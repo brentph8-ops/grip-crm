@@ -262,10 +262,11 @@
         const script = document.createElement("script");
         script.id = "leafletJs";
         script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-        script.onload = () => { _map = null; loadMap(); };
+        script.onload = () => { if (_map) { _map.remove(); } _map = null; loadMap(); };
         document.head.appendChild(script);
       }
     } else {
+      if (_map) { _map.remove(); }
       _map = null;
       loadMap();
     }

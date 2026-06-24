@@ -10005,6 +10005,7 @@ function setView(view) {
   }
 }
 window.setView = setView;
+window.showDetail = showDetail;
 
 function closeMobileMoreMenu() {
   const menu = byId("mobileMoreMenu");

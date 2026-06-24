@@ -268,9 +268,8 @@
     // Wire events
     el.querySelectorAll("[data-open-account]").forEach(row => {
       row.addEventListener("click", () => {
-        if (typeof window.showAccountDetail === "function")
-          window.showAccountDetail(row.dataset.openAccount);
-        if (typeof window.setView === "function") window.setView("accounts");
+        if (typeof window.showDetail === "function")
+          window.showDetail("account", row.dataset.openAccount);
       });
     });
 
