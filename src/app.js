@@ -799,7 +799,7 @@ const projectChecklistItems = [
 const sheetActivityImportKey = "garlandSheetActivitiesImportedV2";
 
 const state = {
-  view: "dashboard",
+  view: "today",
   search: "",
   filters: {
     rank: "All rankings",
