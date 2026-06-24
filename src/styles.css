@@ -4702,6 +4702,30 @@ textarea {
   white-space: nowrap;
 }
 
+/* Hide Details toggle — compact chip style in mobile */
+.app-shell.mobile-preview #detailToggle {
+  font-size: 0.62rem;
+  min-height: 22px;
+  padding: 0 8px;
+  width: auto !important;
+  background: transparent;
+  border-color: rgba(0,0,0,0.18);
+  color: #666;
+  border-radius: 20px;
+  align-self: flex-end;
+}
+
+/* When details hidden in mobile: collapse topbar items, keep toggle */
+.app-shell.mobile-preview.details-hidden #gripSyncStatus,
+.app-shell.mobile-preview.details-hidden #gripUserDisplay,
+.app-shell.mobile-preview.details-hidden #gripSignOutButton,
+.app-shell.mobile-preview.details-hidden #territorySettingsButton,
+.app-shell.mobile-preview.details-hidden #printSummaryButton,
+.app-shell.mobile-preview.details-hidden #newTaskButton,
+.app-shell.mobile-preview.details-hidden .mobile-quick-add {
+  display: none !important;
+}
+
 .app-shell.mobile-preview #printSummaryButton {
   display: none;
 }
