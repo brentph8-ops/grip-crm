@@ -6203,6 +6203,7 @@ function showAccountDetail(record) {
       </div>
       <div class="detail-header-actions">
         <button class="mini-button" data-add-task-account="${escapeHtml(record.client)}" type="button">+ Task</button>
+        <button class="mini-button" data-quick-deal-account="${escapeHtml(record.id)}" type="button">◈ Deal</button>
         <button class="mini-button" data-roof-notes-account="${escapeHtml(record.id)}" type="button">🏗 Roof Notes</button>
         <button class="mini-button" data-dossier-account="${escapeHtml(record.id)}" type="button">📋 Dossier</button>
         <button class="edit-button" data-edit-record="account" data-edit-id="${escapeHtml(record.id)}" type="button">Edit</button>
@@ -9947,11 +9948,145 @@ function proposalTrackingControls(record) {
   </section>`;
 }
 
+function countOutreachDue() {
+  try {
+    const o = JSON.parse(localStorage.getItem("garlandOutreach") || "{}");
+    const today = new Date().toISOString().slice(0, 10);
+    const active = (o.campaigns || []).find(c => c.status === "active");
+    if (!active) return 0;
+    return (o.contacts || []).filter(c => {
+      if (c.campaignId !== active.id || c.doNotContact || c.status === "Unsubscribed") return false;
+      const f = c.followUp || {};
+      return (f.day3Due  && f.day3Due  <= today && !f.day3Sent)  ||
+             (f.day7Due  && f.day7Due  <= today && !f.day7Sent)  ||
+             (f.day14Due && f.day14Due <= today && !f.day14Sent);
+    }).length;
+  } catch (_) { return 0; }
+}
+
 function renderNavBadges() {
   const overdue = followUpQueueRecords().filter((item) => ["overdue", "today"].includes(item.urgency)).length;
   document.querySelectorAll('[data-view="followUpQueue"]').forEach((btn) => {
     btn.querySelectorAll(".nav-due-badge").forEach((b) => b.remove());
     if (overdue > 0) btn.insertAdjacentHTML("beforeend", `<span class="nav-due-badge">${overdue}</span>`);
+  });
+  const outreachDue = countOutreachDue();
+  document.querySelectorAll('[data-view="outreach"]').forEach((btn) => {
+    btn.querySelectorAll(".nav-due-badge").forEach((b) => b.remove());
+    if (outreachDue > 0) btn.insertAdjacentHTML("beforeend", `<span class="nav-due-badge">${outreachDue}</span>`);
+  });
+}
+
+// ── Global search overlay ─────────────────────────────────────────
+
+function closeGlobalSearch() {
+  const el = byId("globalSearchResults");
+  if (el) el.hidden = true;
+}
+
+function renderGlobalSearch(query) {
+  const el = byId("globalSearchResults");
+  if (!el) return;
+  const q = (query || "").trim().toLowerCase();
+  if (q.length < 2) { el.hidden = true; return; }
+
+  const esc = s => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const hit = s => String(s || "").toLowerCase().includes(q);
+
+  // Accounts
+  const acctHits = cleanAccounts().filter(a =>
+    hit(a.client) || hit(a.poc) || hit(a.county) || hit(a.entity) || hit(a.sharedRep)
+  ).slice(0, 6);
+
+  // Pipeline deals
+  let dealHits = [];
+  try {
+    const deals = JSON.parse(localStorage.getItem("garlandPipeline") || "[]");
+    dealHits = deals.filter(d => hit(d.title) || hit(d.accountName) || hit(d.county)).slice(0, 4);
+  } catch (_) {}
+
+  // Outreach prospects
+  let prospectHits = [];
+  try {
+    const o = JSON.parse(localStorage.getItem("garlandOutreach") || "{}");
+    prospectHits = (o.contacts || []).filter(c =>
+      hit(c.firstName) || hit(c.lastName) || hit(c.company) || hit(c.email)
+    ).slice(0, 4);
+  } catch (_) {}
+
+  if (!acctHits.length && !dealHits.length && !prospectHits.length) {
+    el.innerHTML = `<p class="gs-empty">No results for "${esc(query)}"</p>`;
+    el.hidden = false;
+    return;
+  }
+
+  let html = "";
+
+  if (acctHits.length) {
+    html += `<p class="gs-group-label">Accounts</p>`;
+    html += acctHits.map(a => `
+      <div class="gs-item" tabindex="0" data-gs-type="account" data-gs-id="${esc(a.id)}">
+        <span class="gs-item-icon">🏢</span>
+        <div class="gs-item-text">
+          <div class="gs-item-name">${esc(a.client)}</div>
+          <div class="gs-item-meta">${[a.entity, a.county].filter(Boolean).join(" · ")}</div>
+        </div>
+        <span class="gs-item-badge">${esc(a.clientRanking || "Account")}</span>
+      </div>`).join("");
+  }
+
+  if (dealHits.length) {
+    if (html) html += `<div class="gs-divider"></div>`;
+    html += `<p class="gs-group-label">Pipeline Deals</p>`;
+    html += dealHits.map(d => `
+      <div class="gs-item" tabindex="0" data-gs-type="deal" data-gs-id="${esc(d.id)}">
+        <span class="gs-item-icon">◈</span>
+        <div class="gs-item-text">
+          <div class="gs-item-name">${esc(d.title || d.accountName)}</div>
+          <div class="gs-item-meta">${esc(d.accountName)}${d.amount ? " · $" + Number(d.amount).toLocaleString() : ""}</div>
+        </div>
+        <span class="gs-item-badge">${esc(d.stage)}</span>
+      </div>`).join("");
+  }
+
+  if (prospectHits.length) {
+    if (html) html += `<div class="gs-divider"></div>`;
+    html += `<p class="gs-group-label">Prospects</p>`;
+    html += prospectHits.map(p => {
+      const name = [p.firstName, p.lastName].filter(Boolean).join(" ") || p.company || p.email;
+      return `
+      <div class="gs-item" tabindex="0" data-gs-type="prospect" data-gs-id="${esc(p.id)}">
+        <span class="gs-item-icon">✉</span>
+        <div class="gs-item-text">
+          <div class="gs-item-name">${esc(name)}</div>
+          <div class="gs-item-meta">${esc(p.company || p.email || "")}</div>
+        </div>
+        <span class="gs-item-badge">${esc(p.status || "Prospect")}</span>
+      </div>`;
+    }).join("");
+  }
+
+  el.innerHTML = html;
+  el.hidden = false;
+
+  el.querySelectorAll(".gs-item").forEach(item => {
+    const activate = () => {
+      const type = item.dataset.gsType;
+      const id = item.dataset.gsId;
+      closeGlobalSearch();
+      byId("globalSearch").value = "";
+      state.search = "";
+      if (type === "account") {
+        showDetail("account", id);
+      } else if (type === "deal") {
+        setView("pipeline");
+        setTimeout(() => window.gripPipeline?.render(), 50);
+      } else if (type === "prospect") {
+        setView("outreach");
+      }
+    };
+    item.addEventListener("click", activate);
+    item.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") activate(); });
   });
 }
 
@@ -10273,6 +10408,16 @@ function bindEvents() {
   byId("globalSearch").addEventListener("input", (event) => {
     state.search = event.target.value;
     render();
+    renderGlobalSearch(event.target.value);
+  });
+  byId("globalSearch").addEventListener("focus", (event) => {
+    if (event.target.value.trim().length >= 2) renderGlobalSearch(event.target.value);
+  });
+  byId("globalSearch").addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeGlobalSearch();
+  });
+  document.addEventListener("click", (event) => {
+    if (!byId("globalSearchWrap")?.contains(event.target)) closeGlobalSearch();
   });
   byId("taskSearchInput").addEventListener("input", (event) => {
     state.filters.taskSearch = event.target.value;
@@ -10890,6 +11035,18 @@ function bindEvents() {
     const addTaskAccount = event.target.closest("[data-add-task-account]");
     if (addTaskAccount) {
       openTaskDialog("", addTaskAccount.dataset.addTaskAccount);
+      return;
+    }
+    const quickDealBtn = event.target.closest("[data-quick-deal-account]");
+    if (quickDealBtn) {
+      const accountId = quickDealBtn.dataset.quickDealAccount;
+      setView("pipeline");
+      setTimeout(() => {
+        if (window.gripPipeline) {
+          window.gripPipeline.render();
+          window.gripPipeline.openDealDialog(null, accountId);
+        }
+      }, 80);
       return;
     }
     const roofNotesBtn = event.target.closest("[data-roof-notes-account]");

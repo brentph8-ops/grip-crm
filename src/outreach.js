@@ -31,6 +31,8 @@
   let _selectedContactId = null;
   let _pendingEmailContactId = null;
   let _pendingEmailType = null;
+  let _calToken = null;
+  let _calTokenExpiry = 0;
   let _importSelections = new Set();
   let _searchTerm = "";
   let _statusFilter = "all";
@@ -368,6 +370,78 @@
     });
   }
 
+  // ── Google Calendar sync ──────────────────────────────────────────
+
+  function getCalendarToken() {
+    return new Promise((resolve) => {
+      if (_calToken && Date.now() < _calTokenExpiry - 60_000) { resolve(_calToken); return; }
+      if (!_data.settings.googleClientId || !window.google?.accounts?.oauth2) { resolve(null); return; }
+      const client = window.google.accounts.oauth2.initTokenClient({
+        client_id: _data.settings.googleClientId,
+        scope: "https://www.googleapis.com/auth/calendar.events",
+        callback: (res) => {
+          if (res.error || !res.access_token) { resolve(null); return; }
+          _calToken = res.access_token;
+          _calTokenExpiry = Date.now() + (res.expires_in || 3600) * 1000;
+          resolve(_calToken);
+        },
+        prompt: "",
+      });
+      client.requestAccessToken();
+    });
+  }
+
+  async function syncCampaignToCalendar(campaign) {
+    if (!campaign?.visitDate) {
+      (window.showToast || alert)("Set a visit date on this campaign first.", "warning");
+      return;
+    }
+    if (!_data.settings.googleClientId) {
+      openSettings();
+      (window.showToast || alert)("Add your Google OAuth Client ID in Settings first.", "warning");
+      return;
+    }
+    (window.showToast || alert)("Connecting to Google Calendar…", "info");
+    const token = await getCalendarToken();
+    if (!token) {
+      (window.showToast || alert)("Calendar auth failed or was cancelled.", "error");
+      return;
+    }
+
+    const contacts = (_data.contacts || []).filter(c => c.campaignId === campaign.id);
+    const city = campaign.city || "Campaign Visit";
+    const state = campaign.state || "TX";
+    const desc = [
+      `Campaign: ${campaign.name || city}`,
+      `Prospects: ${contacts.length}`,
+      contacts.slice(0, 8).map(c => `• ${[c.firstName, c.lastName].filter(Boolean).join(" ") || c.company}`).join("\n"),
+    ].join("\n");
+
+    try {
+      const res = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          summary: `GRIP Visit — ${city}, ${state}`,
+          description: desc,
+          start: { date: campaign.visitDate },
+          end:   { date: campaign.visitDate },
+          colorId: "7",
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error?.message || `HTTP ${res.status}`);
+      }
+      (window.showToast || alert)(`✓ Added to Google Calendar: ${city} visit on ${campaign.visitDate}`, "success");
+    } catch (e) {
+      (window.showToast || alert)("Calendar sync failed: " + e.message, "error");
+    }
+  }
+
   async function sendViaGmail(to, subject, body) {
     // Auto-refresh expired token silently before sending
     if (!isGmailConnected()) {
@@ -517,10 +591,14 @@ ${s.assistantName}`;
           <div class="payton-stat"><span class="payton-stat-num ${stats.meetings ? "payton-stat-accent" : ""}">${stats.meetings}</span><span class="payton-stat-label">Meetings</span></div>
           ${due ? `<div class="payton-stat payton-stat-warn"><span class="payton-stat-num">${due}</span><span class="payton-stat-label">Due Today</span></div>` : ""}
         </div>
-        ${_data.campaigns.length > 1 ? `<button class="payton-switch-btn" id="switchCampaignBtn" type="button">Switch</button>` : ""}
+        <div class="payton-campaign-actions">
+          ${_data.campaigns.length > 1 ? `<button class="payton-switch-btn" id="switchCampaignBtn" type="button">Switch</button>` : ""}
+          <button class="payton-cal-btn" id="syncCalendarBtn" type="button" title="Add visit to Google Calendar">📅 Calendar</button>
+        </div>
       </div>
     `;
     document.getElementById("switchCampaignBtn")?.addEventListener("click", openSwitchCampaign);
+    document.getElementById("syncCalendarBtn")?.addEventListener("click", () => syncCampaignToCalendar(activeCampaign()));
     document.getElementById("editVisitDateBtn")?.addEventListener("click", () => {
       const btn = document.getElementById("editVisitDateBtn");
       const current = activeCampaign()?.visitDate || "";

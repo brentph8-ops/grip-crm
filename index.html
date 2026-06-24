@@ -248,9 +248,10 @@
               <span class="mobile-version-label">Mobile Version</span>
             </button>
           </div>
-          <div class="search">
+          <div class="search" id="globalSearchWrap">
             <span aria-hidden="true">⌕</span>
-            <input id="globalSearch" type="search" placeholder="Search clients, projects, contacts, notes" />
+            <input id="globalSearch" type="search" placeholder="Search accounts, deals, prospects…" autocomplete="off" />
+            <div id="globalSearchResults" class="gs-results" hidden></div>
           </div>
           <button id="gripSyncStatus" class="grip-sync-status sync-local" type="button" title="Click to force sync"></button>
           <span id="gripUserDisplay" class="grip-user-display" hidden></span>
@@ -1350,7 +1351,7 @@
           <p class="form-section-label">Gmail OAuth</p>
           <label class="form-label">
             Google OAuth Client ID
-            <small class="form-hint">Create a Client ID in Google Cloud Console with Gmail API scope and your GitHub Pages URL as an authorized JavaScript origin.</small>
+            <small class="form-hint">Create a Client ID in Google Cloud Console. Enable Gmail API + Google Calendar API. Add scopes: gmail.send and calendar.events. Add your GitHub Pages URL as an authorized JavaScript origin.</small>
             <input name="googleClientId" class="form-input" placeholder="123456789.apps.googleusercontent.com" />
           </label>
           <p id="outreachGmailSetupStatus" class="muted-note"></p>

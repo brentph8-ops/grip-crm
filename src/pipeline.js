@@ -286,20 +286,21 @@
 
   // ── Deal dialog ───────────────────────────────────────────────────
 
-  function openDealDialog(editId) {
+  function openDealDialog(editId, preAccountId) {
     _editId = editId || null;
     const dlg = document.getElementById("pipelineDealDialog");
     if (!dlg) return;
 
     const deals = load();
     const existing = editId ? deals.find(d => d.id === editId) : null;
+    const selectId = existing?.accountId || preAccountId || "";
 
     // Populate account select
     const acctSel = document.getElementById("plDealAccount");
     if (acctSel) {
       const accts = accounts();
       acctSel.innerHTML = `<option value="">Select account…</option>` +
-        accts.map(a => `<option value="${esc(a.id)}" data-county="${esc(a.county || "")}" data-entity="${esc(a.entity || "")}" ${existing?.accountId === a.id ? "selected" : ""}>${esc(a.client)}</option>`).join("");
+        accts.map(a => `<option value="${esc(a.id)}" data-county="${esc(a.county || "")}" data-entity="${esc(a.entity || "")}" ${selectId === a.id ? "selected" : ""}>${esc(a.client)}</option>`).join("");
     }
 
     // Fill form
