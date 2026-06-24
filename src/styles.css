@@ -429,8 +429,8 @@ textarea {
 .topbar {
   display: flex;
   align-items: center;
-  flex-wrap: nowrap;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 8px 10px;
   margin-bottom: 22px;
 }
 
@@ -439,7 +439,8 @@ textarea {
   align-items: center;
   gap: 6px;
   flex: 0 0 auto;
-  flex-shrink: 0;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .topbar-user-info {
