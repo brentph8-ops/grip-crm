@@ -318,6 +318,23 @@ ${a}`,
     return !!(s.gmailToken && s.gmailTokenExpiry && Date.now() < s.gmailTokenExpiry);
   }
 
+  function isGmailExpiringSoon() {
+    const s = _data.settings;
+    if (!s.gmailToken || !s.gmailTokenExpiry) return false;
+    // warn when < 10 minutes remain
+    return Date.now() > s.gmailTokenExpiry - 10 * 60 * 1000;
+  }
+
+  function _initTokenClient(prompt, callback) {
+    if (!_data.settings.googleClientId || !window.google?.accounts?.oauth2) return null;
+    return window.google.accounts.oauth2.initTokenClient({
+      client_id: _data.settings.googleClientId,
+      scope: "https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email",
+      callback,
+      prompt,
+    });
+  }
+
   function connectGmail() {
     if (!_data.settings.googleClientId) {
       openSettings();
@@ -328,28 +345,21 @@ ${a}`,
       (window.showToast || alert)("Google Identity Services not loaded yet. Try again in a moment.", "warning");
       return;
     }
-    const client = window.google.accounts.oauth2.initTokenClient({
-      client_id: _data.settings.googleClientId,
-      scope: [
-        "https://www.googleapis.com/auth/gmail.send",
-        "https://www.googleapis.com/auth/userinfo.email",
-      ].join(" "),
-      callback: async (res) => {
-        if (res.error) { (window.showToast || alert)("Gmail auth failed: " + res.error, "error"); return; }
-        _data.settings.gmailToken = res.access_token;
-        _data.settings.gmailTokenExpiry = Date.now() + res.expires_in * 1000;
-        try {
-          const me = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-            headers: { Authorization: `Bearer ${res.access_token}` },
-          }).then(r => r.json());
-          _data.settings.gmailEmail = me.email || "";
-        } catch (_) {}
-        saveData();
-        renderOutreach();
-        (window.showToast || alert)(`Gmail connected: ${_data.settings.gmailEmail}`, "success");
-      },
+    const client = _initTokenClient("select_account", async (res) => {
+      if (res.error) { (window.showToast || alert)("Gmail auth failed: " + res.error, "error"); return; }
+      _data.settings.gmailToken = res.access_token;
+      _data.settings.gmailTokenExpiry = Date.now() + (res.expires_in || 3600) * 1000;
+      try {
+        const me = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+          headers: { Authorization: `Bearer ${res.access_token}` },
+        }).then(r => r.json());
+        _data.settings.gmailEmail = me.email || "";
+      } catch (_) {}
+      saveData();
+      renderOutreach();
+      (window.showToast || alert)(`Gmail connected as ${_data.settings.gmailEmail}`, "success");
     });
-    client.requestAccessToken({ prompt: "select_account" });
+    if (client) client.requestAccessToken();
   }
 
   function disconnectGmail() {
@@ -361,17 +371,38 @@ ${a}`,
     (window.showToast || alert)("Gmail disconnected.", "info");
   }
 
+  // Silently refreshes the token without forcing account picker.
+  // Returns true if a new token was obtained.
+  function silentTokenRefresh() {
+    return new Promise((resolve) => {
+      if (!_data.settings.googleClientId || !window.google?.accounts?.oauth2) {
+        resolve(false); return;
+      }
+      const client = _initTokenClient("", async (res) => {
+        if (res.error || !res.access_token) { resolve(false); return; }
+        _data.settings.gmailToken = res.access_token;
+        _data.settings.gmailTokenExpiry = Date.now() + (res.expires_in || 3600) * 1000;
+        saveData();
+        renderGmailBadge();
+        resolve(true);
+      });
+      if (client) client.requestAccessToken();
+      else resolve(false);
+    });
+  }
+
   async function sendViaGmail(to, subject, body) {
+    // Auto-refresh expired token silently before sending
     if (!isGmailConnected()) {
-      (window.showToast || alert)("Connect Gmail first.", "warning");
-      return false;
+      const refreshed = await silentTokenRefresh();
+      if (!refreshed) {
+        (window.showToast || alert)("Gmail session expired — please reconnect in Settings.", "warning");
+        return false;
+      }
     }
+
     const s = _data.settings;
-    const from = `${s.assistantName} <${s.gmailEmail}>`;
-    const headers = [
-      `From: ${from}`,
-      `To: ${to}`,
-    ];
+    const headers = [`To: ${to}`];
     if (s.ccEmail) headers.push(`Cc: ${s.ccEmail}`);
     headers.push(
       `Subject: ${subject}`,
@@ -382,6 +413,7 @@ ${a}`,
     );
     const msg = headers.join("\r\n");
 
+    // URL-safe base64 encoding (RFC 4648)
     const encoded = btoa(unescape(encodeURIComponent(msg)))
       .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
@@ -396,7 +428,16 @@ ${a}`,
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error?.message || `HTTP ${res.status}`);
+        const msg = err.error?.message || `HTTP ${res.status}`;
+        // Scope error after reconnect = user needs to re-auth manually
+        if (res.status === 403 || (err.error?.status === "PERMISSION_DENIED")) {
+          (window.showToast || alert)(
+            "Gmail permission denied. Go to Settings → Disconnect Gmail → Reconnect to grant send access.",
+            "error"
+          );
+          return false;
+        }
+        throw new Error(msg);
       }
       return true;
     } catch (e) {
@@ -508,8 +549,13 @@ ${s.assistantName}`;
     const connectBtn = document.getElementById("outreachConnectGmailButton");
     if (!statusEl || !connectBtn) return;
     if (isGmailConnected()) {
-      statusEl.textContent = `✓ Sending as ${_data.settings.gmailEmail}`;
-      statusEl.className = "outreach-gmail-status connected";
+      if (isGmailExpiringSoon()) {
+        statusEl.textContent = `⚠ Session expiring — ${_data.settings.gmailEmail}`;
+        statusEl.className = "outreach-gmail-status expiring";
+      } else {
+        statusEl.textContent = `✓ Sending as ${_data.settings.gmailEmail}`;
+        statusEl.className = "outreach-gmail-status connected";
+      }
       connectBtn.textContent = "Disconnect Gmail";
     } else {
       statusEl.textContent = "Gmail not connected";

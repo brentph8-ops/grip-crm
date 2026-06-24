@@ -5841,6 +5841,7 @@ textarea {
 
 .outreach-gmail-status { font-size: 12px; color: var(--muted); white-space: nowrap; }
 .outreach-gmail-status.connected { color: #059669; font-weight: 600; }
+.outreach-gmail-status.expiring { color: #d97706; font-weight: 600; }
 
 /* ── Campaign card ───────────────────────────────────────────────── */
 .payton-empty-campaign { font-size: 14px; color: var(--muted); padding: 4px 0; }
