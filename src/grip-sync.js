@@ -25,6 +25,8 @@
     "grip_ai_memory",
     "grip_followup_queue",
     "garlandOutreach",
+    "garlandPipeline",
+    "garlandRoofNotes",
   ]);
 
   // ── Helpers ──────────────────────────────────────────────────────

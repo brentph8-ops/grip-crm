@@ -50,9 +50,21 @@
         </div>
 
         <nav class="nav" aria-label="Primary views">
-          <button class="nav-button is-active" data-view="dashboard" type="button">
+          <button class="nav-button is-active" data-view="today" type="button">
+            <span aria-hidden="true">☀</span>
+            Today
+          </button>
+          <button class="nav-button" data-view="dashboard" type="button">
             <span aria-hidden="true">⌂</span>
             Dashboard
+          </button>
+          <button class="nav-button" data-view="pipeline" type="button">
+            <span aria-hidden="true">◈</span>
+            Pipeline
+          </button>
+          <button class="nav-button" data-view="territory" type="button">
+            <span aria-hidden="true">⊙</span>
+            Territory
           </button>
           <button class="nav-button" data-view="accounts" type="button">
             <span aria-hidden="true">◎</span>
@@ -250,7 +262,7 @@
           <button data-mobile-quick-add="activity" type="button">Activity</button>
         </section>
 
-        <section id="dashboardView" class="view is-active" aria-labelledby="viewTitle">
+        <section id="dashboardView" class="view" aria-labelledby="viewTitle">
           <div id="dashboardGoals" class="goal-strip"></div>
           <div id="commandCenter" class="command-center"></div>
           <div id="quickFilters" class="quick-filter-strip"></div>
@@ -1027,6 +1039,15 @@
           </div>
         </section>
 
+        <!-- ── Today Dashboard ───────────────────────────────────── -->
+        <section id="todayView" class="view is-active"></section>
+
+        <!-- ── Pipeline / Proposal Tracker ──────────────────────── -->
+        <section id="pipelineView" class="view"></section>
+
+        <!-- ── Territory Map ─────────────────────────────────────── -->
+        <section id="territoryView" class="view"></section>
+
         <!-- ── Outreach / Payton View ────────────────────────────── -->
         <section id="outreachView" class="view">
           <div class="outreach-header">
@@ -1069,6 +1090,123 @@
           </div>
         </section>
       </main>
+
+      <!-- ── Quick Visit Log Dialog ────────────────────────────── -->
+      <dialog id="quickVisitLogDialog" class="modal-dialog">
+        <div class="modal-header">
+          <h3>Quick Visit Log</h3>
+          <button id="closeQuickVisitLogDialog" class="modal-close" type="button" aria-label="Close">×</button>
+        </div>
+        <form id="qlForm" class="modal-form">
+          <label class="form-label">Account
+            <select name="accountId" id="qlAccountSelect" class="form-input" required></select>
+          </label>
+          <label class="form-label">Visit Type
+            <select name="type" class="form-input">
+              <option>Site Visit</option>
+              <option>Phone Call</option>
+              <option>Email Follow-Up</option>
+              <option>Meeting</option>
+              <option>Proposal Delivered</option>
+            </select>
+          </label>
+          <label class="form-label">Notes
+            <textarea name="notes" class="form-textarea" rows="4" placeholder="Quick summary of the visit…" required></textarea>
+          </label>
+          <div class="modal-footer">
+            <button type="button" class="secondary-button" id="cancelQuickVisitLog">Cancel</button>
+            <button type="submit" class="primary-button">Log Visit</button>
+          </div>
+        </form>
+      </dialog>
+
+      <!-- ── Pipeline Deal Dialog ───────────────────────────────── -->
+      <dialog id="pipelineDealDialog" class="modal-dialog">
+        <div class="modal-header">
+          <h3 id="plDealDialogTitle">New Deal</h3>
+          <button id="closePipelineDealDialog" class="modal-close" type="button" aria-label="Close">×</button>
+        </div>
+        <form id="plDealForm" class="modal-form">
+          <label class="form-label">Account
+            <select name="accountId" id="plDealAccount" class="form-input" required></select>
+          </label>
+          <label class="form-label">Deal Title <small class="form-hint">e.g. Roof Replacement – Building A</small>
+            <input name="title" class="form-input" placeholder="Deal description" />
+          </label>
+          <div class="form-row">
+            <label class="form-label">Amount ($) <input name="amount" class="form-input" type="number" step="1000" placeholder="0" /></label>
+            <label class="form-label">Probability (%) <input name="probability" class="form-input" type="number" min="0" max="100" placeholder="50" /></label>
+          </div>
+          <div class="form-row">
+            <label class="form-label">Stage
+              <select name="stage" class="form-input">
+                <option>Prospect</option>
+                <option>Qualifying</option>
+                <option>Proposal Sent</option>
+                <option>Won</option>
+                <option>Lost</option>
+              </select>
+            </label>
+            <label class="form-label">Expected Close <input name="closeDate" class="form-input" type="date" /></label>
+          </div>
+          <label class="form-label">Notes <textarea name="notes" class="form-textarea" rows="3"></textarea></label>
+          <label class="form-label">Loss Reason <small class="form-hint">If applicable</small>
+            <input name="lostReason" class="form-input" placeholder="e.g. Budget, Timing, Competitor" />
+          </label>
+          <div class="modal-footer">
+            <button type="button" class="secondary-button" id="cancelPipelineDeal">Cancel</button>
+            <button type="submit" class="primary-button">Save Deal</button>
+          </div>
+        </form>
+      </dialog>
+
+      <!-- ── Roof / Facility Notes Dialog ──────────────────────── -->
+      <dialog id="roofNotesDialog" class="modal-dialog">
+        <div class="modal-header">
+          <h3>Roof &amp; Facility Notes</h3>
+          <button id="closeRoofNotesDialog" class="modal-close" type="button" aria-label="Close">×</button>
+        </div>
+        <form id="roofNotesForm" class="modal-form">
+          <input type="hidden" name="accountId" id="roofNotesAccountId" />
+          <div class="form-row">
+            <label class="form-label">Roof System <input name="system" class="form-input" placeholder="e.g. TPO, BUR, Metal" /></label>
+            <label class="form-label">Roof Age (year) <input name="roofAge" class="form-input" placeholder="e.g. 2018" /></label>
+          </div>
+          <div class="form-row">
+            <label class="form-label">Sq Footage <input name="sqFt" class="form-input" placeholder="e.g. 45,000" /></label>
+            <label class="form-label">Stories <input name="stories" class="form-input" placeholder="e.g. 2" /></label>
+          </div>
+          <label class="form-label">Condition
+            <select name="condition" class="form-input">
+              <option value="">Unknown</option>
+              <option>Good</option>
+              <option>Fair</option>
+              <option>Poor</option>
+              <option>Critical</option>
+            </select>
+          </label>
+          <label class="form-label">Garland Products Installed <input name="garlandProducts" class="form-input" placeholder="e.g. Sure-Weld TPO" /></label>
+          <label class="form-label">Last Inspection <input name="lastInspection" class="form-input" type="date" /></label>
+          <label class="form-label">Notes <textarea name="notes" class="form-textarea" rows="3" placeholder="Leaks, HVAC issues, access notes…"></textarea></label>
+          <div class="modal-footer">
+            <button type="button" class="secondary-button" id="cancelRoofNotes">Cancel</button>
+            <button type="submit" class="primary-button">Save Notes</button>
+          </div>
+        </form>
+      </dialog>
+
+      <!-- ── Pre-Visit Dossier Dialog ───────────────────────────── -->
+      <dialog id="preDossierDialog" class="modal-dialog modal-dialog-wide">
+        <div class="modal-header">
+          <h3>Pre-Visit Dossier</h3>
+          <button id="closePreDossierDialog" class="modal-close" type="button" aria-label="Close">×</button>
+        </div>
+        <div class="modal-body" id="preDossierContent"></div>
+        <div class="modal-footer">
+          <button type="button" class="secondary-button" onclick="window.print()">Print</button>
+          <button type="button" class="primary-button" id="closePreDossierBtn">Done</button>
+        </div>
+      </dialog>
 
       <!-- ── Outreach Dialogs ──────────────────────────────────── -->
 
@@ -2333,5 +2471,8 @@
     <script src="src/app.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="src/outreach.js"></script>
+    <script src="src/today.js"></script>
+    <script src="src/pipeline.js"></script>
+    <script src="src/territory.js"></script>
   </body>
 </html>

@@ -6183,6 +6183,8 @@ function showAccountDetail(record) {
       </div>
       <div class="detail-header-actions">
         <button class="mini-button" data-add-task-account="${escapeHtml(record.client)}" type="button">+ Task</button>
+        <button class="mini-button" data-roof-notes-account="${escapeHtml(record.id)}" type="button">🏗 Roof Notes</button>
+        <button class="mini-button" data-dossier-account="${escapeHtml(record.id)}" type="button">📋 Dossier</button>
         <button class="edit-button" data-edit-record="account" data-edit-id="${escapeHtml(record.id)}" type="button">Edit</button>
       </div>
     </div>
@@ -9993,12 +9995,16 @@ function setView(view) {
   if (view === "warrantySummary") renderWarrantySummaryChart();
   if (view === "noteTaker") renderNoteTaker();
   if (view === "outreach") { if (window.gripOutreach) window.gripOutreach.render(); }
-  byId("viewTitle").textContent = { dashboard: "Dashboard", accounts: "Accounts", projects: "Projects", punchList: "Punch List", takeoffEstimator: "Takeoff Estimator", warrantySummary: "Warranty Summary Chart", proposals: "Proposals", scopeDatabase: "Scope of Work", tasks: "Tasks", callList: "Call List", followUpQueue: "Follow-Up Queue", activityLog: "Activity Log", newsReport: "Your News Report", contractors: "Contractors", noteTaker: "Note Taker", outreach: "Assistant" }[view] || view;
+  if (view === "today")     { if (window.gripToday)    window.gripToday.render(); }
+  if (view === "pipeline")  { if (window.gripPipeline) window.gripPipeline.render(); }
+  if (view === "territory") { if (window.gripTerritory) window.gripTerritory.render(); }
+  byId("viewTitle").textContent = { today: "Today", dashboard: "Dashboard", pipeline: "Pipeline", territory: "Territory", accounts: "Accounts", projects: "Projects", punchList: "Punch List", takeoffEstimator: "Takeoff Estimator", warrantySummary: "Warranty Summary Chart", proposals: "Proposals", scopeDatabase: "Scope of Work", tasks: "Tasks", callList: "Call List", followUpQueue: "Follow-Up Queue", activityLog: "Activity Log", newsReport: "Your News Report", contractors: "Contractors", noteTaker: "Note Taker", outreach: "Assistant" }[view] || view;
   if (view === "dashboard") {
     showDueTodayProposalDialog();
     showTaskDailyAlertDialog();
   }
 }
+window.setView = setView;
 
 function closeMobileMoreMenu() {
   const menu = byId("mobileMoreMenu");
@@ -10018,6 +10024,91 @@ function toggleMobileMoreMenu() {
   menu.classList.toggle("is-open", open);
   button.setAttribute("aria-expanded", open ? "true" : "false");
 }
+
+function openRoofNotesDialog(accountId) {
+  const dlg = byId("roofNotesDialog");
+  if (!dlg) return;
+  const notes = JSON.parse(localStorage.getItem("garlandRoofNotes") || "{}");
+  const n = notes[accountId] || {};
+  const form = byId("roofNotesForm");
+  if (form) {
+    byId("roofNotesAccountId").value = accountId;
+    form.elements.namedItem("system").value = n.system || "";
+    form.elements.namedItem("roofAge").value = n.roofAge || "";
+    form.elements.namedItem("sqFt").value = n.sqFt || "";
+    form.elements.namedItem("stories").value = n.stories || "";
+    form.elements.namedItem("condition").value = n.condition || "";
+    form.elements.namedItem("garlandProducts").value = n.garlandProducts || "";
+    form.elements.namedItem("lastInspection").value = n.lastInspection || "";
+    form.elements.namedItem("notes").value = n.notes || "";
+  }
+  dlg.showModal();
+}
+
+function openPreVisitDossier(accountId) {
+  const dlg = byId("preDossierDialog");
+  const content = byId("preDossierContent");
+  if (!dlg || !content) return;
+  const account = data.accounts.find(a => a.id === accountId);
+  if (!account) return;
+  const acts = state.activities[accountId] || [];
+  const recent = acts.slice(-5).reverse();
+  const roofNotes = JSON.parse(localStorage.getItem("garlandRoofNotes") || "{}")[accountId] || {};
+  const pipeline = JSON.parse(localStorage.getItem("garlandPipeline") || "[]").filter(d => d.accountId === accountId);
+  const outreach = JSON.parse(localStorage.getItem("garlandOutreach") || "{}");
+  const prospect = (outreach.contacts || []).find(c => c.accountId === accountId);
+
+  const fmtD = iso => iso ? new Date(iso + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+  const esc = s => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  content.innerHTML = `
+    <div class="dossier">
+      <div class="dossier-section">
+        <h4 class="dossier-h">${esc(account.client)}</h4>
+        <div class="dossier-grid">
+          <span class="dossier-label">Contact</span><span>${esc(account.poc || "—")}</span>
+          <span class="dossier-label">Title</span><span>${esc(account.title || "—")}</span>
+          <span class="dossier-label">Phone</span><span>${esc(account.phone || "—")}</span>
+          <span class="dossier-label">Email</span><span>${esc(account.email || "—")}</span>
+          <span class="dossier-label">County</span><span>${esc(account.county || "—")}</span>
+          <span class="dossier-label">Entity</span><span>${esc(account.entity || "—")}</span>
+          <span class="dossier-label">Address</span><span>${esc(account.address || "—")}</span>
+        </div>
+      </div>
+      ${Object.keys(roofNotes).length ? `
+      <div class="dossier-section">
+        <h4 class="dossier-h">Roof &amp; Facility</h4>
+        <div class="dossier-grid">
+          ${roofNotes.system ? `<span class="dossier-label">System</span><span>${esc(roofNotes.system)}</span>` : ""}
+          ${roofNotes.roofAge ? `<span class="dossier-label">Installed</span><span>${esc(roofNotes.roofAge)}</span>` : ""}
+          ${roofNotes.sqFt ? `<span class="dossier-label">Sq Ft</span><span>${esc(roofNotes.sqFt)}</span>` : ""}
+          ${roofNotes.condition ? `<span class="dossier-label">Condition</span><span>${esc(roofNotes.condition)}</span>` : ""}
+          ${roofNotes.garlandProducts ? `<span class="dossier-label">Garland Products</span><span>${esc(roofNotes.garlandProducts)}</span>` : ""}
+          ${roofNotes.notes ? `<span class="dossier-label">Notes</span><span>${esc(roofNotes.notes)}</span>` : ""}
+        </div>
+      </div>` : ""}
+      ${pipeline.length ? `
+      <div class="dossier-section">
+        <h4 class="dossier-h">Open Deals</h4>
+        ${pipeline.map(d => `<div class="dossier-deal"><span>${esc(d.title || d.accountName)}</span><span class="dossier-stage">${esc(d.stage)}</span>${d.amount ? `<span>$${Number(d.amount).toLocaleString()}</span>` : ""}</div>`).join("")}
+      </div>` : ""}
+      ${prospect ? `
+      <div class="dossier-section">
+        <h4 class="dossier-h">Payton Outreach</h4>
+        <div class="dossier-grid">
+          <span class="dossier-label">Status</span><span>${esc(prospect.status || "—")}</span>
+          <span class="dossier-label">Last Email</span><span>${prospect.lastContactedAt ? fmtD(prospect.lastContactedAt.slice(0,10)) : "—"}</span>
+        </div>
+      </div>` : ""}
+      <div class="dossier-section">
+        <h4 class="dossier-h">Recent Activity</h4>
+        ${recent.length ? recent.map(a => `<div class="dossier-activity"><span class="dossier-act-date">${esc((a.date || a.at || "").slice(0,10))}</span><span>${esc(a.note || a.text || "")}</span></div>`).join("") : "<p style='color:var(--muted);font-size:13px'>No activity logged yet.</p>"}
+      </div>
+    </div>`;
+  dlg.showModal();
+}
+window.openRoofNotesDialog = openRoofNotesDialog;
+window.openPreVisitDossier = openPreVisitDossier;
 
 function bindEvents() {
   document.querySelector(".sidebar").addEventListener("click", (event) => {
@@ -10779,6 +10870,16 @@ function bindEvents() {
       openTaskDialog("", addTaskAccount.dataset.addTaskAccount);
       return;
     }
+    const roofNotesBtn = event.target.closest("[data-roof-notes-account]");
+    if (roofNotesBtn) {
+      openRoofNotesDialog(roofNotesBtn.dataset.roofNotesAccount);
+      return;
+    }
+    const dossierBtn = event.target.closest("[data-dossier-account]");
+    if (dossierBtn) {
+      openPreVisitDossier(dossierBtn.dataset.dossierAccount);
+      return;
+    }
     const editRecord = event.target.closest("[data-edit-record]");
     if (editRecord) {
       if (editRecord.dataset.editRecord === "contractor") {
@@ -11307,6 +11408,41 @@ resetProposalForm();
 render();
 renderNavBadges();
 bindEvents();
+// Start on Today dashboard
+setTimeout(() => { if (window.gripToday) { setView("today"); window.gripToday.render(); } }, 0);
+// Roof notes & dossier dialog wiring
+(function wireNewDialogs() {
+  // Quick log cancel
+  byId("cancelQuickVisitLog")?.addEventListener("click", () => byId("quickVisitLogDialog")?.close());
+  // Pipeline deal cancel
+  byId("cancelPipelineDeal")?.addEventListener("click", () => byId("pipelineDealDialog")?.close());
+  // Roof notes
+  byId("cancelRoofNotes")?.addEventListener("click", () => byId("roofNotesDialog")?.close());
+  byId("closeRoofNotesDialog")?.addEventListener("click", () => byId("roofNotesDialog")?.close());
+  byId("roofNotesForm")?.addEventListener("submit", function(e) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const accountId = fd.get("accountId");
+    if (!accountId) return;
+    const notes = JSON.parse(localStorage.getItem("garlandRoofNotes") || "{}");
+    notes[accountId] = {
+      system: fd.get("system") || "",
+      roofAge: fd.get("roofAge") || "",
+      sqFt: fd.get("sqFt") || "",
+      stories: fd.get("stories") || "",
+      condition: fd.get("condition") || "",
+      garlandProducts: fd.get("garlandProducts") || "",
+      lastInspection: fd.get("lastInspection") || "",
+      notes: fd.get("notes") || "",
+      updatedAt: new Date().toISOString(),
+    };
+    localStorage.setItem("garlandRoofNotes", JSON.stringify(notes));
+    byId("roofNotesDialog")?.close();
+  });
+  // Pre-visit dossier close
+  byId("closePreDossierDialog")?.addEventListener("click", () => byId("preDossierDialog")?.close());
+  byId("closePreDossierBtn")?.addEventListener("click", () => byId("preDossierDialog")?.close());
+})();
 
 // ── Offline banner ────────────────────────────────────────────────
 window.addEventListener("offline", () => { const b = byId("gripOfflineBanner"); if (b) b.hidden = false; });
