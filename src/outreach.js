@@ -105,67 +105,42 @@
     const he = heOrShe();
     const him = himOrHer();
     const his = hisOrHer();
-
-    const locationPhrase = "the area";
     const HeUc = he.charAt(0).toUpperCase() + he.slice(1);
+
+    const sig = `Thanks,\n\n${a}\n\nThe Garland Company\nW: www.garlandco.com\nE: payton.garlandco@gmail.com`;
 
     if (type === "initial") {
       return {
         subject: "Quick question on your roofing",
-        body:
-`Hey ${first},
-
-My name is ${a}. I help ${rep} with The Garland Company out of ${state}.
-
-${rep} is a building envelope representative, so ${he} covers everything that keeps water and air out of a building. ${HeUc} will be in ${locationPhrase} on ${visitDate} and I am putting together a short list of stops for ${him} while ${he} is in the area.
-
-Are you the right person to talk to about roofing or exterior maintenance at your facility? Even a quick 10 to 15 minutes while ${he} is nearby could be worth your time.
-
-${a}`,
+        body: `Hey ${first},\n\nMy name is ${a} and I assist ${rep} with The Garland Company out of ${state}. ${rep} is a building envelope representative covering roofing, waterproofing, and everything that keeps water and air out of a building.\n\n${HeUc} will be in the area on ${visitDate} and I am putting together a short list of stops for ${him}. Would you be the right person to connect with about roofing or exterior maintenance at your facility? Even 10 or 15 minutes while ${he} is nearby would be well worth your time.\n\n${sig}`,
       };
     }
 
     if (type === "followup1") {
       return {
         subject: "Re: Quick question on your roofing",
-        body:
-`Just bumping this up. ${rep}'s schedule in the area on ${visitDate} is starting to fill in.
-
-${a}`,
+        body: `Hey ${first},\n\nJust wanted to bump this up in case it got lost. ${rep} still has a few openings on ${his} schedule for ${visitDate} and would love to stop by if you have a few minutes to spare.\n\n${sig}`,
       };
     }
 
     if (type === "followup2") {
       return {
         subject: "Re: Quick question on your roofing",
-        body:
-`Still have a couple of openings left for ${visitDate}. Wanted to give you a heads up before ${he} is fully booked.
-
-${a}`,
+        body: `Hey ${first},\n\nStill reaching out on behalf of ${rep}. ${his.charAt(0).toUpperCase() + his.slice(1)} schedule for ${visitDate} is getting close to full, but ${he} still has a couple of openings. Wanted to make sure you had a chance to see this before ${he} locks everything in.\n\n${sig}`,
       };
     }
 
     if (type === "final") {
       return {
         subject: "Re: Quick question on your roofing",
-        body:
-`Last one from me. If the timing ever works out down the road, feel free to reach out and I will get something on the calendar.
-
-${a}`,
+        body: `Hey ${first},\n\nLast note from me on this. If the timing ever lines up down the road, feel free to reach back out and I will get something on the calendar for ${rep}. No pressure at all.\n\n${sig}`,
       };
     }
 
     if (type === "warmCheckin") {
       return {
         subject: "Checking in",
-        body:
-`Hey ${first},
-
-This is ${a}, ${rep}'s assistant. ${rep} has been meaning to reconnect and asked me to reach out.
-
-${HeUc} will be in ${locationPhrase} on ${visitDate} and thought it might be a good chance to stop by and catch up. Would you have 15 or 20 minutes while ${he} is around?
-
-${a}`,
+        body: `Hey ${first},\n\nThis is ${a}, ${rep}'s assistant. ${rep} has been meaning to reconnect and asked me to reach out. ${HeUc} will be in the area on ${visitDate} and thought it might be a good chance to stop by and catch up. Would you have 15 or 20 minutes while ${he} is around?\n\n${sig}`,
       };
     }
 
