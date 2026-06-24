@@ -5728,6 +5728,51 @@ textarea {
 }
 .asst-mem-delete:hover { opacity: 1; color: var(--red); }
 
+/* ── All <dialog> elements: force light theme so --ink stays readable ── */
+.modal-dialog {
+  color-scheme: light;
+  background: #ffffff;
+  color: #182b45;
+  border: none;
+  border-radius: 14px;
+  box-shadow: 0 12px 48px rgba(0,0,0,.22);
+  padding: 0;
+  max-width: min(92vw, 540px);
+  width: min(92vw, 540px);
+}
+.modal-dialog.modal-dialog-wide { max-width: min(96vw, 680px); width: min(96vw, 680px); }
+.modal-dialog::backdrop { background: rgba(0,0,0,.45); }
+.modal-dialog .modal-header {
+  padding: 20px 22px 0;
+  margin-bottom: 0;
+  border-bottom: 1px solid #d7e0ea;
+  padding-bottom: 14px;
+}
+.modal-dialog .modal-header h3 { font-size: 16px; font-weight: 700; color: #182b45; margin: 0; }
+.modal-dialog .modal-close {
+  background: none; border: none; font-size: 20px; cursor: pointer;
+  color: #64748b; padding: 0 2px; line-height: 1;
+}
+.modal-dialog .modal-close:hover { color: #182b45; }
+.modal-dialog .modal-body { padding: 18px 22px; }
+.modal-dialog .modal-form { padding: 18px 22px 0; }
+.modal-dialog .modal-footer {
+  padding: 14px 22px 18px;
+  display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+  border-top: 1px solid #d7e0ea; margin-top: 4px;
+}
+.modal-dialog .form-label { color: #182b45; }
+.modal-dialog .form-input,
+.modal-dialog .form-textarea,
+.modal-dialog select,
+.modal-dialog input,
+.modal-dialog textarea {
+  color: #182b45;
+  background: #f5f8fc;
+  border-color: #d7e0ea;
+}
+.modal-dialog .muted-note { color: #64748b; font-size: 12px; }
+
 /* ── Inline modal dialogs ─────────────────────────────────────── */
 .grip-modal-dialog {
   border: none;
