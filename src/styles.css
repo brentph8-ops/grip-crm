@@ -5887,6 +5887,26 @@ textarea {
   color: var(--muted);
   margin-top: 3px;
 }
+.payton-date-edit-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  color: var(--muted);
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+.payton-date-edit-btn:hover { color: var(--accent); }
+.payton-date-inline-input {
+  font-size: 12px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 2px 6px;
+  background: var(--surface);
+  color: var(--ink);
+  outline: none;
+}
 .payton-stat-row {
   display: flex;
   gap: 2px;

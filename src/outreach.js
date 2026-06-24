@@ -71,7 +71,7 @@
   function fmtDate(iso) {
     if (!iso) return "";
     const d = new Date(iso + "T12:00:00");
-    return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+    return d.toLocaleDateString("en-US", { month: "long", day: "numeric" });
   }
 
   function fmtShortDate(iso) {
@@ -504,7 +504,7 @@ ${s.assistantName}`;
       <div class="payton-campaign-card">
         <div class="payton-campaign-left">
           <div class="payton-campaign-name">${escHtml(campaign.city)}${campaign.state ? `, ${escHtml(campaign.state)}` : ""}</div>
-          <div class="payton-campaign-date">Visit · ${fmtDate(campaign.visitDate)}</div>
+          <div class="payton-campaign-date">Visit · <button class="payton-date-edit-btn" id="editVisitDateBtn" type="button" title="Change visit date">${campaign.visitDate ? fmtDate(campaign.visitDate) : "Set date"}</button></div>
         </div>
         <div class="payton-stat-row">
           <div class="payton-stat"><span class="payton-stat-num">${stats.total}</span><span class="payton-stat-label">Prospects</span></div>
@@ -517,6 +517,25 @@ ${s.assistantName}`;
       </div>
     `;
     document.getElementById("switchCampaignBtn")?.addEventListener("click", openSwitchCampaign);
+    document.getElementById("editVisitDateBtn")?.addEventListener("click", () => {
+      const btn = document.getElementById("editVisitDateBtn");
+      const current = activeCampaign()?.visitDate || "";
+      const input = document.createElement("input");
+      input.type = "date";
+      input.value = current;
+      input.className = "payton-date-inline-input";
+      btn.replaceWith(input);
+      input.focus();
+      input.showPicker?.();
+      const commit = () => {
+        const val = input.value;
+        const c = activeCampaign();
+        if (c && val) { c.visitDate = val; saveData(); }
+        renderCampaignBar();
+      };
+      input.addEventListener("change", commit);
+      input.addEventListener("blur", commit);
+    });
   }
 
   function renderGmailBadge() {
