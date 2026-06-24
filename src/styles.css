@@ -429,11 +429,62 @@ textarea {
 .topbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 18px;
+  flex-wrap: nowrap;
+  gap: 10px;
   margin-bottom: 22px;
 }
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  flex-shrink: 0;
+}
+
+.topbar-user-info {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: #f3f4f6;
+  border-radius: 20px;
+  padding: 3px 10px 3px 5px;
+  white-space: nowrap;
+}
+
+.topbar-btn {
+  font-size: 0.72rem;
+  font-weight: 600;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.topbar-btn:hover { background: #f5f5f5; }
+
+.topbar-detail-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  min-height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: transparent;
+  color: #888;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.topbar-detail-toggle:hover { background: #f0f0f0; color: var(--ink); }
+.topbar-detail-toggle svg { transition: transform 0.2s; }
 
 .topbar-title {
   flex: 0 0 292px;
@@ -4647,7 +4698,7 @@ textarea {
 /* Hide collapsible sections when collapsed */
 .app-shell.mobile-preview.header-collapsed .search,
 .app-shell.mobile-preview.header-collapsed .detail-toggle,
-.app-shell.mobile-preview.header-collapsed .topbar > .secondary-button,
+.app-shell.mobile-preview.header-collapsed .topbar-actions,
 .app-shell.mobile-preview.header-collapsed #gripSyncStatus,
 .app-shell.mobile-preview.header-collapsed #gripUserDisplay,
 .app-shell.mobile-preview.header-collapsed .mobile-quick-add {
@@ -4673,15 +4724,9 @@ textarea {
   padding: 6px 4px;
 }
 
-.app-shell.mobile-preview .search,
-.app-shell.mobile-preview .detail-toggle,
-.app-shell.mobile-preview .topbar > .secondary-button {
-  width: 100%;
-  min-width: 0;
-}
-
 .app-shell.mobile-preview .search {
   flex: 0 0 auto;
+  width: 100%;
   height: 36px;
   max-width: none;
   padding: 0 9px;
@@ -4692,37 +4737,27 @@ textarea {
   font-size: 0.82rem;
 }
 
-.app-shell.mobile-preview #territorySettingsButton {
-  width: auto;
-  min-width: 0;
-  min-height: 32px;
-  align-self: flex-start;
-  padding: 0 10px;
+/* Mobile topbar-actions: stack as a row of compact items */
+.app-shell.mobile-preview .topbar-actions {
+  flex-wrap: wrap;
+  width: 100%;
+  gap: 5px;
+}
+
+.app-shell.mobile-preview .topbar-btn,
+.app-shell.mobile-preview #newTaskButton {
   font-size: 0.72rem;
-  white-space: nowrap;
+  min-height: 32px;
+  padding: 0 10px;
+  width: auto;
 }
 
-/* Hide Details toggle — compact chip style in mobile */
-.app-shell.mobile-preview #detailToggle {
-  font-size: 0.62rem;
-  min-height: 22px;
-  padding: 0 8px;
-  width: auto !important;
-  background: transparent;
-  border-color: rgba(0,0,0,0.18);
-  color: #666;
-  border-radius: 20px;
-  align-self: flex-end;
+.app-shell.mobile-preview .topbar-user-info {
+  flex: 0 0 auto;
 }
 
-/* When details hidden in mobile: collapse topbar items, keep toggle */
-.app-shell.mobile-preview.details-hidden #gripSyncStatus,
-.app-shell.mobile-preview.details-hidden #gripUserDisplay,
-.app-shell.mobile-preview.details-hidden #gripSignOutButton,
-.app-shell.mobile-preview.details-hidden #territorySettingsButton,
-.app-shell.mobile-preview.details-hidden #printSummaryButton,
-.app-shell.mobile-preview.details-hidden #newTaskButton,
-.app-shell.mobile-preview.details-hidden .mobile-quick-add {
+/* When details hidden in mobile: collapse topbar-actions, keep toggle */
+.app-shell.mobile-preview.details-hidden .topbar-actions > *:not(#detailToggle) {
   display: none !important;
 }
 

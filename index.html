@@ -243,13 +243,20 @@
             <input id="globalSearch" type="search" placeholder="Search accounts, deals, prospects…" autocomplete="off" />
             <div id="globalSearchResults" class="gs-results" hidden></div>
           </div>
-          <button id="gripSyncStatus" class="grip-sync-status sync-local" type="button" title="Click to force sync"></button>
-          <span id="gripUserDisplay" class="grip-user-display" hidden></span>
-          <button class="secondary-button" id="gripSignOutButton" type="button" hidden>Sign Out</button>
-          <button class="secondary-button detail-toggle" id="territorySettingsButton" type="button">My Settings</button>
-          <button class="secondary-button detail-toggle" id="printSummaryButton" type="button">Print</button>
-          <button class="primary-button detail-toggle" id="newTaskButton" type="button">+ Task</button>
-          <button class="secondary-button detail-toggle" id="detailToggle" type="button">Hide Details</button>
+          <div class="topbar-actions">
+            <div class="topbar-user-info">
+              <button id="gripSyncStatus" class="grip-sync-status sync-local" type="button" title="Click to force sync"></button>
+              <span id="gripUserDisplay" class="grip-user-display" hidden></span>
+            </div>
+            <button class="topbar-btn detail-toggle" id="territorySettingsButton" type="button">My Settings</button>
+            <button class="topbar-btn detail-toggle" id="printSummaryButton" type="button">Print</button>
+            <button class="topbar-btn" id="gripSignOutButton" type="button" hidden>Sign Out</button>
+            <button class="primary-button detail-toggle" id="newTaskButton" type="button">+ Task</button>
+            <button class="topbar-detail-toggle detail-toggle" id="detailToggle" type="button" title="Toggle detail panel">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M10 4H2l4 4z"/></svg>
+              <span id="detailToggleLabel">Details</span>
+            </button>
+          </div>
         </header>
         <section class="mobile-quick-add" aria-label="Mobile quick add">
           <button data-mobile-quick-add="task" type="button">Task</button>

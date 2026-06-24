@@ -10143,7 +10143,12 @@ function clearDetailDrawer() {
 function setDetailsHidden(hidden) {
   state.detailsHidden = hidden;
   byId("appShell").classList.toggle("details-hidden", hidden);
-  byId("detailToggle").textContent = hidden ? "Show Details" : "Hide Details";
+  const lbl = byId("detailToggleLabel");
+  if (lbl) lbl.textContent = hidden ? "Show" : "Details";
+  const tog = byId("detailToggle");
+  if (tog) tog.setAttribute("title", hidden ? "Show detail panel" : "Hide detail panel");
+  const arrow = tog?.querySelector("svg");
+  if (arrow) arrow.style.transform = hidden ? "rotate(180deg)" : "";
 }
 
 function setView(view) {
