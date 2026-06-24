@@ -3896,21 +3896,41 @@ function applyPhoneModeDefaults() {
 function syncMobilePreviewButton() {
   const shell = byId("appShell");
   const button = byId("mobileVersionButton");
+  const toggleBtn = byId("mobileHeaderToggle");
   shell?.classList.toggle("mobile-preview", state.mobilePreview);
   if (button) {
     const label = state.mobilePreview ? "Desktop" : "Mobile";
     const fullLabel = `${label} Version`;
-    const text = button.querySelector("span");
-    if (text) text.textContent = label;
+    const text = button.querySelector(".mobile-version-label");
+    if (text) text.textContent = `${label} Version`;
     button.setAttribute("aria-label", fullLabel);
     button.setAttribute("title", fullLabel);
   }
+  if (toggleBtn) toggleBtn.hidden = !state.mobilePreview;
 }
 
 function toggleMobilePreview() {
   state.mobilePreview = !state.mobilePreview;
-  if (!state.mobilePreview) closeMobileMoreMenu();
+  if (!state.mobilePreview) {
+    closeMobileMoreMenu();
+    byId("appShell")?.classList.remove("header-collapsed");
+  }
   render();
+}
+
+function toggleMobileHeader() {
+  const shell = byId("appShell");
+  if (!shell) return;
+  const collapsed = shell.classList.toggle("header-collapsed");
+  try { localStorage.setItem("gripMobileHeaderCollapsed", collapsed ? "1" : "0"); } catch (_) {}
+}
+
+function restoreMobileHeaderState() {
+  try {
+    if (localStorage.getItem("gripMobileHeaderCollapsed") === "1" && state.mobilePreview) {
+      byId("appShell")?.classList.add("header-collapsed");
+    }
+  } catch (_) {}
 }
 
 function setLayout(viewName, layout) {
@@ -10157,6 +10177,7 @@ function bindEvents() {
   });
   byId("territorySettingsButton").addEventListener("click", openTerritorySettings);
   byId("mobileVersionButton").addEventListener("click", toggleMobilePreview);
+  byId("mobileHeaderToggle")?.addEventListener("click", toggleMobileHeader);
   byId("exportBackupButton").addEventListener("click", exportBackup);
   byId("importBackupButton").addEventListener("click", () => byId("backupImportInput").click());
   byId("backupImportInput").addEventListener("change", (event) => {
@@ -11409,6 +11430,7 @@ resetProposalForm();
 render();
 renderNavBadges();
 bindEvents();
+restoreMobileHeaderState();
 // Start on Today dashboard
 setTimeout(() => { if (window.gripToday) { setView("today"); window.gripToday.render(); } }, 0);
 // Roof notes & dossier dialog wiring

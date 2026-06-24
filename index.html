@@ -232,12 +232,20 @@
       <main class="workspace">
         <header class="topbar">
           <div class="topbar-title">
-            <div>
+            <div class="topbar-title-text">
               <p class="eyebrow">Live working copy</p>
               <h2 id="viewTitle">Dashboard</h2>
             </div>
+            <button class="mobile-header-toggle" id="mobileHeaderToggle" type="button" aria-label="Collapse header" title="Collapse header" hidden>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 5.5 3 10.5l1 1 4-4 4 4 1-1z"/></svg>
+            </button>
             <button class="mobile-version-button" id="mobileVersionButton" type="button" title="Toggle Mobile View" aria-label="Toggle Mobile View">
-              <img src="icons/icon-192.png" alt="GRIP" class="topbar-logo" />
+              <svg class="mobile-version-icon" width="13" height="20" viewBox="0 0 13 20" fill="currentColor" aria-hidden="true">
+                <rect x="1" y="1" width="11" height="18" rx="2.5" ry="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/>
+                <circle cx="6.5" cy="16.5" r="1" fill="currentColor"/>
+                <rect x="4" y="2.8" width="5" height="1" rx=".5" fill="currentColor"/>
+              </svg>
+              <span class="mobile-version-label">Mobile Version</span>
             </button>
           </div>
           <div class="search">
@@ -1322,15 +1330,24 @@
       <!-- Outreach Settings -->
       <dialog id="outreachSettingsDialog" class="modal-dialog">
         <div class="modal-header">
-          <h3>Outreach Settings</h3>
+          <h3>Assistant Settings</h3>
           <button id="closeOutreachSettingsDialog" class="modal-close" type="button" aria-label="Close">×</button>
         </div>
         <form id="outreachSettingsForm" class="modal-form">
-          <label class="form-label">Assistant Name <input name="assistantName" class="form-input" placeholder="Payton" /></label>
+          <p class="form-section-label">Identity</p>
+          <label class="form-label">Assistant Name <small class="form-hint">Name used in subject lines and greetings</small>
+            <input name="assistantName" class="form-input" placeholder="Payton" /></label>
+          <label class="form-label">Sender Display Name <small class="form-hint">Name shown in the Gmail "From" field</small>
+            <input name="senderDisplayName" class="form-input" placeholder="Payton" /></label>
           <label class="form-label">Your Name (Rep) <input name="repName" class="form-input" placeholder="Brent Phillips" /></label>
           <label class="form-label">Your State <input name="repState" class="form-input" placeholder="Texas" /></label>
+          <p class="form-section-label">Email Settings</p>
           <label class="form-label">Daily Recap Email <input name="recapEmail" class="form-input" type="email" /></label>
           <label class="form-label">CC Me On Sent Emails <input name="ccEmail" class="form-input" type="email" placeholder="your@email.com" /></label>
+          <label class="form-label">Email Signature <small class="form-hint">Appears at the bottom of every outreach email</small>
+            <textarea name="signatureText" class="form-textarea" rows="5" placeholder="Thanks,&#10;&#10;Payton&#10;&#10;The Garland Company&#10;W: www.garlandco.com"></textarea>
+          </label>
+          <p class="form-section-label">Gmail OAuth</p>
           <label class="form-label">
             Google OAuth Client ID
             <small class="form-hint">Create a Client ID in Google Cloud Console with Gmail API scope and your GitHub Pages URL as an authorized JavaScript origin.</small>

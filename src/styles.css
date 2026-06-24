@@ -174,6 +174,10 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 28px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .brand {
@@ -185,31 +189,35 @@ textarea {
 
 .mobile-version-button {
   flex: 0 0 auto;
-  width: 38px;
-  height: 38px;
-  border: none;
+  height: 36px;
+  border: 1px solid var(--line);
   border-radius: 8px;
-  background: transparent;
+  background: var(--panel);
+  color: var(--ink);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
-  overflow: hidden;
-  opacity: 0.9;
-  transition: opacity .15s;
+  gap: 7px;
+  padding: 0 12px;
+  opacity: 0.85;
+  transition: opacity .15s, background .15s;
+  white-space: nowrap;
 }
 
 .mobile-version-button:hover {
   opacity: 1;
+  background: var(--line);
 }
 
-.topbar-logo {
-  width: 38px;
-  height: 38px;
-  border-radius: 8px;
-  display: block;
-  object-fit: cover;
+.mobile-version-icon {
+  flex: 0 0 auto;
+}
+
+.mobile-version-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 .brand-mark {
@@ -4461,6 +4469,10 @@ textarea {
   padding: 14px 12px 92px;
 }
 
+.mobile-header-toggle {
+  display: none;
+}
+
 .app-shell.mobile-preview .topbar {
   align-items: stretch;
   flex-direction: column;
@@ -4480,6 +4492,49 @@ textarea {
   flex: 0 0 auto;
   min-width: 0;
   width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.app-shell.mobile-preview .topbar-title-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.app-shell.mobile-preview .mobile-header-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background .15s;
+}
+
+.app-shell.mobile-preview .mobile-header-toggle:hover {
+  background: var(--panel);
+}
+
+/* Rotate arrow when collapsed */
+.app-shell.mobile-preview.header-collapsed .mobile-header-toggle svg {
+  transform: rotate(180deg);
+}
+
+/* Hide collapsible sections when collapsed */
+.app-shell.mobile-preview.header-collapsed .search,
+.app-shell.mobile-preview.header-collapsed .detail-toggle,
+.app-shell.mobile-preview.header-collapsed .topbar > .secondary-button,
+.app-shell.mobile-preview.header-collapsed #gripSyncStatus,
+.app-shell.mobile-preview.header-collapsed #gripUserDisplay,
+.app-shell.mobile-preview.header-collapsed .mobile-quick-add {
+  display: none !important;
 }
 
 .app-shell.mobile-preview .mobile-quick-add {
@@ -6353,6 +6408,7 @@ textarea {
   cursor: pointer;
 }
 .form-hint { display: block; font-size: 11px; color: var(--muted); margin: 2px 0 5px; }
+.form-section-label { margin: 12px 0 4px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .campaign-custom-city-row.hidden { display: none; }
 
 /* Sync button clickable */

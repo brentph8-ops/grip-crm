@@ -9,11 +9,13 @@
 
   const DEFAULT_SETTINGS = {
     assistantName: "Payton",
+    senderDisplayName: "Payton",
     repName: "Brent Phillips",
     repState: "Texas",
     repGender: "male",
     recapEmail: "brentph8@gmail.com",
     ccEmail: "brentph8@gmail.com",
+    signatureText: "Thanks,\n\nPayton\n\nThe Garland Company\nW: www.garlandco.com\nE: payton.garlandco@gmail.com",
     googleClientId: "",
     gmailToken: null,
     gmailEmail: "",
@@ -107,7 +109,7 @@
     const his = hisOrHer();
     const HeUc = he.charAt(0).toUpperCase() + he.slice(1);
 
-    const sig = `Thanks,\n\n${a}\n\nThe Garland Company\nW: www.garlandco.com\nE: payton.garlandco@gmail.com`;
+    const sig = s.signatureText || `Thanks,\n\n${a}\n\nThe Garland Company\nW: www.garlandco.com\nE: payton.garlandco@gmail.com`;
 
     if (type === "initial") {
       return {
@@ -377,7 +379,9 @@
     }
 
     const s = _data.settings;
+    const displayName = s.senderDisplayName || s.assistantName || "Payton";
     const headers = [`To: ${to}`];
+    if (s.gmailEmail) headers.push(`From: ${displayName} <${s.gmailEmail}>`);
     if (s.ccEmail) headers.push(`Cc: ${s.ccEmail}`);
     headers.push(
       `Subject: ${subject}`,
@@ -782,12 +786,14 @@ ${s.assistantName}`;
     const s = _data.settings;
     const form = document.getElementById("outreachSettingsForm");
     if (!form) return;
-    form.elements.assistantName.value = s.assistantName;
-    form.elements.repName.value       = s.repName;
-    form.elements.repState.value      = s.repState;
-    form.elements.recapEmail.value    = s.recapEmail;
-    form.elements.ccEmail.value       = s.ccEmail || "";
-    form.elements.googleClientId.value = s.googleClientId;
+    form.elements.assistantName.value    = s.assistantName;
+    form.elements.senderDisplayName.value = s.senderDisplayName || s.assistantName;
+    form.elements.repName.value          = s.repName;
+    form.elements.repState.value         = s.repState;
+    form.elements.recapEmail.value       = s.recapEmail;
+    form.elements.ccEmail.value          = s.ccEmail || "";
+    form.elements.signatureText.value    = s.signatureText || DEFAULT_SETTINGS.signatureText;
+    form.elements.googleClientId.value   = s.googleClientId;
     const statusEl = document.getElementById("outreachGmailSetupStatus");
     if (statusEl) {
       statusEl.textContent = isGmailConnected()
@@ -821,12 +827,14 @@ ${s.assistantName}`;
     document.getElementById("outreachSettingsForm")?.addEventListener("submit", (e) => {
       e.preventDefault();
       const form = new FormData(e.currentTarget);
-      _data.settings.assistantName  = String(form.get("assistantName") || "").trim() || "Payton";
-      _data.settings.repName        = String(form.get("repName") || "").trim();
-      _data.settings.repState       = String(form.get("repState") || "").trim();
-      _data.settings.recapEmail     = String(form.get("recapEmail") || "").trim();
-      _data.settings.ccEmail        = String(form.get("ccEmail") || "").trim();
-      _data.settings.googleClientId = String(form.get("googleClientId") || "").trim();
+      _data.settings.assistantName      = String(form.get("assistantName") || "").trim() || "Payton";
+      _data.settings.senderDisplayName  = String(form.get("senderDisplayName") || "").trim() || _data.settings.assistantName;
+      _data.settings.repName            = String(form.get("repName") || "").trim();
+      _data.settings.repState           = String(form.get("repState") || "").trim();
+      _data.settings.recapEmail         = String(form.get("recapEmail") || "").trim();
+      _data.settings.ccEmail            = String(form.get("ccEmail") || "").trim();
+      _data.settings.signatureText      = String(form.get("signatureText") || "").trim() || DEFAULT_SETTINGS.signatureText;
+      _data.settings.googleClientId     = String(form.get("googleClientId") || "").trim();
       saveData();
       document.getElementById("outreachSettingsDialog")?.close();
       renderOutreach();
