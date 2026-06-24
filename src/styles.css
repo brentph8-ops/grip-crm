@@ -4783,7 +4783,7 @@ textarea {
 }
 
 .app-shell.mobile-preview .goal-strip {
-  gap: 8px;
+  display: none;
 }
 
 .app-shell.mobile-preview .goal-card {
