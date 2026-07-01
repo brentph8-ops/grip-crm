@@ -9856,15 +9856,6 @@ function handleProposalSubmit(event) {
   ) {
     return;
   }
-  if (
-    shouldStopForDuplicate(
-      "proposal",
-      form.get("project"),
-      cleanProposals().map((proposal) => proposal.project || proposal.client)
-    )
-  ) {
-    return;
-  }
   backfillAccountFromWork(client, {
     clientRanking: form.get("clientRanking") || "Prospecting",
     entity: form.get("entity") || "",
