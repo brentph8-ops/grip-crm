@@ -66,6 +66,7 @@
   // Accumulates writes, then flushes after 800 ms of quiet.
 
   const pushQueue = {};
+  const _lastLocalWriteTime = {}; // tracks when WE last wrote each key
 
   async function flushKey(key, jsonString) {
     const client = getClient();
@@ -87,6 +88,7 @@
   }
 
   function schedulePush(key, jsonString) {
+    _lastLocalWriteTime[key] = Date.now();
     clearTimeout(pushQueue[key]);
     pushQueue[key] = setTimeout(() => flushKey(key, jsonString), 800);
   }
@@ -248,6 +250,54 @@
     }
   }
 
+  // ── Real-time subscription ───────────────────────────────────────
+  // Listens for changes pushed from OTHER devices and applies them live.
+  // Changes WE wrote are suppressed for 5 s to avoid echo loops.
+
+  let _realtimeChannel = null;
+  const ECHO_SUPPRESS_MS = 5000;
+
+  function subscribeToRemoteChanges(user) {
+    const client = getClient();
+    if (!client || !user) return;
+
+    if (_realtimeChannel) {
+      client.removeChannel(_realtimeChannel);
+      _realtimeChannel = null;
+    }
+
+    _realtimeChannel = client
+      .channel("grip-realtime-" + user.id)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "grip_data", filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          const row = payload.new;
+          if (!row || !row.data_key) return;
+
+          // Ignore echo of our own writes
+          const lastWrite = _lastLocalWriteTime[row.data_key] || 0;
+          if (Date.now() - lastWrite < ECHO_SUPPRESS_MS) return;
+
+          // Write to localStorage without re-triggering the push
+          _origSetItem(row.data_key, JSON.stringify(row.data_value));
+
+          // Re-render the app with the fresh data
+          if (typeof window.render === "function") window.render();
+          updateSyncIndicator("saved");
+        }
+      )
+      .subscribe();
+  }
+
+  function unsubscribeFromRemoteChanges() {
+    const client = getClient();
+    if (client && _realtimeChannel) {
+      client.removeChannel(_realtimeChannel);
+      _realtimeChannel = null;
+    }
+  }
+
   // ── Initialisation ───────────────────────────────────────────────
 
   async function init() {
@@ -282,6 +332,7 @@
         updateUserDisplay(user);
         showAuthOverlay(false);
         updateSyncIndicator("syncing");
+        subscribeToRemoteChanges(user);
         const hadCloud = await pullAll();
         if (!hadCloud) {
           // First time — offer to push local data up
@@ -300,6 +351,7 @@
           window.location.reload();
         }
       } else if (event === "SIGNED_OUT") {
+        unsubscribeFromRemoteChanges();
         updateSyncIndicator("local");
         updateUserDisplay(null);
         showAuthOverlay(true);
@@ -314,6 +366,7 @@
       showAuthOverlay(false);
       updateUserDisplay(session.user);
       updateSyncIndicator("saved");
+      subscribeToRemoteChanges(session.user);
     }
   }
 
