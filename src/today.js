@@ -123,6 +123,28 @@
     };
   }
 
+  function overdueDeals() {
+    const today = todayIso();
+    return pipeline().filter(d =>
+      !["Won", "Lost"].includes(d.stage) && d.closeDate && d.closeDate < today
+    ).sort((a, b) => a.closeDate.localeCompare(b.closeDate));
+  }
+
+  function renderOverdueDeals(deals) {
+    if (!deals.length) return "";
+    const todayMs = new Date(todayIso() + "T12:00:00").getTime();
+    return deals.map(d => {
+      const days = Math.floor((todayMs - new Date(d.closeDate + "T12:00:00").getTime()) / 86400000);
+      return `<div class="td-overdue-deal" data-pl-overdue="${esc(d.id)}">
+        <div>
+          <span class="td-overdue-name">${esc(d.title || d.accountName)}</span>
+          <span class="td-overdue-meta">${esc(d.accountName)} · ${esc(d.stage)}</span>
+        </div>
+        <span class="td-overdue-age">${days}d past close</span>
+      </div>`;
+    }).join("");
+  }
+
   // ── Render helpers ────────────────────────────────────────────────
 
   function card(title, count, body, subtitle = "") {
@@ -213,6 +235,7 @@
     const cold = coldAccounts();
     const visits = upcomingVisits();
     const ps = pipelineStats();
+    const overdue = overdueDeals();
     const accts = accounts();
 
     const now = new Date();
@@ -255,6 +278,12 @@
           </div>` : ""}
         </div>
 
+        ${overdue.length ? `<div class="td-overdue-alert">
+          <span class="td-overdue-alert-label">⚠ ${overdue.length} deal${overdue.length !== 1 ? "s" : ""} past close date</span>
+          <button class="td-overdue-view-btn" data-view="pipeline" type="button">View Pipeline →</button>
+        </div>
+        <div class="td-overdue-list">${renderOverdueDeals(overdue)}</div>` : ""}
+
         <div class="td-grid">
           ${card("Follow-Ups Due", fups.length, renderFollowUps(fups))}
           ${card("Tasks Due Today", tdue.length, renderTasks(tdue))}
@@ -276,6 +305,12 @@
     el.querySelectorAll("[data-view]").forEach(btn => {
       btn.addEventListener("click", () => {
         if (typeof window.setView === "function") window.setView(btn.dataset.view);
+      });
+    });
+
+    el.querySelectorAll("[data-pl-overdue]").forEach(row => {
+      row.addEventListener("click", () => {
+        if (typeof window.setView === "function") window.setView("pipeline");
       });
     });
 
@@ -313,6 +348,11 @@
   // ── Public API ────────────────────────────────────────────────────
 
   window.gripToday = { render, openQuickLog, submitQuickLog };
+
+  // Activate Today as the landing view now that this module is ready
+  if (typeof window.setView === "function") {
+    window.setView("today");
+  }
 
   // Wire dialog form on DOM ready
   function initDialogListeners() {

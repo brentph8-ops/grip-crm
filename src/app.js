@@ -142,8 +142,22 @@ const projectStages = [
   "Work Scheduled",
   "Work Completed",
   "On Hold",
-  "Proposal Rejected",
+  "Project Won",
+  "Dead Project",
 ];
+
+const PROJECT_TERMINAL_STAGES = new Set(["Project Won", "Dead Project"]);
+const PROJECT_WON_ARCHIVE_MS = 365 * 86400000;
+
+function projectAutoArchived(item) {
+  if (!PROJECT_TERMINAL_STAGES.has(item.stage)) return false;
+  if (item.stage === "Dead Project") return true;
+  // Project Won: archive after 1 year. Fall back to createdAt for records
+  // that were moved to this stage before stageClosedAt stamping was added.
+  const closedDate = item.stageClosedAt || item.createdAt;
+  if (!closedDate) return false;
+  return Date.now() - dateValue(closedDate) > PROJECT_WON_ARCHIVE_MS;
+}
 
 const abcScores = ["Job Won", "A (90%)", "B (50%)", "C (25%)"];
 const accountRankOptions = ["Prospecting", "In Progress", "Meeting", "C", "B", "A", "Dead End"];
@@ -3346,7 +3360,13 @@ function followUpQueueRecords() {
     ...cleanProjects().map((record) => ({ type: "project", id: record.id, title: record.projectName || record.client, client: record.client, date: record.nextFollowUp, record })),
     ...cleanProposals().map((record) => ({ type: "proposal", id: record.id, title: record.project || record.client, client: record.client, date: record.nextFollowUp, record })),
   ].filter((item) => openRecordStatus(item.record));
-  return base
+
+  // Add pipeline deals whose close date is overdue or within 7 days
+  const pipelineDeals = JSON.parse(localStorage.getItem("garlandPipeline") || "[]")
+    .filter(d => !["Won", "Lost"].includes(d.stage) && d.closeDate && d.closeDate <= soonKey)
+    .map(d => ({ type: "deal", id: d.id, title: d.title || d.accountName, client: d.accountName, date: d.closeDate, record: d }));
+
+  return [...base, ...pipelineDeals]
     .map((item) => {
       const urgency = !item.date ? "missing" : item.date < todayKey ? "overdue" : item.date === todayKey ? "today" : item.date <= soonKey ? "soon" : "later";
       const urgencyRank = { overdue: 0, today: 1, missing: 2, soon: 3, later: 4 }[urgency];
@@ -3601,10 +3621,22 @@ function taskCreatedIncompleteAccounts() {
     .filter((item) => item.missing.length);
 }
 
+function applyTaskDailyAlertSnooze() {
+  const cb = byId("taskDailyAlertSnoozeCheckbox");
+  if (!cb?.checked) return;
+  const until = new Date(Date.now() + 30 * 86400000).toISOString();
+  localStorage.setItem("garlandTaskDailyAlertSnoozedUntil", until);
+}
+
 function showTaskDailyAlertDialog(force = false) {
   const dialog = byId("taskDailyAlertDialog");
   if (!dialog || dialog.open) return;
   if (!force && document.querySelector("dialog[open]")) return;
+  if (!force) {
+    const snoozedUntil = localStorage.getItem("garlandTaskDailyAlertSnoozedUntil");
+    if (snoozedUntil && Date.now() < new Date(snoozedUntil).getTime()) return;
+  }
+  if (!force && !byId("gripAuthOverlay")?.hidden) return;
   const key = taskDailyAlertKey();
   if (!force && localStorage.getItem(key)) return;
   const todayTasks = state.tasks.filter((task) => taskDueLevel(task) === "today" && !["Completed", "Cancelled"].includes(task.status));
@@ -3713,6 +3745,8 @@ function renderFollowUpQueue() {
 
 function followUpQueueItem(item) {
   const dateLabel = item.date ? compactDate(item.date) : "No next step";
+  const isDeal = item.type === "deal";
+  const amtLabel = isDeal && item.record?.amount ? ` · ${item.record.amount >= 1000 ? "$" + Math.round(item.record.amount / 1000) + "K" : "$" + Math.round(item.record.amount).toLocaleString()}` : "";
   return `<article class="timeline-item follow-up-item ${item.urgency}" data-type="${item.type}" data-id="${escapeHtml(item.id)}">
     <div class="timeline-date">
       <strong>${escapeHtml(item.urgency.toUpperCase())}</strong>
@@ -3720,7 +3754,7 @@ function followUpQueueItem(item) {
     </div>
     <div class="timeline-body">
       <h3>${escapeHtml(item.title || item.client || "Record")}</h3>
-      <p>${escapeHtml([item.client, item.type].filter(Boolean).join(" • "))}</p>
+      <p>${escapeHtml([item.client, isDeal ? "pipeline deal" : item.type].filter(Boolean).join(" • "))}${escapeHtml(amtLabel)}</p>
       <div class="card-meta">
         <span class="pill ${dashboardColorClass(item.urgency)}">${escapeHtml(item.urgency)}</span>
         ${item.record?.stage ? `<span class="pill ${rankClass(item.record.stage)}">${escapeHtml(item.record.stage)}</span>` : ""}
@@ -4147,6 +4181,14 @@ function renderAccounts() {
     state.layouts.accounts === "kanban" ? (item) => item.entity || item.clientRanking : null
   );
   byId("accountsManageList").innerHTML = records.length ? records.map(manageAccountRow).join("") : empty("No accounts match this view.");
+  const countBar = byId("accountsCountBar");
+  if (countBar) {
+    const total = cleanAccounts().length;
+    countBar.textContent = records.length === total
+      ? `${total} account${total !== 1 ? "s" : ""}`
+      : `${records.length} of ${total} account${total !== 1 ? "s" : ""}`;
+    countBar.hidden = false;
+  }
 }
 
 function renderActivityLog() {
@@ -4200,6 +4242,7 @@ function activityTimelineItem(item) {
 function renderProjects() {
   const records = cleanProjects().filter((item) => {
     return (
+      !projectAutoArchived(item) &&
       includesSearch(item) &&
       dataQualityMatch("project", item) &&
       (state.filters.projectStage === "All project stages" || item.stage === state.filters.projectStage) &&
@@ -4210,6 +4253,12 @@ function renderProjects() {
   }).sort(sortProjects);
   applyLayout("projectsList", "projects");
   byId("projectsList").innerHTML = listWrap(records, projectCard, "No projects match this view.", state.layouts.projects === "kanban" ? (item) => item.stage : null, projectStages);
+  const projBar = byId("projectsCountBar");
+  if (projBar) {
+    const total = cleanProjects().filter(i => !projectAutoArchived(i)).length;
+    projBar.textContent = records.length === total ? `${total} project${total !== 1 ? "s" : ""}` : `${records.length} of ${total} project${total !== 1 ? "s" : ""}`;
+    projBar.hidden = false;
+  }
 }
 
 function takeoffCatalogForType(type) {
@@ -5271,9 +5320,20 @@ function showAccountActivityLog(accountId) {
   renderActivityLog();
 }
 
+const PROPOSAL_CLOSED_STAGES = new Set(["Work Completed", "Proposal Rejected"]);
+const PROPOSAL_ARCHIVE_MS = 45 * 86400000;
+
+function proposalAutoArchived(item) {
+  if (!PROPOSAL_CLOSED_STAGES.has(item.stage)) return false;
+  const closedDate = item.stageClosedAt || item.bidDueDate || item.projectStartDate || item.createdAt;
+  if (!closedDate) return false;
+  return Date.now() - dateValue(closedDate) > PROPOSAL_ARCHIVE_MS;
+}
+
 function renderProposals() {
   const records = cleanProposals().filter((item) => {
     return (
+      !proposalAutoArchived(item) &&
       includesSearch(item) &&
       dataQualityMatch("proposal", item) &&
       (state.filters.proposalStage === "All proposal stages" || item.stage === state.filters.proposalStage) &&
@@ -5284,6 +5344,12 @@ function renderProposals() {
   }).sort(sortProposals);
   applyLayout("proposalsList", "proposals");
   byId("proposalsList").innerHTML = listWrap(records, proposalCard, "No proposals match this view.", state.layouts.proposals === "kanban" ? (item) => item.stage : null, proposalStages);
+  const propBar = byId("proposalsCountBar");
+  if (propBar) {
+    const total = cleanProposals().filter(i => !proposalAutoArchived(i)).length;
+    propBar.textContent = records.length === total ? `${total} proposal${total !== 1 ? "s" : ""}` : `${records.length} of ${total} proposal${total !== 1 ? "s" : ""}`;
+    propBar.hidden = false;
+  }
 }
 
 function renderContractors() {
@@ -5981,7 +6047,19 @@ function persistRecordEdit(type, id, key, value, refresh = true) {
   } else {
     savedCrm.edits[collection][id] = { ...(savedCrm.edits[collection][id] || {}), [key]: cleanedValue };
   }
+  if (key === "stage" && (
+    (type === "proposal" && ["Work Completed", "Proposal Rejected"].includes(cleanedValue)) ||
+    (type === "project" && PROJECT_TERMINAL_STAGES.has(cleanedValue))
+  )) {
+    const closedNow = new Date().toISOString();
+    if (record) record.stageClosedAt = closedNow;
+    if (local) local.stageClosedAt = closedNow;
+    else if (savedCrm.edits[collection]?.[id]) savedCrm.edits[collection][id].stageClosedAt = closedNow;
+  }
   saveCrm();
+  if (type === "account" && key === "address" && cleanedValue && String(cleanedValue).trim().length > 5) {
+    setTimeout(() => window.gripMap?.geocodeAccountById(id, cleanedValue), 300);
+  }
   if (key === "nextFollowUp" && record) promptFollowUpActivity(type, record, oldValue, cleanedValue);
   if (refresh) {
     renderFilters();
@@ -6196,6 +6274,7 @@ function findRecord(type, id) {
 }
 
 function showDetail(type, id) {
+  if (type === "deal") { setView("pipeline"); return; }
   const record = findRecord(type, id);
   if (!record) return;
   setDetailsHidden(false);
@@ -6245,6 +6324,7 @@ function showDetail(type, id) {
     ${type === "project" ? projectChecklistButton(record) : ""}
     ${type === "project" ? projectPunchListSection(record) : ""}
     ${quickActionSection(type, record)}
+    ${recordPipelineDeals(type, record)}
     ${type === "project" ? projectUploadSections(record) : ""}
     ${type === "proposal" ? proposalUploadSections(record) : ""}
     <section class="detail-section">
@@ -6278,7 +6358,7 @@ function showAccountDetail(record) {
       </div>
       <div class="detail-header-actions">
         <button class="mini-button" data-add-task-account="${escapeHtml(record.client)}" type="button">+ Task</button>
-        <button class="mini-button" data-quick-deal-account="${escapeHtml(record.id)}" type="button">◈ Deal</button>
+        <button class="mini-button" data-quick-deal-account="${escapeHtml(record.id)}" type="button">+ Pipeline</button>
         <button class="mini-button" data-roof-notes-account="${escapeHtml(record.id)}" type="button">🏗 Roof Notes</button>
         <button class="mini-button" data-dossier-account="${escapeHtml(record.id)}" type="button">📋 Dossier</button>
         <button class="edit-button" data-edit-record="account" data-edit-id="${escapeHtml(record.id)}" type="button">Edit</button>
@@ -6306,6 +6386,7 @@ function showAccountDetail(record) {
     ${relatedSection("Tasks", related.tasks.filter(t => !["Completed","Cancelled"].includes(t.status)), accountTaskMiniRecord)}
     ${relatedSection("Projects", related.projects, accountProjectMiniRecord)}
     ${relatedSection("Proposals", related.proposals, accountProposalMiniRecord)}
+    ${accountPipelineDeals(record)}
 
     <section class="detail-section">
       <h4>Activity Log</h4>
@@ -6325,6 +6406,50 @@ function showAccountDetail(record) {
     ${deleteButton("account", record.id, "account")}
   `;
   byId("detailDrawer").classList.add("is-open");
+}
+
+function recordPipelineDeals(type, record) {
+  if (!["project", "proposal"].includes(type)) return "";
+  const linked = JSON.parse(localStorage.getItem("garlandPipeline") || "[]")
+    .filter(d => d.linkedType === type && d.linkedId === record.id);
+  if (!linked.length) return "";
+  const fmtAmt = n => { const v = parseFloat(n) || 0; return v >= 1000 ? "$" + Math.round(v / 1000) + "K" : v ? "$" + Math.round(v).toLocaleString() : ""; };
+  const COLORS = { Prospect: "#f1f5f9", Qualifying: "#dbeafe", "Proposal Sent": "#fef9c3", Won: "#bbf7d0", Lost: "#fee2e2" };
+  const TCOLORS = { Prospect: "#475569", Qualifying: "#1d4ed8", "Proposal Sent": "#92400e", Won: "#15803d", Lost: "#991b1b" };
+  return `<section class="detail-section">
+    <h4>Linked Pipeline Deals</h4>
+    <div class="acct-deal-list">
+      ${linked.map(d => `<div class="acct-deal-row">
+        <div class="acct-deal-info">
+          <span class="acct-deal-name">${escapeHtml(d.title || d.accountName)}</span>
+          ${fmtAmt(d.amount) ? `<span class="acct-deal-amt">${fmtAmt(d.amount)}</span>` : ""}
+        </div>
+        <span class="acct-deal-stage" style="background:${COLORS[d.stage] || "#f1f5f9"};color:${TCOLORS[d.stage] || "#475569"}">${escapeHtml(d.stage)}</span>
+      </div>`).join("")}
+    </div>
+  </section>`;
+}
+
+function accountPipelineDeals(account) {
+  const deals = JSON.parse(localStorage.getItem("garlandPipeline") || "[]")
+    .filter(d => d.accountId === account.id);
+  if (!deals.length) return "";
+  const fmtAmt = n => { const v = parseFloat(n) || 0; return v >= 1000 ? "$" + Math.round(v / 1000) + "K" : v ? "$" + Math.round(v).toLocaleString() : ""; };
+  const COLORS = { Prospect: "#f1f5f9", Qualifying: "#dbeafe", "Proposal Sent": "#fef9c3", Won: "#bbf7d0", Lost: "#fee2e2" };
+  const TCOLORS = { Prospect: "#475569", Qualifying: "#1d4ed8", "Proposal Sent": "#92400e", Won: "#15803d", Lost: "#991b1b" };
+  return `<section class="detail-section">
+    <h4>Pipeline Deals</h4>
+    <div class="acct-deal-list">
+      ${deals.map(d => `<div class="acct-deal-row">
+        <div class="acct-deal-info">
+          <span class="acct-deal-name">${escapeHtml(d.title || d.accountName)}</span>
+          ${fmtAmt(d.amount) ? `<span class="acct-deal-amt">${fmtAmt(d.amount)}</span>` : ""}
+        </div>
+        <span class="acct-deal-stage" style="background:${COLORS[d.stage] || "#f1f5f9"};color:${TCOLORS[d.stage] || "#475569"}">${escapeHtml(d.stage)}</span>
+      </div>`).join("")}
+    </div>
+    <button class="mini-button" style="margin-top:8px" data-quick-deal-account="${escapeHtml(account.id)}" type="button">+ Add Pipeline Deal</button>
+  </section>`;
 }
 
 function accountRelatedContractors(account) {
@@ -6733,6 +6858,7 @@ function renderCallList() {
               <strong>${escapeHtml(account.client)}</strong>
               <small>${escapeHtml([account.poc, account.phone, account.email].filter(Boolean).join(" • "))}</small>
             </button>
+            <button class="call-account-page-btn" data-open-account-page="${escapeHtml(account.id)}" type="button" title="Open account page">↗</button>
             <div class="call-item-calendar">
               ${calendarButtons(callListEvent(account, day), "Add to Calendar")}
             </div>
@@ -7585,6 +7711,84 @@ function exportContactsCsv(type) {
   const headers = ["Company", "Name", "Title", "Phone", "Email", "Address", "Category"];
   const csv = [headers.map(csvCell).join(","), ...rows.map((row) => [row.company, row.name, row.title, row.phone, row.email, row.address, row.category].map(csvCell).join(","))].join("\n");
   downloadTextFile(`grip-${type}-contacts-${toLocalDateKey(new Date())}.csv`, csv, "text/csv;charset=utf-8");
+}
+
+function exportAccountsExcel() {
+  const pipeline = JSON.parse(localStorage.getItem("garlandPipeline") || "[]");
+  const pipelineByAccount = {};
+  for (const d of pipeline) {
+    if (!d.accountId || ["Won","Lost"].includes(d.stage)) continue;
+    if (!pipelineByAccount[d.accountId]) pipelineByAccount[d.accountId] = { count: 0, value: 0 };
+    pipelineByAccount[d.accountId].count++;
+    pipelineByAccount[d.accountId].value += parseFloat(d.amount) || 0;
+  }
+
+  const xlCell = (val, type = "String") =>
+    `<Cell><Data ss:Type="${type}">${String(val ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}</Data></Cell>`;
+  const hdCell = (val) =>
+    `<Cell ss:StyleID="hdr"><Data ss:Type="String">${String(val).replace(/&/g,"&amp;")}</Data></Cell>`;
+
+  const headers = [
+    "Account Name","Contact (POC)","Title","Phone","Email","Address",
+    "Entity","County","Ranking","Shared Rep","Next Follow-Up",
+    "Activity Status","Days Since Contact",
+    "Open Proposals","Won Proposals","Lost Proposals",
+    "Open Pipeline Deals","Pipeline Value ($)",
+  ];
+
+  const rows = cleanAccounts().sort(sortAccounts).map((account) => {
+    const activity = accountActivityStatus(account);
+    const latest = latestAccountActivity(account);
+    const counts = accountProposalCounts(account);
+    const plData = pipelineByAccount[account.id] || { count: 0, value: 0 };
+
+    let daysSinceContact = "";
+    if (latest) {
+      const d = latest.at || latest.date || latest.createdAt || "";
+      if (d) daysSinceContact = Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
+    }
+
+    return [
+      xlCell(account.client),
+      xlCell(account.poc),
+      xlCell(account.title),
+      xlCell(account.phone),
+      xlCell(account.email),
+      xlCell(account.address),
+      xlCell(account.entity),
+      xlCell(account.county),
+      xlCell(account.clientRanking),
+      xlCell(account.sharedRep),
+      xlCell(account.nextFollowUp),
+      xlCell(activity.label),
+      daysSinceContact !== "" ? xlCell(daysSinceContact, "Number") : xlCell(""),
+      xlCell(counts.open, "Number"),
+      xlCell(counts.won, "Number"),
+      xlCell(counts.lost, "Number"),
+      xlCell(plData.count, "Number"),
+      xlCell(Math.round(plData.value), "Number"),
+    ].join("");
+  });
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+ <Styles>
+  <Style ss:ID="hdr">
+   <Font ss:Bold="1" ss:Color="#FFFFFF"/>
+   <Interior ss:Color="#1e40af" ss:Pattern="Solid"/>
+  </Style>
+ </Styles>
+ <Worksheet ss:Name="Accounts">
+  <Table>
+   <Row>${headers.map(hdCell).join("")}</Row>
+   ${rows.map(r => `<Row>${r}</Row>`).join("\n   ")}
+  </Table>
+ </Worksheet>
+</Workbook>`;
+
+  downloadTextFile(`grip-accounts-${toLocalDateKey(new Date())}.xls`, xml, "application/vnd.ms-excel;charset=utf-8");
 }
 
 function exportContactsVcard(type) {
@@ -10224,7 +10428,8 @@ function setView(view) {
   if (view === "today")     { if (window.gripToday)    window.gripToday.render(); }
   if (view === "pipeline")  { if (window.gripPipeline) window.gripPipeline.render(); }
   if (view === "territory") { if (window.gripTerritory) window.gripTerritory.render(); }
-  const _viewTitles = { today: "Today", dashboard: "Dashboard", pipeline: "Pipeline", territory: "Territory", accounts: "Accounts", projects: "Projects", punchList: "Punch List", takeoffEstimator: "Takeoff Estimator", warrantySummary: "Warranty Summary Chart", proposals: "Proposals", scopeDatabase: "Scope of Work", tasks: "Tasks", callList: "Call List", followUpQueue: "Follow-Up Queue", activityLog: "Activity Log", newsReport: "Your News Report", contractors: "Contractors", noteTaker: "Note Taker", outreach: "Assistant" };
+  if (view === "liveMap")   { if (window.gripMap)      window.gripMap.render(); }
+  const _viewTitles = { today: "Today", dashboard: "Dashboard", pipeline: "Pipeline", territory: "Territory", accounts: "Accounts", projects: "Projects", punchList: "Punch List", takeoffEstimator: "Takeoff Estimator", warrantySummary: "Warranty Summary Chart", proposals: "Proposals", scopeDatabase: "Scope of Work", tasks: "Tasks", callList: "Call List", followUpQueue: "Follow-Up Queue", activityLog: "Activity Log", newsReport: "Your News Report", contractors: "Contractors", noteTaker: "Note Taker", outreach: "Assistant", liveMap: "Live Account Map" };
   const _resolvedTitle = _viewTitles[view] || view;
   byId("viewTitle").textContent = _resolvedTitle;
   updateMobileViewLabel(_resolvedTitle);
@@ -10410,6 +10615,7 @@ function bindEvents() {
     importAccountContactsCsv(event.target.files?.[0]);
     event.target.value = "";
   });
+  byId("exportAccountsExcelButton").addEventListener("click", () => exportAccountsExcel());
   byId("exportAccountContactsButton").addEventListener("click", () => exportContactsCsv("account"));
   byId("exportAccountVcardsButton").addEventListener("click", () => exportContactsVcard("account"));
   byId("exportContractorContactsButton").addEventListener("click", () => exportContactsCsv("contractor"));
@@ -10436,9 +10642,7 @@ function bindEvents() {
   byId("gripContinueLocalButton")?.addEventListener("click", () => window.gripSync?.continueLocal());
   byId("gripClearSessionButton")?.addEventListener("click", () => window.gripSync?.clearSessionAndRetry());
   byId("gripSyncStatus")?.addEventListener("click", () => window.gripSync?.forceSync());
-  byId("gripSignOutButton")?.addEventListener("click", async () => {
-    if (await gripConfirm("Sign out of GRIP cloud sync? Your local data stays on this device.", "Sign Out", "Cancel")) window.gripSync?.signOut();
-  });
+  byId("gripSignOutButton")?.addEventListener("click", () => window.gripSync?.signOutEverywhere());
   byId("cancelReleaseNotesButton").addEventListener("click", () => byId("releaseNotesDialog").close());
   byId("cancelProposalDueTodayButton").addEventListener("click", () => {
     byId("proposalDueTodayDialog").close();
@@ -10448,8 +10652,8 @@ function bindEvents() {
     byId("proposalDueTodayDialog").close();
     showTaskDailyAlertDialog();
   });
-  byId("cancelTaskDailyAlertButton").addEventListener("click", () => byId("taskDailyAlertDialog").close());
-  byId("closeTaskDailyAlertButton").addEventListener("click", () => byId("taskDailyAlertDialog").close());
+  byId("cancelTaskDailyAlertButton").addEventListener("click", () => { applyTaskDailyAlertSnooze(); byId("taskDailyAlertDialog").close(); });
+  byId("closeTaskDailyAlertButton").addEventListener("click", () => { applyTaskDailyAlertSnooze(); byId("taskDailyAlertDialog").close(); });
   byId("viewTodayTasksButton").addEventListener("click", () => {
     byId("taskDailyAlertDialog").close();
     openTasksDueToday();
@@ -11364,6 +11568,12 @@ function bindEvents() {
       openCallActivityDialog(openCallAccount.dataset.openCallAccount);
       return;
     }
+    const openAccountPage = event.target.closest("[data-open-account-page]");
+    if (openAccountPage) {
+      navigateTo("accounts");
+      showDetail("account", openAccountPage.dataset.openAccountPage);
+      return;
+    }
     const addSupport = event.target.closest("[data-add-support-contact]");
     if (addSupport) {
       openSupportContactDialog(addSupport.dataset.addSupportContact);
@@ -11462,20 +11672,69 @@ function bindEvents() {
     state.notes[noteId] = event.target.value;
     localStorage.setItem("garlandCrmNotes", JSON.stringify(state.notes));
   });
+  // Inject proposal drop bar once
+  if (!byId("proposalDropBar")) {
+    const bar = document.createElement("div");
+    bar.id = "proposalDropBar";
+    bar.innerHTML = `
+      <div class="proposal-drop-target" data-proposal-drop="Work Completed">
+        <span class="drop-icon">✅</span>Work Completed
+      </div>
+      <div class="proposal-drop-target" data-proposal-drop="Proposal Rejected">
+        <span class="drop-icon">❌</span>Proposal Rejected
+      </div>`;
+    document.body.appendChild(bar);
+  }
+
+  // Inject project drop bar once
+  if (!byId("projectDropBar")) {
+    const bar = document.createElement("div");
+    bar.id = "projectDropBar";
+    bar.innerHTML = `
+      <div class="proposal-drop-target" data-project-drop="Project Won">
+        <span class="drop-icon">🏆</span>Project Won
+      </div>
+      <div class="proposal-drop-target" data-project-drop="Dead Project">
+        <span class="drop-icon">💀</span>Dead Project
+      </div>`;
+    document.body.appendChild(bar);
+  }
+
   document.body.addEventListener("dragstart", (event) => {
-    const card = event.target.closest(".record-grid.is-kanban .record-card[data-type][data-id]");
-    if (!card || !["project", "proposal", "task", "punchList"].includes(card.dataset.type)) return;
+    // Allow drag from both kanban and tile views for projects/proposals;
+    // tasks and punchLists remain kanban-only.
+    const card = event.target.closest(".record-card[data-type][data-id]");
+    if (!card) return;
+    const inKanban = !!card.closest(".record-grid.is-kanban");
+    if (!["project", "proposal"].includes(card.dataset.type) && !inKanban) return;
+    if (!["project", "proposal", "task", "punchList"].includes(card.dataset.type)) return;
     state.draggingKanbanRecord = { type: card.dataset.type, id: card.dataset.id };
     const payload = JSON.stringify(state.draggingKanbanRecord);
     event.dataTransfer?.setData("application/x-grip-card", payload);
     event.dataTransfer?.setData("text/plain", payload);
     if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
     card.classList.add("is-dragging");
+    if (card.dataset.type === "proposal") {
+      byId("proposalDropBar")?.classList.add("is-visible");
+    }
+    if (card.dataset.type === "project") {
+      byId("projectDropBar")?.classList.add("is-visible");
+    }
   });
   document.body.addEventListener("dragend", () => {
     document.querySelectorAll(".record-card.is-dragging").forEach((card) => card.classList.remove("is-dragging"));
     state.draggingKanbanRecord = null;
     clearKanbanDropTargets();
+    const bar = byId("proposalDropBar");
+    if (bar) {
+      bar.classList.remove("is-visible");
+      bar.querySelectorAll(".is-drag-over").forEach((el) => el.classList.remove("is-drag-over"));
+    }
+    const pbar = byId("projectDropBar");
+    if (pbar) {
+      pbar.classList.remove("is-visible");
+      pbar.querySelectorAll(".is-drag-over").forEach((el) => el.classList.remove("is-drag-over"));
+    }
   });
   document.body.addEventListener("change", (event) => {
     const territoryColorInput = event.target.closest("[data-territory-color]");
@@ -11547,6 +11806,22 @@ function bindEvents() {
     showDetail("proposal", id);
   });
   document.body.addEventListener("dragover", (event) => {
+    const proposalDropTarget = event.target.closest("[data-proposal-drop]");
+    if (proposalDropTarget) {
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+      document.querySelectorAll("[data-proposal-drop].is-drag-over").forEach((el) => el.classList.remove("is-drag-over"));
+      proposalDropTarget.classList.add("is-drag-over");
+      return;
+    }
+    const projectDropTarget = event.target.closest("[data-project-drop]");
+    if (projectDropTarget) {
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+      document.querySelectorAll("[data-project-drop].is-drag-over").forEach((el) => el.classList.remove("is-drag-over"));
+      projectDropTarget.classList.add("is-drag-over");
+      return;
+    }
     const taskDropZone = event.target.closest("[data-task-drop-zone]");
     if (taskDropZone) {
       event.preventDefault();
@@ -11588,6 +11863,16 @@ function bindEvents() {
     dropZone.classList.add("is-dragging");
   });
   document.body.addEventListener("dragleave", (event) => {
+    const proposalDropTarget = event.target.closest("[data-proposal-drop]");
+    if (proposalDropTarget && !proposalDropTarget.contains(event.relatedTarget)) {
+      proposalDropTarget.classList.remove("is-drag-over");
+      return;
+    }
+    const projectDropTarget = event.target.closest("[data-project-drop]");
+    if (projectDropTarget && !projectDropTarget.contains(event.relatedTarget)) {
+      projectDropTarget.classList.remove("is-drag-over");
+      return;
+    }
     const taskDropZone = event.target.closest("[data-task-drop-zone]");
     if (taskDropZone) {
       if (!taskDropZone.contains(event.relatedTarget)) taskDropZone.classList.remove("is-dragging");
@@ -11618,6 +11903,36 @@ function bindEvents() {
     dropZone.classList.remove("is-dragging");
   });
   document.body.addEventListener("drop", (event) => {
+    const proposalDropTarget = event.target.closest("[data-proposal-drop]");
+    if (proposalDropTarget) {
+      event.preventDefault();
+      const stage = proposalDropTarget.dataset.proposalDrop;
+      const payload = kanbanDragPayload(event);
+      const bar = byId("proposalDropBar");
+      if (bar) {
+        bar.classList.remove("is-visible");
+        bar.querySelectorAll(".is-drag-over").forEach((el) => el.classList.remove("is-drag-over"));
+      }
+      if (payload?.type === "proposal" && stage) {
+        persistRecordEdit("proposal", payload.id, "stage", stage);
+      }
+      return;
+    }
+    const projectDropTarget = event.target.closest("[data-project-drop]");
+    if (projectDropTarget) {
+      event.preventDefault();
+      const stage = projectDropTarget.dataset.projectDrop;
+      const payload = kanbanDragPayload(event);
+      const pbar = byId("projectDropBar");
+      if (pbar) {
+        pbar.classList.remove("is-visible");
+        pbar.querySelectorAll(".is-drag-over").forEach((el) => el.classList.remove("is-drag-over"));
+      }
+      if (payload?.type === "project" && stage) {
+        persistRecordEdit("project", payload.id, "stage", stage);
+      }
+      return;
+    }
     const taskDropZone = event.target.closest("[data-task-drop-zone]");
     if (taskDropZone) {
       event.preventDefault();
@@ -11674,6 +11989,37 @@ render();
 renderNavBadges();
 bindEvents();
 restoreMobileHeaderState();
+
+// Reload all in-memory data from localStorage without a page reload.
+// Called by grip-sync.js after a cloud pull so modules see fresh data immediately.
+window.gripReloadData = function () {
+  const freshCrm = readStorageJson("garlandCrmData", { accounts: [], proposals: [], contractors: [] });
+  savedCrm.accounts    = Array.isArray(freshCrm.accounts)    ? freshCrm.accounts    : [];
+  savedCrm.projects    = Array.isArray(freshCrm.projects)    ? freshCrm.projects    : [];
+  savedCrm.proposals   = Array.isArray(freshCrm.proposals)   ? freshCrm.proposals   : [];
+  savedCrm.contractors = Array.isArray(freshCrm.contractors) ? freshCrm.contractors : [];
+  savedCrm.deleted     = Array.isArray(freshCrm.deleted)     ? freshCrm.deleted     : [];
+
+  const freshPU = readStorageJson("garlandProposalUpdates", {});
+  Object.keys(proposalUpdates).forEach(k => delete proposalUpdates[k]);
+  Object.assign(proposalUpdates, freshPU);
+
+  const freshTS = readStorageJson("garlandTerritorySettings", {});
+  Object.assign(territorySettings, freshTS);
+
+  state.notes               = readStorageJson("garlandAccountActivities",      {});
+  state.activities          = readStorageJson("garlandAccountActivities",      {});
+  state.attachments         = readStorageJson("garlandProposalAttachments",    {});
+  state.projectChecklists   = readStorageJson("garlandProjectChecklists",      {});
+  state.scopeDatabase       = readStorageJson("garlandScopeDatabase",          []);
+  state.takeoffEstimates    = readStorageJson("garlandTakeoffEstimates",       []);
+  state.takeoffManualProducts = readStorageJson("garlandTakeoffManualProducts",[]);
+  state.favoriteSystems     = readStorageJson("garlandFavoriteSystems",        []);
+  state.callLists           = readStorageJson("garlandCallLists",              { rules: [], completed: {} });
+  state.tasks               = readStorageJson("garlandTasks",                  []);
+  state.punchLists          = readStorageJson("garlandPunchLists",             []);
+};
+
 // Start on Today dashboard
 setTimeout(() => { if (window.gripToday) { setView("today"); window.gripToday.render(); } }, 0);
 // Roof notes & dossier dialog wiring

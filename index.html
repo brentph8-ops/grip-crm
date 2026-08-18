@@ -13,6 +13,7 @@
     <meta name="apple-mobile-web-app-title" content="GRIP" />
     <link rel="apple-touch-icon" href="icons/icon-192.png" />
     <link rel="stylesheet" href="src/styles.css" />
+    <link rel="stylesheet" href="src/leaflet.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
     <script src="src/supabase-client.js"></script>
   </head>
@@ -108,6 +109,10 @@
             <span class="nav-icon nav-letter-icon nav-letter-icon-wide" aria-hidden="true">SOW</span>
             Scope of Work
           </button>
+          <button class="nav-button" data-view="liveMap" type="button">
+            <span aria-hidden="true">⊕</span>
+            Live Map
+          </button>
           <button class="nav-button" data-view="tasks" type="button">
             <span aria-hidden="true">☑</span>
             Tasks
@@ -147,10 +152,10 @@
           <button class="nav-button nav-more-button" id="mobileMoreButton" type="button" aria-expanded="false" aria-controls="mobileMoreMenu">
             <span class="nav-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" focusable="false">
-                <path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/>
+                <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
               </svg>
             </span>
-            Mobile Version
+            More
           </button>
         </nav>
 
@@ -169,6 +174,7 @@
           <button class="nav-button" data-view="pipeline" type="button"><span aria-hidden="true">◈</span>Pipeline</button>
           <button class="nav-button" data-view="territory" type="button"><span aria-hidden="true">⊙</span>Territory</button>
           <button class="nav-button" data-view="accounts" type="button"><span aria-hidden="true">◎</span>Accounts</button>
+          <button class="nav-button" data-view="liveMap" type="button"><span aria-hidden="true">⊕</span>Live Map</button>
           <button class="nav-button" data-view="projects" type="button"><span aria-hidden="true">▦</span>Projects</button>
           <button class="nav-button" data-view="proposals" type="button"><span aria-hidden="true">◥</span>Proposals</button>
           <button class="nav-button" data-view="tasks" type="button"><span aria-hidden="true">☑</span>Tasks</button>
@@ -186,6 +192,7 @@
         </div>
 
         <div class="mobile-more-menu" id="mobileMoreMenu" hidden>
+          <button class="nav-button" data-view="dashboard" type="button"><span aria-hidden="true">⌂</span>Dashboard</button>
           <button class="nav-button" data-view="punchList" type="button"><span aria-hidden="true">☒</span>Punch</button>
           <button class="nav-button" data-view="takeoffEstimator" type="button"><span aria-hidden="true">📐</span>Takeoff</button>
           <button class="nav-button" data-view="warrantySummary" type="button"><span class="nav-letter-icon">WS</span>Warranty</button>
@@ -248,14 +255,16 @@
               <button id="gripSyncStatus" class="grip-sync-status sync-local" type="button" title="Click to force sync"></button>
               <span id="gripUserDisplay" class="grip-user-display" hidden></span>
             </div>
-            <button class="topbar-btn detail-toggle" id="territorySettingsButton" type="button">My Settings</button>
-            <button class="topbar-btn detail-toggle" id="printSummaryButton" type="button">Print</button>
-            <button class="topbar-btn" id="gripSignOutButton" type="button" hidden>Sign Out</button>
-            <button class="primary-button detail-toggle" id="newTaskButton" type="button">+ Task</button>
-            <button class="topbar-detail-toggle detail-toggle" id="detailToggle" type="button" title="Toggle detail panel">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M10 4H2l4 4z"/></svg>
-              <span id="detailToggleLabel">Details</span>
-            </button>
+            <button class="primary-button detail-toggle topbar-task-btn" id="newTaskButton" type="button">+ Task</button>
+            <div class="topbar-util-group">
+              <button class="topbar-btn detail-toggle" id="territorySettingsButton" type="button">My Settings</button>
+              <button class="topbar-btn detail-toggle" id="printSummaryButton" type="button">Print</button>
+              <button class="topbar-btn" id="gripSignOutButton" type="button" hidden>Sign Out</button>
+              <button class="topbar-detail-toggle detail-toggle" id="detailToggle" type="button" title="Toggle detail panel">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M10 4H2l4 4z"/></svg>
+                <span id="detailToggleLabel">Details</span>
+              </button>
+            </div>
           </div>
         </header>
         <section class="mobile-quick-add" aria-label="Mobile quick add">
@@ -371,6 +380,7 @@
                 <summary class="mini-button utility-mini">Contact Import / Export</summary>
                 <div class="toolbar-menu-panel">
                   <button class="mini-button utility-mini" id="importAccountContactsButton" type="button">Import Contacts</button>
+                  <button class="mini-button utility-mini" id="exportAccountsExcelButton" type="button">Export Excel</button>
                   <button class="mini-button utility-mini" id="exportAccountContactsButton" type="button">Export CSV</button>
                   <button class="mini-button utility-mini" id="exportAccountVcardsButton" type="button">Export vCard</button>
                 </div>
@@ -384,6 +394,7 @@
               <button class="primary-button create-button" id="newAccountButton" type="button">+ Account</button>
             </div>
           </div>
+          <div class="view-record-count" id="accountsCountBar" hidden></div>
           <div id="accountsList" class="record-grid"></div>
           <div id="accountsManageList" class="manage-table" hidden></div>
         </section>
@@ -456,6 +467,7 @@
               <button class="primary-button create-button" id="newProjectButton" type="button">+ Project</button>
             </div>
           </div>
+          <div class="view-record-count" id="projectsCountBar" hidden></div>
           <div id="projectsList" class="record-grid"></div>
         </section>
 
@@ -828,6 +840,7 @@
               <button class="primary-button create-button" id="newProposalButton" type="button">+ Proposal</button>
             </div>
           </div>
+          <div class="view-record-count" id="proposalsCountBar" hidden></div>
           <div id="proposalsList" class="record-grid"></div>
         </section>
 
@@ -1054,6 +1067,9 @@
         <!-- ── Territory Map ─────────────────────────────────────── -->
         <section id="territoryView" class="view"></section>
 
+        <!-- ── Live Account Map ──────────────────────────────────── -->
+        <section id="liveMapView" class="view"></section>
+
         <!-- ── Outreach / Payton View ────────────────────────────── -->
         <section id="outreachView" class="view">
           <div class="outreach-header">
@@ -1062,7 +1078,9 @@
               <div class="outreach-header-actions">
                 <span id="outreachGmailStatus" class="outreach-gmail-status"></span>
                 <button id="outreachConnectGmailButton" class="secondary-button" type="button">Connect Gmail</button>
-                <button id="outreachSettingsButton" class="secondary-button" type="button" title="Outreach settings">⚙ Settings</button>
+                <button id="outreachSettingsButton" class="icon-button outreach-settings-btn" type="button" title="Assistant settings" aria-label="Assistant settings">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+                </button>
               </div>
             </div>
             <div class="outreach-toolbar">
@@ -1135,6 +1153,9 @@
         <form id="plDealForm" class="modal-form">
           <label class="form-label">Account
             <select name="accountId" id="plDealAccount" class="form-input" required></select>
+          </label>
+          <label class="form-label">Link to Project/Proposal <small class="form-hint">Optional</small>
+            <select name="linkedRecord" id="plLinkedRecord" class="form-input"><option value="">None</option></select>
           </label>
           <label class="form-label">Deal Title <small class="form-hint">e.g. Roof Replacement – Building A</small>
             <input name="title" class="form-input" placeholder="Deal description" />
@@ -1332,25 +1353,84 @@
           <button id="closeOutreachSettingsDialog" class="modal-close" type="button" aria-label="Close">×</button>
         </div>
         <form id="outreachSettingsForm" class="modal-form">
+
+          <div class="asst-setup-steps">
+            <p class="asst-setup-steps-title">How to set up the Assistant</p>
+            <ol class="asst-setup-step-list">
+              <li>
+                <span class="asst-step-num">1</span>
+                <div>
+                  <strong>Fill in your info below</strong> — enter your name, state, and the assistant name (default: Payton). These appear in every email.
+                </div>
+              </li>
+              <li>
+                <span class="asst-step-num">2</span>
+                <div>
+                  <strong>Create a Google Cloud project</strong> — go to <a href="https://console.cloud.google.com" target="_blank" rel="noopener">console.cloud.google.com</a>, create a new project, then enable the <em>Gmail API</em> under APIs &amp; Services → Library.
+                </div>
+              </li>
+              <li>
+                <span class="asst-step-num">3</span>
+                <div>
+                  <strong>Create OAuth credentials</strong> — go to APIs &amp; Services → Credentials → Create Credentials → OAuth Client ID. Choose <em>Web Application</em>. Under "Authorized JavaScript Origins" add your app URL (e.g. <code>https://grip-crm.pages.dev</code>).
+                </div>
+              </li>
+              <li>
+                <span class="asst-step-num">4</span>
+                <div>
+                  <strong>Paste the Client ID below</strong> in the Gmail OAuth section, then click Save Settings.
+                </div>
+              </li>
+              <li>
+                <span class="asst-step-num">5</span>
+                <div>
+                  <strong>Click "Connect Gmail"</strong> on the main Assistant screen to authorize. Done — the Assistant can now send emails on your behalf.
+                </div>
+              </li>
+            </ol>
+          </div>
+
           <p class="form-section-label">Identity</p>
-          <label class="form-label">Assistant Name <small class="form-hint">Name used in subject lines and greetings</small>
-            <input name="assistantName" class="form-input" placeholder="Payton" /></label>
-          <label class="form-label">Sender Display Name <small class="form-hint">Name shown in the Gmail "From" field</small>
-            <input name="senderDisplayName" class="form-input" placeholder="Payton" /></label>
-          <label class="form-label">Your Name (Rep) <input name="repName" class="form-input" placeholder="Brent Phillips" /></label>
-          <label class="form-label">Your State <input name="repState" class="form-input" placeholder="Texas" /></label>
+          <div class="asst-field-rows">
+            <div class="asst-field-row">
+              <label class="asst-field-label" for="asst-assistantName">Assistant's Name <small>used in subject lines &amp; greetings</small></label>
+              <input id="asst-assistantName" name="assistantName" class="form-input" placeholder="Payton" />
+            </div>
+            <div class="asst-field-row">
+              <label class="asst-field-label" for="asst-senderDisplayName">Sender Display Name <small>shown in Gmail "From" field</small></label>
+              <input id="asst-senderDisplayName" name="senderDisplayName" class="form-input" placeholder="Payton" />
+            </div>
+            <div class="asst-field-row">
+              <label class="asst-field-label" for="asst-repName">Your Name</label>
+              <input id="asst-repName" name="repName" class="form-input" placeholder="Brent Phillips" />
+            </div>
+            <div class="asst-field-row">
+              <label class="asst-field-label" for="asst-repState">Your State</label>
+              <input id="asst-repState" name="repState" class="form-input" placeholder="Texas" />
+            </div>
+          </div>
           <p class="form-section-label">Email Settings</p>
-          <label class="form-label">Daily Recap Email <input name="recapEmail" class="form-input" type="email" /></label>
-          <label class="form-label">CC Me On Sent Emails <input name="ccEmail" class="form-input" type="email" placeholder="your@email.com" /></label>
-          <label class="form-label">Email Signature <small class="form-hint">Appears at the bottom of every outreach email</small>
-            <textarea name="signatureText" class="form-textarea" rows="5" placeholder="Thanks,&#10;&#10;Payton&#10;&#10;The Garland Company&#10;W: www.garlandco.com"></textarea>
-          </label>
+          <div class="asst-field-rows">
+            <div class="asst-field-row">
+              <label class="asst-field-label" for="asst-recapEmail">Daily Recap Email</label>
+              <input id="asst-recapEmail" name="recapEmail" class="form-input" type="email" />
+            </div>
+            <div class="asst-field-row">
+              <label class="asst-field-label" for="asst-ccEmail">CC Me on Sent Emails</label>
+              <input id="asst-ccEmail" name="ccEmail" class="form-input" type="email" placeholder="your@email.com" />
+            </div>
+            <div class="asst-field-row asst-field-row--full">
+              <label class="asst-field-label" for="asst-signatureText">Email Signature <small>appears at the bottom of every outreach email</small></label>
+              <textarea id="asst-signatureText" name="signatureText" class="form-textarea" rows="5" placeholder="Thanks,&#10;&#10;Payton&#10;&#10;The Garland Company&#10;W: www.garlandco.com"></textarea>
+            </div>
+          </div>
           <p class="form-section-label">Gmail OAuth</p>
-          <label class="form-label">
-            Google OAuth Client ID
-            <small class="form-hint">Create a Client ID in Google Cloud Console. Enable Gmail API + Google Calendar API. Add scopes: gmail.send and calendar.events. Add your GitHub Pages URL as an authorized JavaScript origin.</small>
-            <input name="googleClientId" class="form-input" placeholder="123456789.apps.googleusercontent.com" />
-          </label>
+          <div class="asst-field-rows">
+            <div class="asst-field-row">
+              <label class="asst-field-label" for="asst-googleClientId">Google OAuth Client ID <small>paste the ID from step 3 above</small></label>
+              <input id="asst-googleClientId" name="googleClientId" class="form-input" placeholder="123456789.apps.googleusercontent.com" />
+            </div>
+          </div>
           <p id="outreachGmailSetupStatus" class="muted-note"></p>
           <div class="modal-footer">
             <button id="cancelOutreachSettingsButton" class="secondary-button" type="button">Cancel</button>
@@ -1732,6 +1812,12 @@
           <button class="secondary-button" id="viewIncompleteTaskAccountsButton" type="button">View Accounts</button>
           <button class="secondary-button" id="viewTodayTasksButton" type="button">View Tasks</button>
           <button class="primary-button" id="closeTaskDailyAlertButton" type="button">Got it</button>
+        </div>
+        <div class="daily-alert-snooze-row">
+          <label class="daily-alert-snooze-label">
+            <input type="checkbox" id="taskDailyAlertSnoozeCheckbox" />
+            Don't show for 30 days
+          </label>
         </div>
       </div>
     </dialog>
@@ -2484,10 +2570,24 @@
     <script src="src/data.js"></script>
     <script src="src/grip-sync.js"></script>
     <script src="src/app.js"></script>
+    <script src="src/leaflet.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="src/outreach.js"></script>
     <script src="src/today.js"></script>
     <script src="src/pipeline.js"></script>
     <script src="src/territory.js"></script>
+    <script src="src/map.js"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(function(err) {
+          console.warn('GRIP SW registration failed:', err);
+        });
+        navigator.serviceWorker.addEventListener('message', function(event) {
+          if (event.data && event.data.type === 'GRIP_SW_UPDATED') {
+            window.location.reload();
+          }
+        });
+      }
+    </script>
   </body>
 </html>

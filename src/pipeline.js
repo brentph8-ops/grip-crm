@@ -56,10 +56,46 @@
     return typeof window.cleanAccounts === "function" ? window.cleanAccounts() : [];
   }
 
+  function projects() {
+    return typeof window.cleanProjects === "function" ? window.cleanProjects() : [];
+  }
+
+  function proposals() {
+    return typeof window.cleanProposals === "function" ? window.cleanProposals() : [];
+  }
+
+  function linkedLabel(linkedType, linkedId) {
+    if (!linkedType || !linkedId) return null;
+    if (linkedType === "project") {
+      const p = projects().find(p => p.id === linkedId);
+      return p ? (p.projectName || p.client || "Project") : null;
+    }
+    if (linkedType === "proposal") {
+      const p = proposals().find(p => p.id === linkedId);
+      return p ? (p.project || p.client || "Proposal") : null;
+    }
+    return null;
+  }
+
+  function populateLinkedSelect(sel, accountId, selectedVal) {
+    const norm = s => String(s || "").toLowerCase().trim();
+    const acct = accounts().find(a => a.id === accountId);
+    const clientName = acct?.client || "";
+    const matchProjects = projects().filter(p => !clientName || norm(p.client) === norm(clientName));
+    const matchProposals = proposals().filter(p => !clientName || norm(p.client) === norm(clientName));
+    sel.innerHTML = `<option value="">None</option>` +
+      (matchProjects.length ? `<optgroup label="Projects">${matchProjects.map(p =>
+        `<option value="project:${esc(p.id)}" ${selectedVal === `project:${p.id}` ? "selected" : ""}>${esc(p.projectName || p.client)}</option>`).join("")}</optgroup>` : "") +
+      (matchProposals.length ? `<optgroup label="Proposals">${matchProposals.map(p =>
+        `<option value="proposal:${esc(p.id)}" ${selectedVal === `proposal:${p.id}` ? "selected" : ""}>${esc(p.project || p.client)}</option>`).join("")}</optgroup>` : "");
+  }
+
   // ── State ─────────────────────────────────────────────────────────
 
   let _tab = "board"; // "board" | "analytics"
   let _editId = null;
+  let _sortBy = "default"; // "default" | "amount" | "closeDate"
+  let _sortDir = -1; // -1 = desc, 1 = asc
 
   // ── Analytics ─────────────────────────────────────────────────────
 
@@ -90,10 +126,54 @@
 
   // ── Board render ──────────────────────────────────────────────────
 
+  function buildValueBar(deals) {
+    const totalVal = deals.reduce((s, d) => s + (parseFloat(d.amount) || 0), 0);
+    if (!totalVal) return "";
+    const segments = STAGES.map(stage => {
+      const val = deals.filter(d => d.stage === stage).reduce((s, d) => s + (parseFloat(d.amount) || 0), 0);
+      return { stage, val, pct: Math.round(val / totalVal * 100) };
+    }).filter(s => s.val > 0);
+    return `<div class="pl-value-bar">
+      ${segments.map(s => {
+        const col = STAGE_COLORS[s.stage] || { bg: "#e2e8f0", text: "#475569" };
+        return `<div class="pl-vb-seg" style="width:${s.pct}%;background:${col.bg};color:${col.text}" title="${esc(s.stage)}: ${fmtMoney(s.val)} (${s.pct}%)">
+          <span class="pl-vb-stage">${esc(s.stage)}</span>
+          <span class="pl-vb-amount">${fmtMoney(s.val)}</span>
+        </div>`;
+      }).join("")}
+    </div>`;
+  }
+
+  function sortedDeals(cards) {
+    if (_sortBy === "amount") {
+      return [...cards].sort((a, b) => _sortDir * ((parseFloat(b.amount) || 0) - (parseFloat(a.amount) || 0)));
+    }
+    if (_sortBy === "closeDate") {
+      return [...cards].sort((a, b) => {
+        if (!a.closeDate && !b.closeDate) return 0;
+        if (!a.closeDate) return 1;
+        if (!b.closeDate) return -1;
+        return _sortDir * a.closeDate.localeCompare(b.closeDate);
+      });
+    }
+    return cards;
+  }
+
   function renderBoard(deals) {
-    return `<div class="pl-board">` +
+    const sortLabel = _sortBy === "amount" ? "$ " + (_sortDir < 0 ? "↓" : "↑")
+      : _sortBy === "closeDate" ? "Date " + (_sortDir < 0 ? "↓" : "↑")
+      : "Sort";
+    return buildValueBar(deals) +
+      `<div class="pl-board-toolbar">
+        <span class="pl-sort-label">Sort columns:</span>
+        <button class="pl-sort-btn ${_sortBy === "amount" ? "pl-sort-btn--active" : ""}" data-pl-sort="amount" type="button">$ Value</button>
+        <button class="pl-sort-btn ${_sortBy === "closeDate" ? "pl-sort-btn--active" : ""}" data-pl-sort="closeDate" type="button">Close Date</button>
+        ${_sortBy !== "default" ? `<button class="pl-sort-btn pl-sort-btn--dir" data-pl-sort-dir type="button">${sortLabel}</button>
+        <button class="pl-sort-btn pl-sort-btn--clear" data-pl-sort="default" type="button">✕ Clear</button>` : ""}
+      </div>` +
+      `<div class="pl-board">` +
       STAGES.map(stage => {
-        const cards = deals.filter(d => d.stage === stage);
+        const cards = sortedDeals(deals.filter(d => d.stage === stage));
         const val = cards.reduce((s, d) => s + (parseFloat(d.amount) || 0), 0);
         const col = STAGE_COLORS[stage] || {};
         return `
@@ -103,7 +183,7 @@
               <span class="pl-col-meta">${cards.length} · ${fmtMoney(val)}</span>
             </div>
             <div class="pl-col-body">
-              ${cards.map(d => dealCard(d, col)).join("") || `<div class="pl-col-empty">Drop deals here</div>`}
+              ${cards.map(d => dealCard(d, col)).join("") || `<div class="pl-col-empty">No deals</div>`}
             </div>
           </div>`;
       }).join("") +
@@ -112,10 +192,12 @@
 
   function dealCard(d, col) {
     const age = daysSince(d.createdAt);
+    const link = linkedLabel(d.linkedType, d.linkedId);
     return `
       <div class="pl-deal-card" data-deal-id="${esc(d.id)}">
         <div class="pl-deal-name">${esc(d.title || d.accountName)}</div>
         <div class="pl-deal-account">${esc(d.accountName)}</div>
+        ${link ? `<div class="pl-linked-badge">↗ ${esc(link)}</div>` : ""}
         <div class="pl-deal-footer">
           <span class="pl-deal-amount">${d.amount ? fmtMoney(d.amount) : "—"}</span>
           <span class="pl-deal-age">${age}d</span>
@@ -247,6 +329,15 @@
       btn.addEventListener("click", () => { _tab = btn.dataset.tab; render(); });
     });
 
+    el.querySelectorAll("[data-pl-sort]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const val = btn.dataset.plSort;
+        if (val === _sortBy) { _sortDir *= -1; } else { _sortBy = val; _sortDir = -1; }
+        render();
+      });
+    });
+    el.querySelector("[data-pl-sort-dir]")?.addEventListener("click", () => { _sortDir *= -1; render(); });
+
     el.querySelector("#plAddDealBtn")?.addEventListener("click", () => openDealDialog(null));
 
     el.querySelectorAll("[data-edit-deal]").forEach(btn => {
@@ -303,6 +394,17 @@
         accts.map(a => `<option value="${esc(a.id)}" data-county="${esc(a.county || "")}" data-entity="${esc(a.entity || "")}" ${selectId === a.id ? "selected" : ""}>${esc(a.client)}</option>`).join("");
     }
 
+    // Populate linked record select
+    const linkedSel = document.getElementById("plLinkedRecord");
+    if (linkedSel) {
+      const existingLinked = existing?.linkedType && existing?.linkedId ? `${existing.linkedType}:${existing.linkedId}` : "";
+      populateLinkedSelect(linkedSel, selectId, existingLinked);
+      // Re-populate when account changes
+      acctSel?.removeEventListener("change", acctSel._linkedHandler);
+      acctSel._linkedHandler = () => populateLinkedSelect(linkedSel, acctSel.value, "");
+      acctSel?.addEventListener("change", acctSel._linkedHandler);
+    }
+
     // Fill form
     const form = document.getElementById("plDealForm");
     if (form && existing) {
@@ -315,6 +417,8 @@
       form.elements.namedItem("lostReason").value = existing.lostReason || "";
     } else if (form) {
       form.reset();
+      // Re-populate linked select after reset (reset clears it)
+      if (linkedSel) populateLinkedSelect(linkedSel, selectId, "");
     }
 
     document.getElementById("plDealDialogTitle").textContent = editId ? "Edit Deal" : "New Deal";
@@ -328,6 +432,11 @@
 
     const accts = accounts();
     const acct = accts.find(a => a.id === accountId);
+
+    const linkedRaw = formData.get("linkedRecord") || "";
+    const colonIdx = linkedRaw.indexOf(":");
+    const linkedType = colonIdx > -1 ? linkedRaw.slice(0, colonIdx) : "";
+    const linkedId   = colonIdx > -1 ? linkedRaw.slice(colonIdx + 1) : "";
 
     const deals = load();
     if (_editId) {
@@ -346,6 +455,8 @@
           probability: formData.get("probability") || "",
           notes: formData.get("notes") || "",
           lostReason: formData.get("lostReason") || "",
+          linkedType,
+          linkedId,
           updatedAt: new Date().toISOString(),
         };
       }
@@ -363,6 +474,8 @@
         probability: formData.get("probability") || "",
         notes: formData.get("notes") || "",
         lostReason: "",
+        linkedType,
+        linkedId,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
@@ -370,6 +483,12 @@
     save(deals);
     document.getElementById("pipelineDealDialog")?.close();
     render();
+    // Refresh account detail panel if it's currently showing this deal's account
+    if (accountId && typeof window.showDetail === "function") {
+      const openId = document.getElementById("detailContent")
+        ?.querySelector("[data-quick-deal-account]")?.dataset?.quickDealAccount;
+      if (openId === accountId) window.showDetail("account", accountId);
+    }
   }
 
   // ── Public API ────────────────────────────────────────────────────

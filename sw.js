@@ -5,22 +5,25 @@
 const CACHE = 'grip-v43';
 
 const PRECACHE = [
-  '/grip-crm/',
-  '/grip-crm/index.html',
-  '/grip-crm/contractor.html',
-  '/grip-crm/src/styles.css',
-  '/grip-crm/src/app.js',
-  '/grip-crm/src/data.js',
-  '/grip-crm/src/grip-sync.js',
-  '/grip-crm/src/supabase-client.js',
-  '/grip-crm/src/contractor.js',
-  '/grip-crm/src/outreach.js',
-  '/grip-crm/src/today.js',
-  '/grip-crm/src/pipeline.js',
-  '/grip-crm/src/territory.js',
-  '/grip-crm/manifest.json',
-  '/grip-crm/icons/icon-192.png',
-  '/grip-crm/icons/icon-512.png',
+  '/',
+  '/index.html',
+  '/contractor.html',
+  '/src/styles.css',
+  '/src/app.js',
+  '/src/data.js',
+  '/src/grip-sync.js',
+  '/src/supabase-client.js',
+  '/src/contractor.js',
+  '/src/outreach.js',
+  '/src/today.js',
+  '/src/pipeline.js',
+  '/src/territory.js',
+  '/src/map.js',
+  '/src/leaflet.min.js',
+  '/src/leaflet.min.css',
+  '/manifest.json',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
 ];
 
 // ── Install: pre-cache all app shell assets ───────────────────────
@@ -33,12 +36,18 @@ self.addEventListener('install', e => {
   self.skipWaiting();
 });
 
-// ── Activate: remove old caches ───────────────────────────────────
+// ── Activate: remove old caches, then reload all open tabs ────────
 self.addEventListener('activate', e => {
   e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    )
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(() => self.clients.matchAll({ type: 'window', includeUncontrolled: true }))
+      .then(clients => {
+        clients.forEach(client => {
+          // Tell each open tab to reload so it picks up the new code.
+          client.postMessage({ type: 'GRIP_SW_UPDATED', version: CACHE });
+        });
+      })
   );
   self.clients.claim();
 });
@@ -47,11 +56,16 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
-  // Never intercept Supabase API, Google OAuth, non-GET requests,
+  // Never intercept Supabase API, Google OAuth, map tiles, geocoder,
   // or non-HTTP schemes (chrome-extension://, data:, blob:, etc.)
   if (
     url.hostname.includes('supabase.co') ||
     url.hostname.includes('google') ||
+    url.hostname.includes('jsdelivr') ||
+    url.hostname.includes('cloudflare') ||
+    url.hostname.includes('tile.openstreetmap.org') ||
+    url.hostname.includes('nominatim.openstreetmap.org') ||
+    url.hostname.includes('arcgisonline.com') ||
     e.request.method !== 'GET' ||
     !url.protocol.startsWith('http')
   ) return;
@@ -65,7 +79,6 @@ self.addEventListener('fetch', e => {
         }
         return res;
       }).catch(() => cached || new Response('Offline', { status: 503 }));
-      // Serve cache instantly; update in background
       return cached || network;
     })
   );
