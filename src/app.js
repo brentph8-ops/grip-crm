@@ -33,6 +33,43 @@ if (!savedCrm.edits) savedCrm.edits = { accounts: {}, projects: {}, proposals: {
 if (!savedCrm.edits.accounts) savedCrm.edits.accounts = {};
 if (!savedCrm.edits.projects) savedCrm.edits.projects = {};
 if (!savedCrm.edits.proposals) savedCrm.edits.proposals = {};
+
+// ── Seed locally-created accounts ────────────────────────────────
+(function seedAccounts() {
+  const _seed = [
+    {
+      id: "local-account-seed-waller",
+      sourceRow: "Local", clientRanking: "Prospecting",
+      client: "City of Waller", entity: "Municipal", county: "Waller", state: "TX",
+      poc: "Daniel Wilson", title: "Public Works Director",
+      phone: "(936) 372-3880", email: "dwilson@wallertexas.gov",
+      address: "1218 Farr St, Waller, TX 77484",
+      action: "", nextStep: "", activity: new Date().toISOString(),
+    },
+    {
+      id: "local-account-seed-sealyisd",
+      sourceRow: "Local", clientRanking: "Prospecting",
+      client: "Sealy ISD", entity: "K-12", county: "Austin", state: "TX",
+      poc: "Michael Zapalac", title: "Project Manager",
+      phone: "(979) 885-3516", email: "mzapalac@sealyisd.com",
+      address: "939 Tiger Ln, Sealy, TX 77474",
+      action: "", nextStep: "", activity: new Date().toISOString(),
+    },
+    {
+      id: "local-account-seed-hempstead",
+      sourceRow: "Local", clientRanking: "Prospecting",
+      client: "City of Hempstead", entity: "Municipal", county: "Waller", state: "TX",
+      poc: "James Glover", title: "Park & Recreation Director",
+      phone: "(979) 826-2486", email: "",
+      address: "1125 Austin St, Hempstead, TX 77445",
+      action: "", nextStep: "", activity: new Date().toISOString(),
+    },
+  ];
+  const existing = new Set(savedCrm.accounts.map(a => a.id));
+  let changed = false;
+  _seed.forEach(acct => { if (!existing.has(acct.id)) { savedCrm.accounts.push(acct); changed = true; } });
+  if (changed) try { localStorage.setItem("garlandCrmData", JSON.stringify(savedCrm)); } catch(e) {}
+})();
 savedCrm.contractors = savedCrm.contractors.map((contractor) =>
   typeof contractor === "string"
     ? {
