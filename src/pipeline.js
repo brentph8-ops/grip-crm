@@ -242,6 +242,7 @@
           <div class="pl-col-header" style="background:${GRAVEYARD_COLOR.bg}">
             <span class="pl-col-name" style="color:${GRAVEYARD_COLOR.text}">⚰ Graveyard</span>
             <span class="pl-col-meta" style="color:${GRAVEYARD_COLOR.text};opacity:0.75">${graveyardDeals.length} · ${fmtMoney(graveyardVal)}</span>
+            ${graveyardDeals.length ? `<button class="pl-restore-all-btn" data-restore-all type="button" title="Move all back to pipeline">↑ Restore All</button>` : ""}
           </div>
           <div class="pl-col-body">
             ${graveyardDeals.map(d => dealCard(d, GRAVEYARD_COLOR, acctMap)).join("") || `<div class="pl-col-empty" style="color:#64748b">No dead ends</div>`}
@@ -254,10 +255,14 @@
     const age = daysSince(d.createdAt);
     const link = linkedLabel(d.linkedType, d.linkedId);
     const displayName = (d.title && d.title !== d.accountName) ? d.title : d.accountName;
-    const acct = acctMap?.[d.accountId];
+    // Look up by accountId first, fall back to name match
+    const norm = s => String(s || "").toLowerCase().trim();
+    const acct = acctMap?.[d.accountId]
+      || (d.accountName ? Object.values(acctMap || {}).find(a => norm(a.client) === norm(d.accountName)) : null);
     const rank = acct?.clientRanking || "";
     const rankCol = RANK_COLORS[rank] || { bg: "#f1f5f9", text: "#94a3b8" };
-    const allStages = [...STAGES, "Graveyard"];
+    // Graveyard column shows normal stages (to restore); normal columns never show Graveyard option
+    const stageOptions = d.stage === "Graveyard" ? STAGES : STAGES;
     const rankBadge = rank
       ? `<span class="pl-rank-badge" data-rank-deal="${esc(d.id)}" data-rank-account="${esc(d.accountId || "")}" style="background:${rankCol.bg};color:${rankCol.text}" title="Click to change rank">${esc(rank)}</span>`
       : `<span class="pl-rank-badge pl-rank-badge--empty" data-rank-deal="${esc(d.id)}" data-rank-account="${esc(d.accountId || "")}" title="Click to set rank">Set rank</span>`;
@@ -271,7 +276,7 @@
         </div>
         <div class="pl-deal-actions">
           <select class="pl-stage-select" data-deal-id="${esc(d.id)}" title="Move stage">
-            ${allStages.map(s => `<option ${s === d.stage ? "selected" : ""}>${esc(s)}</option>`).join("")}
+            ${stageOptions.map(s => `<option ${s === d.stage ? "selected" : ""}>${esc(s)}</option>`).join("")}
           </select>
           <button class="pl-edit-btn" data-edit-deal="${esc(d.id)}" data-edit-account="${esc(d.accountId || "")}" type="button" title="Open account">↗</button>
           <button class="pl-del-btn" data-del-deal="${esc(d.id)}" type="button" title="Delete">✕</button>
@@ -439,6 +444,22 @@
       render();
     });
 
+    el.querySelector("[data-restore-all]")?.addEventListener("click", () => {
+      if (!confirm("Move all Graveyard accounts back to the pipeline?")) return;
+      const all = load();
+      for (const deal of all) {
+        if (deal.stage !== "Graveyard") continue;
+        deal.stage = "Client";
+        deal.updatedAt = new Date().toISOString();
+        if (deal.accountId) {
+          window.gripApp?.persistRecordEdit("account", deal.accountId, "clientRanking", "Prospecting", false);
+        }
+      }
+      save(all);
+      _showGraveyard = false;
+      render();
+    });
+
     el.querySelector("#plFilterEntity")?.addEventListener("change", e => {
       _filterEntity = e.target.value;
       render();
@@ -480,6 +501,8 @@
         if (newStage === "Project Completed") deal.completedAt = new Date().toISOString();
         if (newStage === "Graveyard" && deal.accountId) {
           window.gripApp?.persistRecordEdit("account", deal.accountId, "clientRanking", "Dead End", false);
+        } else if (deal.stage === "Graveyard" && deal.accountId) {
+          window.gripApp?.persistRecordEdit("account", deal.accountId, "clientRanking", "Prospecting", false);
         }
         deal.stage = newStage;
         deal.updatedAt = new Date().toISOString();
@@ -526,6 +549,14 @@
                   deal.updatedAt = new Date().toISOString();
                   save(all);
                   _showGraveyard = true;
+                }
+              } else if (current === "Dead End") {
+                const all = load();
+                const deal = all.find(d => d.id === dealId);
+                if (deal && deal.stage === "Graveyard") {
+                  deal.stage = "Client";
+                  deal.updatedAt = new Date().toISOString();
+                  save(all);
                 }
               }
             }

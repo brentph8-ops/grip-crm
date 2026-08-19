@@ -7131,6 +7131,12 @@ button#gripSyncStatus:hover { opacity: 0.75; }
 }
 .pl-graveyard-toggle:hover { background: #1e293b; color: #94a3b8; border-color: #334155; }
 .pl-graveyard-toggle--active { background: #1e293b; color: #64748b; border-color: #334155; }
+.pl-restore-all-btn {
+  font-size: 10px; padding: 2px 7px; border-radius: 6px;
+  border: 1px solid #475569; background: transparent;
+  color: #94a3b8; cursor: pointer; white-space: nowrap; margin-left: auto;
+}
+.pl-restore-all-btn:hover { background: #334155; color: #e2e8f0; }
 
 /* Filter bar */
 .pl-filter-sep { color: var(--line); margin: 0 4px; }
