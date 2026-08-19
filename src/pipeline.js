@@ -17,13 +17,18 @@
     "Bidding":           { bg: "#fed7aa", text: "#c2410c" },
     "Project Completed": { bg: "#bbf7d0", text: "#15803d" },
   };
-  // Rank auto-syncs when a deal moves to these stages
+  // Rank auto-syncs when a deal moves to any stage
   const STAGE_RANK_SYNC = {
-    "Client":           "Prospecting",
-    "Meeting":          "Meeting",
-    "Budget":           "C",
-    "Project Planning": "B",
-    "Bidding":          "A",
+    "Client":            "Prospecting",
+    "Contacted":         "In Progress",
+    "Meeting":           "Meeting",
+    "Bucket":            "In Progress",
+    "Follow-up Meeting": "Meeting",
+    "Budget":            "C",
+    "Project Planning":  "B",
+    "Bidding":           "A",
+    "Project Completed": "A",
+    "Graveyard":         "Dead End",
   };
   const GRAVEYARD_COLOR = { bg: "#1e293b", text: "#64748b" };
   const RANK_OPTIONS = ["Prospecting", "In Progress", "Meeting", "C", "B", "A", "Dead End"];
@@ -405,6 +410,28 @@
     if (newDeals.length || anyRestored) {
       save([...deals, ...newDeals]);
     }
+  }
+
+  // ── Bulk rank sync ────────────────────────────────────────────────
+  // Sets every account's clientRanking to match their deal's current stage.
+  // Runs once on load (gated by localStorage flag) and is also callable directly.
+  function syncAllRanksFromStages() {
+    const deals = load();
+    const accts = accounts();
+    const norm = s => String(s || "").toLowerCase().trim();
+    let synced = 0;
+    for (const deal of deals) {
+      const rank = STAGE_RANK_SYNC[deal.stage];
+      if (!rank) continue;
+      const acct = deal.accountId
+        ? accts.find(a => a.id === deal.accountId)
+        : accts.find(a => norm(a.client) === norm(deal.accountName));
+      if (acct && acct.clientRanking !== rank) {
+        window.gripApp?.persistRecordEdit("account", acct.id, "clientRanking", rank, false);
+        synced++;
+      }
+    }
+    return synced;
   }
 
   // ── Main render ───────────────────────────────────────────────────
@@ -848,7 +875,7 @@
     if (changed) { save(all); _showGraveyard = true; render(); }
   }
 
-  window.gripPipeline = { render, openDealDialog, promoteToBucket, moveDealToGraveyardForAccount };
+  window.gripPipeline = { render, openDealDialog, promoteToBucket, moveDealToGraveyardForAccount, syncAllRanksFromStages };
 
   function initListeners() {
     document.getElementById("plDealForm")?.addEventListener("submit", e => {
@@ -858,6 +885,14 @@
     document.getElementById("closePipelineDealDialog")?.addEventListener("click", () => {
       document.getElementById("pipelineDealDialog")?.close();
     });
+    // One-time bulk rank sync: relabel all accounts from their current pipeline stage
+    if (!localStorage.getItem("grip_ranks_synced_v1")) {
+      setTimeout(() => {
+        const n = syncAllRanksFromStages();
+        if (n > 0) render();
+        localStorage.setItem("grip_ranks_synced_v1", "1");
+      }, 500);
+    }
   }
 
   if (document.readyState === "loading") {
