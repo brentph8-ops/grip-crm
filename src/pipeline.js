@@ -5,15 +5,25 @@
 
 (function () {
 
-  const STAGES = ["Client", "Meeting", "Bucket", "Follow-up Meeting", "Budget", "Project Planning", "Project Completed"];
+  const STAGES = ["Client", "Contacted", "Meeting", "Bucket", "Follow-up Meeting", "Budget", "Project Planning", "Bidding", "Project Completed"];
   const STAGE_COLORS = {
     "Client":            { bg: "#f1f5f9", text: "#475569" },
+    "Contacted":         { bg: "#e0f2fe", text: "#0369a1" },
     "Meeting":           { bg: "#dbeafe", text: "#1d4ed8" },
     "Bucket":            { bg: "#e0e7ff", text: "#4338ca" },
     "Follow-up Meeting": { bg: "#fef3c7", text: "#92400e" },
     "Budget":            { bg: "#fce7f3", text: "#9d174d" },
     "Project Planning":  { bg: "#d1fae5", text: "#065f46" },
+    "Bidding":           { bg: "#fed7aa", text: "#c2410c" },
     "Project Completed": { bg: "#bbf7d0", text: "#15803d" },
+  };
+  // Rank auto-syncs when a deal moves to these stages
+  const STAGE_RANK_SYNC = {
+    "Client":           "Prospecting",
+    "Meeting":          "Meeting",
+    "Budget":           "C",
+    "Project Planning": "B",
+    "Bidding":          "A",
   };
   const GRAVEYARD_COLOR = { bg: "#1e293b", text: "#64748b" };
   const RANK_OPTIONS = ["Prospecting", "In Progress", "Meeting", "C", "B", "A", "Dead End"];
@@ -505,11 +515,17 @@
         const deal = all.find(d => d.id === sel.dataset.dealId);
         if (!deal) return;
         const newStage = sel.value;
+        const oldStage = deal.stage;
         if (newStage === "Project Completed") deal.completedAt = new Date().toISOString();
-        if (newStage === "Graveyard" && deal.accountId) {
-          window.gripApp?.persistRecordEdit("account", deal.accountId, "clientRanking", "Dead End", false);
-        } else if (deal.stage === "Graveyard" && deal.accountId) {
-          window.gripApp?.persistRecordEdit("account", deal.accountId, "clientRanking", "Prospecting", false);
+        if (deal.accountId) {
+          if (newStage === "Graveyard") {
+            window.gripApp?.persistRecordEdit("account", deal.accountId, "clientRanking", "Dead End", false);
+          } else if (oldStage === "Graveyard") {
+            const r = STAGE_RANK_SYNC[newStage] || "Prospecting";
+            window.gripApp?.persistRecordEdit("account", deal.accountId, "clientRanking", r, false);
+          } else if (STAGE_RANK_SYNC[newStage]) {
+            window.gripApp?.persistRecordEdit("account", deal.accountId, "clientRanking", STAGE_RANK_SYNC[newStage], false);
+          }
         }
         deal.stage = newStage;
         deal.updatedAt = new Date().toISOString();
@@ -610,11 +626,17 @@
         const all = load();
         const deal = all.find(d => d.id === _dragId);
         if (!deal || deal.stage === targetStage) return;
+        const oldStage = deal.stage;
         if (targetStage === "Project Completed") deal.completedAt = new Date().toISOString();
-        if (targetStage === "Graveyard" && deal.accountId) {
-          window.gripApp?.persistRecordEdit("account", deal.accountId, "clientRanking", "Dead End", false);
-        } else if (deal.stage === "Graveyard" && deal.accountId) {
-          window.gripApp?.persistRecordEdit("account", deal.accountId, "clientRanking", "Prospecting", false);
+        if (deal.accountId) {
+          if (targetStage === "Graveyard") {
+            window.gripApp?.persistRecordEdit("account", deal.accountId, "clientRanking", "Dead End", false);
+          } else if (oldStage === "Graveyard") {
+            const r = STAGE_RANK_SYNC[targetStage] || "Prospecting";
+            window.gripApp?.persistRecordEdit("account", deal.accountId, "clientRanking", r, false);
+          } else if (STAGE_RANK_SYNC[targetStage]) {
+            window.gripApp?.persistRecordEdit("account", deal.accountId, "clientRanking", STAGE_RANK_SYNC[targetStage], false);
+          }
         }
         deal.stage = targetStage;
         deal.updatedAt = new Date().toISOString();
