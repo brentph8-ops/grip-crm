@@ -252,17 +252,19 @@
             </div>
           </div>`;
       }).join("") +
-      (_showGraveyard ? `
-        <div class="pl-col pl-col--graveyard" data-stage="Graveyard" style="border-top:3px solid ${GRAVEYARD_COLOR.text}">
-          <div class="pl-col-header" style="background:${GRAVEYARD_COLOR.bg}">
-            <span class="pl-col-name" style="color:${GRAVEYARD_COLOR.text}">⚰ Graveyard</span>
-            <span class="pl-col-meta" style="color:${GRAVEYARD_COLOR.text};opacity:0.75">${graveyardDeals.length} · ${fmtMoney(graveyardVal)}</span>
-            ${graveyardDeals.length ? `<button class="pl-restore-all-btn" data-restore-all type="button" title="Move all back to pipeline">↑ Restore All</button>` : ""}
-          </div>
-          <div class="pl-col-body">
-            ${graveyardDeals.map(d => dealCard(d, GRAVEYARD_COLOR, acctMap)).join("") || `<div class="pl-col-empty" style="color:#64748b">No dead ends</div>`}
-          </div>
-        </div>` : "") +
+      `<div class="pl-col pl-col--graveyard${_showGraveyard ? "" : " pl-col--graveyard--collapsed"}" data-stage="Graveyard" style="border-top:3px solid ${GRAVEYARD_COLOR.text}">
+        <div class="pl-col-header" style="background:${GRAVEYARD_COLOR.bg}">
+          <span class="pl-col-name" style="color:${GRAVEYARD_COLOR.text}">⚰ Graveyard</span>
+          ${_showGraveyard ? `<span class="pl-col-meta" style="color:${GRAVEYARD_COLOR.text};opacity:0.75">${graveyardDeals.length} · ${fmtMoney(graveyardVal)}</span>` : ""}
+          ${_showGraveyard && graveyardDeals.length ? `<button class="pl-restore-all-btn" data-restore-all type="button" title="Move all back to pipeline">↑ Restore All</button>` : ""}
+        </div>
+        <div class="pl-col-body">
+          ${_showGraveyard
+            ? (graveyardDeals.map(d => dealCard(d, GRAVEYARD_COLOR, acctMap)).join("") || `<div class="pl-col-empty" style="color:#64748b">No dead ends</div>`)
+            : `<div class="pl-graveyard-drop-hint">↓ archive</div>`
+          }
+        </div>
+      </div>` +
     `</div>`;
   }
 
@@ -655,6 +657,7 @@
         if (!deal || deal.stage === targetStage) return;
         const oldStage = deal.stage;
         if (targetStage === "Project Completed") deal.completedAt = new Date().toISOString();
+        if (targetStage === "Graveyard") _showGraveyard = true;
         if (deal.accountId) {
           if (targetStage === "Graveyard") {
             window.gripApp?.persistRecordEdit("account", deal.accountId, "clientRanking", "Dead End", false);

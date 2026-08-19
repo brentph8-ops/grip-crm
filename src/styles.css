@@ -7138,6 +7138,29 @@ button#gripSyncStatus:hover { opacity: 0.75; }
 }
 .pl-restore-all-btn:hover { background: #334155; color: #e2e8f0; }
 
+/* Graveyard collapsed drop zone */
+.pl-col--graveyard--collapsed {
+  flex: 0 0 90px !important;
+  min-width: 90px !important;
+  max-width: 90px !important;
+}
+.pl-col--graveyard--collapsed .pl-col-header { padding: 8px 6px; gap: 0; }
+.pl-col--graveyard--collapsed .pl-col-name { font-size: 11px; }
+.pl-graveyard-drop-hint {
+  color: #475569;
+  font-size: 10px;
+  text-align: center;
+  padding: 20px 4px;
+  opacity: 0.5;
+  user-select: none;
+}
+.pl-col--graveyard--collapsed.pl-col-drop-over .pl-graveyard-drop-hint {
+  opacity: 1;
+  color: #94a3b8;
+  background: #1e293b;
+  border-radius: 6px;
+}
+
 /* Filter bar */
 .pl-filter-sep { color: var(--line); margin: 0 4px; }
 .pl-filter-select {
