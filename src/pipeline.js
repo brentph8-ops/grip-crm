@@ -355,15 +355,25 @@
     const accts = accounts();
     if (!accts.length) return;
     const deals = load();
-    const existingAccountIds = new Set(deals.map(d => d.accountId).filter(Boolean));
-    const existingNames = new Set(deals.map(d => String(d.accountName || "").toLowerCase().trim()).filter(Boolean));
+    // Only count non-Graveyard deals as "existing" — Graveyard deals are hidden
+    const activeAccountIds = new Set(deals.filter(d => d.stage !== "Graveyard").map(d => d.accountId).filter(Boolean));
+    const activeNames = new Set(deals.filter(d => d.stage !== "Graveyard").map(d => String(d.accountName || "").toLowerCase().trim()).filter(Boolean));
 
     const newDeals = [];
+    let anyRestored = false;
     for (const acct of accts) {
       if (!acct.client) continue;
       if (acct.clientRanking === "Dead End") continue;
-      if (acct.id && existingAccountIds.has(acct.id)) continue;
-      if (existingNames.has(String(acct.client).toLowerCase().trim())) continue;
+      if (acct.id && activeAccountIds.has(acct.id)) continue;
+      if (activeNames.has(String(acct.client).toLowerCase().trim())) continue;
+      // If a Graveyard deal exists (rank changed away from Dead End externally), restore it
+      const graveyardDeal = acct.id ? deals.find(d => d.accountId === acct.id && d.stage === "Graveyard") : null;
+      if (graveyardDeal) {
+        graveyardDeal.stage = "Client";
+        graveyardDeal.updatedAt = new Date().toISOString();
+        anyRestored = true;
+        continue;
+      }
       newDeals.push({
         id: uid(),
         accountId: acct.id || "",
@@ -382,7 +392,7 @@
         updatedAt: new Date().toISOString(),
       });
     }
-    if (newDeals.length) {
+    if (newDeals.length || anyRestored) {
       save([...deals, ...newDeals]);
     }
   }
@@ -676,7 +686,8 @@
       form.elements.namedItem("closeDate").value = existing.closeDate || "";
       form.elements.namedItem("probability").value = existing.probability || "";
       form.elements.namedItem("notes").value = existing.notes || "";
-      form.elements.namedItem("lostReason").value = existing.lostReason || "";
+      const lostEl = form.elements.namedItem("lostReason");
+      if (lostEl) lostEl.value = existing.lostReason || "";
     } else if (form) {
       form.reset();
       // Re-populate linked select after reset (reset clears it)
@@ -731,7 +742,7 @@
         entityType: acct?.entity || "",
         title,
         amount: formData.get("amount") || "",
-        stage: formData.get("stage") || "Prospect",
+        stage: formData.get("stage") || "Client",
         closeDate: formData.get("closeDate") || "",
         probability: formData.get("probability") || "",
         notes: formData.get("notes") || "",
@@ -766,10 +777,10 @@
     const deals = load();
     const BUCKET_IDX = STAGES.indexOf("Bucket");
 
-    // Find existing deal for this account
+    // Find existing deal for this account — prefer non-Graveyard deals
     const existing = acct
-      ? deals.find(d => d.accountId === acct.id)
-      : deals.find(d => norm(d.accountName) === norm(clientName));
+      ? deals.find(d => d.accountId === acct.id && d.stage !== "Graveyard") ?? deals.find(d => d.accountId === acct.id)
+      : deals.find(d => norm(d.accountName) === norm(clientName) && d.stage !== "Graveyard") ?? deals.find(d => norm(d.accountName) === norm(clientName));
 
     if (existing) {
       const currentIdx = STAGES.indexOf(existing.stage);
