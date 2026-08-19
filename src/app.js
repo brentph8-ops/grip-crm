@@ -115,6 +115,48 @@ const data = {
   })),
 };
 
+// ── Address helpers ───────────────────────────────────────────────
+function splitAddress(addr) {
+  if (!addr) return { street: "", city: "", state: "", zip: "" };
+  const parts = addr.split(",").map(s => s.trim());
+  const street = parts[0] || "";
+  let city = "", state = "", zip = "";
+  if (parts.length >= 3) {
+    city = parts[1] || "";
+    const sv = (parts[2] || "").trim().split(/\s+/);
+    state = sv[0] || "";
+    zip   = sv.slice(1).join(" ");
+  } else if (parts.length === 2) {
+    const sv = (parts[1] || "").trim().split(/\s+/);
+    if (/^[A-Z]{2}$/.test(sv[0])) { state = sv[0]; zip = sv[1] || ""; }
+    else city = parts[1];
+  }
+  return { street, city, state, zip };
+}
+function buildFullAddress(acct) {
+  const s = [acct.street, acct.city, [acct.state, acct.zip].filter(Boolean).join(" ")].filter(Boolean);
+  return s.join(", ");
+}
+
+// ── One-time migration: split address → street/city/state/zip ────
+(function migrateAddressFields() {
+  let changed = false;
+  for (const acct of data.accounts) {
+    if (acct.street !== undefined || !acct.address) continue;
+    const { street, city, state, zip } = splitAddress(acct.address);
+    acct.street = street; acct.city = city; acct.state = state; acct.zip = zip;
+    if (acct.sourceRow === "Local") {
+      const local = savedCrm.accounts.find(a => a.id === acct.id);
+      if (local) Object.assign(local, { street, city, state, zip });
+    } else {
+      if (!savedCrm.edits.accounts[acct.id]) savedCrm.edits.accounts[acct.id] = {};
+      Object.assign(savedCrm.edits.accounts[acct.id], { street, city, state, zip });
+    }
+    changed = true;
+  }
+  if (changed) try { localStorage.setItem("garlandCrmData", JSON.stringify(savedCrm)); } catch(e) {}
+})();
+
 const proposalStages = [
   "Working on Ramp & SOW",
   "Sent Ramp & Budget to Client",
@@ -6087,6 +6129,15 @@ function persistRecordEdit(type, id, key, value, refresh = true) {
   if (type === "account" && key === "clientRanking" && cleanedValue === "Dead End") {
     setTimeout(() => window.gripPipeline?.moveDealToGraveyardForAccount(id), 100);
   }
+  // When an address component changes, sync the composite address field and re-geocode
+  if (type === "account" && ["street", "city", "state", "zip"].includes(key) && record) {
+    const fullAddr = buildFullAddress(record);
+    record.address = fullAddr;
+    if (local) local.address = fullAddr;
+    else if (savedCrm.edits.accounts[id]) savedCrm.edits.accounts[id].address = fullAddr;
+    saveCrm();
+    if (fullAddr.length > 5) setTimeout(() => window.gripMap?.geocodeAccountById(id, fullAddr), 300);
+  }
   if (type === "account" && key === "address" && cleanedValue && String(cleanedValue).trim().length > 5) {
     setTimeout(() => window.gripMap?.geocodeAccountById(id, cleanedValue), 300);
   }
@@ -6407,7 +6458,10 @@ function showAccountDetail(record) {
       ${editableField("account", record.id, "title", "Title", record.title)}
       ${editableField("account", record.id, "phone", "Phone", record.phone)}
       ${editableField("account", record.id, "email", "Email", record.email)}
-      ${editableField("account", record.id, "address", "Address", record.address)}
+      ${editableField("account", record.id, "street", "Street", record.street || "")}
+      ${editableField("account", record.id, "city", "City", record.city || "")}
+      ${editableField("account", record.id, "state", "State", record.state || "")}
+      ${editableField("account", record.id, "zip", "Zip Code", record.zip || "")}
     </div>
 
     ${quickActionSection("account", record)}
@@ -6558,7 +6612,10 @@ function accountProfileScorecard(account) {
       ${editableField("account", account.id, "title", "Title", account.title)}
       ${editableField("account", account.id, "phone", "Phone", account.phone)}
       ${editableField("account", account.id, "email", "Email", account.email)}
-      ${editableField("account", account.id, "address", "Address", account.address)}
+      ${editableField("account", account.id, "street", "Street", account.street || "")}
+      ${editableField("account", account.id, "city", "City", account.city || "")}
+      ${editableField("account", account.id, "state", "State", account.state || "")}
+      ${editableField("account", account.id, "zip", "Zip Code", account.zip || "")}
       ${editableField("account", account.id, "sharedRep", "Shared Rep", account.sharedRep)}
       ${editableField("account", account.id, "nextFollowUp", "Follow-up Date", account.nextFollowUp)}
     </div>

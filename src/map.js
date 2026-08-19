@@ -186,9 +186,18 @@
   }
 
   function buildGeoQuery(account) {
+    // Prefer structured address components
+    const street = (account.street || "").trim();
+    const city   = (account.city   || "").trim();
+    const state  = (account.state  || "").trim();
+    const zip    = (account.zip    || "").trim();
+    if (street || city) {
+      return [street, city, [state, zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+    }
+    // Fall back to legacy single address field
     const addr = (account.address || "").trim();
     if (addr.length > 4) return addr;
-    return null; // no address → skip geocoding entirely
+    return null;
   }
 
   async function geocodeAccountById(id, query, approximate = false) {
@@ -258,9 +267,10 @@
     const activity = typeof accountActivityStatus === "function"
       ? accountActivityStatus(account) : { label: "Unknown" };
     const actColor = { green: "#1baf7a", yellow: "#eda100", red: "#e55353", dead: "#898781" }[activity.level] || "#898781";
+    const _displayAddr = buildGeoQuery(account) || account.address || "";
     const mapsUrl  = account.lat && account.lng
       ? `https://www.google.com/maps/search/?api=1&query=${account.lat},${account.lng}`
-      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((account.address || account.client || "").trim())}`;
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(_displayAddr || account.client || "")}`;
     const conf     = account.geocodeConfidence || "unverified";
     const confText = { verified: "📍 Verified", manual: "✏️ Manual", unverified: "⚠ Approximate" }[conf] || "⚠ Approximate";
     const color    = entityColor(account.entity);
@@ -275,7 +285,7 @@
       ${account.phone ? `<p class="gmp-field"><a href="tel:${esc(account.phone)}">${esc(account.phone)}</a></p>` : ""}
       ${account.email ? `<p class="gmp-field"><a href="mailto:${esc(account.email)}">${esc(account.email)}</a></p>` : ""}
       <hr class="gmp-divider">
-      ${account.address ? `<p class="gmp-field gmp-address"><a href="${mapsUrl}" target="_blank" rel="noopener noreferrer">${esc(account.address)}</a></p>` : ""}
+      ${_displayAddr ? `<p class="gmp-field gmp-address"><a href="${mapsUrl}" target="_blank" rel="noopener noreferrer">${esc(_displayAddr)}</a></p>` : ""}
       <p class="gmp-meta-row">
         ${account.entity ? `<span>${esc(account.entity)}</span>` : ""}
         ${account.county ? `<span>${esc(account.county)} Co.</span>` : ""}
@@ -964,9 +974,10 @@
     const plBy     = openPipelineByAccount();
     const plValue  = plBy[account.id] || 0;
     const latest   = typeof latestAccountActivity === "function" ? latestAccountActivity(account) : null;
+    const _displayAddr = buildGeoQuery(account) || account.address || "";
     const mapsUrl  = account.lat && account.lng
       ? `https://www.google.com/maps/search/?api=1&query=${account.lat},${account.lng}`
-      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((account.address || account.client || "").trim())}`;
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(_displayAddr || account.client || "")}`;
 
     const fieldRow = (label, val) => val
       ? `<div class="map-dp-row"><span class="map-dp-label">${label}</span><span class="map-dp-val">${val}</span></div>`
@@ -984,7 +995,7 @@
         ${fieldRow("Contact", esc(account.poc) + (account.title ? ` <em>· ${esc(account.title)}</em>` : ""))}
         ${account.phone ? `<div class="map-dp-row"><span class="map-dp-label">Phone</span><a href="tel:${esc(account.phone)}">${esc(account.phone)}</a></div>` : ""}
         ${account.email ? `<div class="map-dp-row"><span class="map-dp-label">Email</span><a href="mailto:${esc(account.email)}">${esc(account.email)}</a></div>` : ""}
-        ${account.address ? `<div class="map-dp-row"><span class="map-dp-label">Address</span><a href="${mapsUrl}" target="_blank" rel="noopener noreferrer">${esc(account.address)}</a></div>` : ""}
+        ${_displayAddr ? `<div class="map-dp-row"><span class="map-dp-label">Address</span><a href="${mapsUrl}" target="_blank" rel="noopener noreferrer">${esc(_displayAddr)}</a></div>` : ""}
         ${fieldRow("Type", esc(account.entity))}
         ${fieldRow("County", account.county ? esc(account.county) + " Co." : "")}
       </div>
