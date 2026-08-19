@@ -258,11 +258,14 @@
     const rank = acct?.clientRanking || "";
     const rankCol = RANK_COLORS[rank] || { bg: "#f1f5f9", text: "#94a3b8" };
     const allStages = [...STAGES, "Graveyard"];
+    const rankBadge = rank
+      ? `<span class="pl-rank-badge" data-rank-deal="${esc(d.id)}" data-rank-account="${esc(d.accountId || "")}" style="background:${rankCol.bg};color:${rankCol.text}" title="Click to change rank">${esc(rank)}</span>`
+      : `<span class="pl-rank-badge pl-rank-badge--empty" data-rank-deal="${esc(d.id)}" data-rank-account="${esc(d.accountId || "")}" title="Click to set rank">Set rank</span>`;
     return `
       <div class="pl-deal-card" data-deal-id="${esc(d.id)}" data-account-id="${esc(d.accountId || "")}" draggable="true">
         <div class="pl-deal-name">${esc(displayName)}</div>
+        <div class="pl-deal-rank-row">${rankBadge}</div>
         <div class="pl-deal-footer">
-          ${rank ? `<span class="pl-rank-badge" data-rank-deal="${esc(d.id)}" data-rank-account="${esc(d.accountId || "")}" style="background:${rankCol.bg};color:${rankCol.text}" title="Click to change rank">${esc(rank)}</span>` : `<span class="pl-rank-badge pl-rank-badge--empty" data-rank-deal="${esc(d.id)}" data-rank-account="${esc(d.accountId || "")}" title="Set rank">—</span>`}
           <span class="pl-deal-amount">${d.amount ? fmtMoney(d.amount) : ""}</span>
           ${d.closeDate ? `<span class="pl-deal-close">${fmtDate(d.closeDate)}</span>` : `<span class="pl-deal-age">${age}d</span>`}
         </div>
@@ -485,42 +488,55 @@
       });
     });
 
-    // ── Rank badge click → inline select ─────────────────────────────
+    // ── Rank badge click → floating popup ────────────────────────────
     el.querySelectorAll("[data-rank-deal]").forEach(badge => {
       badge.addEventListener("click", e => {
         e.stopPropagation();
-        const dealId   = badge.dataset.rankDeal;
+        document.querySelector(".pl-rank-popup")?.remove();
+        const dealId    = badge.dataset.rankDeal;
         const accountId = badge.dataset.rankAccount;
-        const sel = document.createElement("select");
-        sel.className = "pl-rank-select-inline";
+        const acct      = acctMap?.[accountId];
+        const current   = acct?.clientRanking || "";
+
+        const popup = document.createElement("div");
+        popup.className = "pl-rank-popup";
+        const rect = badge.getBoundingClientRect();
+        popup.style.position = "fixed";
+        popup.style.top  = (rect.bottom + 4) + "px";
+        popup.style.left = rect.left + "px";
+        popup.style.zIndex = "9999";
+
         RANK_OPTIONS.forEach(r => {
-          const o = document.createElement("option");
-          o.value = r; o.textContent = r;
-          const acct = acctMap?.[accountId];
-          if ((acct?.clientRanking || "") === r) o.selected = true;
-          sel.appendChild(o);
-        });
-        badge.replaceWith(sel);
-        sel.focus();
-        const commit = () => {
-          const newRank = sel.value;
-          if (accountId) {
-            window.gripApp?.persistRecordEdit("account", accountId, "clientRanking", newRank, false);
-            if (newRank === "Dead End") {
-              const all = load();
-              const deal = all.find(d => d.id === dealId);
-              if (deal && deal.stage !== "Graveyard") {
-                deal.stage = "Graveyard";
-                deal.updatedAt = new Date().toISOString();
-                save(all);
-                _showGraveyard = true;
+          const col = RANK_COLORS[r] || { bg: "#f1f5f9", text: "#94a3b8" };
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "pl-rank-popup-btn" + (r === current ? " pl-rank-popup-btn--active" : "");
+          btn.style.background = col.bg;
+          btn.style.color = col.text;
+          btn.textContent = r;
+          btn.addEventListener("click", () => {
+            popup.remove();
+            if (accountId) {
+              window.gripApp?.persistRecordEdit("account", accountId, "clientRanking", r, false);
+              if (r === "Dead End") {
+                const all = load();
+                const deal = all.find(d => d.id === dealId);
+                if (deal && deal.stage !== "Graveyard") {
+                  deal.stage = "Graveyard";
+                  deal.updatedAt = new Date().toISOString();
+                  save(all);
+                  _showGraveyard = true;
+                }
               }
             }
-          }
-          render();
-        };
-        sel.addEventListener("change", commit);
-        sel.addEventListener("blur", () => setTimeout(() => { if (document.contains(sel)) render(); }, 150));
+            render();
+          });
+          popup.appendChild(btn);
+        });
+
+        document.body.appendChild(popup);
+        const close = ev => { if (!popup.contains(ev.target)) { popup.remove(); document.removeEventListener("click", close, true); } };
+        setTimeout(() => document.addEventListener("click", close, true), 0);
       });
     });
 
@@ -566,6 +582,28 @@
         render();
       });
     });
+
+    // ── Fix board height so column headers stay sticky ─────────────────
+    // overflow-x on the board prevents viewport-relative sticky; instead we
+    // measure the board's actual top offset and give it an explicit pixel
+    // height, then make each column fill + scroll within that height.
+    function fitBoardHeight() {
+      const board = el.querySelector(".pl-board");
+      if (!board) return;
+      const top = board.getBoundingClientRect().top;
+      const h   = window.innerHeight - top - 10;
+      if (h < 120) return;
+      board.style.height    = h + "px";
+      board.style.overflowY = "hidden";
+      board.querySelectorAll(".pl-col").forEach(col => {
+        col.style.height    = "100%";
+        col.style.maxHeight = "none";
+        col.style.overflowY = "auto";
+      });
+    }
+    setTimeout(fitBoardHeight, 0);
+    window._plResizeHandler = fitBoardHeight;
+    window.addEventListener("resize", fitBoardHeight);
   }
 
   // ── Deal dialog ───────────────────────────────────────────────────
