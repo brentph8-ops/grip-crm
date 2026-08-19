@@ -16,6 +16,16 @@
   ];
   const UNRANKED_COLOR = "#898781";
 
+  const RANKING_COLORS = {
+    "A":           "#1baf7a",
+    "B":           "#2a78d6",
+    "C":           "#d97706",
+    "Meeting":     "#059669",
+    "In Progress": "#0891b2",
+    "Prospecting": "#7c3aed",
+    "Dead End":    "#898781",
+  };
+
   const _entityColorCache = {};
   function entityColor(entity) {
     if (!entity) return UNRANKED_COLOR;
@@ -37,8 +47,15 @@
   let _hiddenEntities = new Set();
   let _searchQuery    = "";
   let _geocoding      = false;
-  let _countyLayer    = null;
-  let _showCounty     = false;
+  let _countyLayer          = null;
+  let _partialTerritoryLayer = null;
+  let _countyTopo           = null; // cached raw TopoJSON so we don't re-fetch on retoggle
+  let _showCounty           = false;
+
+  // Sub-county territory polygons: approximate highway-boundary outlines.
+  // Harris County  (FIPS 48201): north of I-10, west of I-45
+  // Montgomery Co. (FIPS 48339): west of I-45
+  const PARTIAL_TERRITORY_POLYS = {};
 
   // ── Route state ────────────────────────────────────────────────────
 
@@ -90,6 +107,8 @@
     return base.map(a => {
       const g = geo[a.id];
       if (!g) return a;
+      // Failed geocode: carry geocodeAddress so pending filter knows it was tried
+      if (!g.lat || !g.lng) return { ...a, geocodeAddress: g.geocodeAddress, geocodeConfidence: g.geocodeConfidence };
       // geo cache wins for coordinates; everything else stays from CRM
       return { ...a, lat: g.lat, lng: g.lng, geocodeConfidence: g.geocodeConfidence, geocodeAddress: g.geocodeAddress };
     });
@@ -109,13 +128,37 @@
 
   // ── Geocoding ──────────────────────────────────────────────────────
 
+  // Bounding box covering Texas + Louisiana (with margin)
+  // Tight bounding box: SE Texas + Louisiana only — excludes OK, AR, MS, AL
+  function inTerritoryBounds(lat, lng) {
+    return lat >= 28.3 && lat <= 32.0 && lng >= -97.2 && lng <= -88.8;
+  }
+
+  // Remove any cached coordinates that landed outside TX/LA so they re-geocode
+  function pruneOutOfBoundsCoords() {
+    try {
+      const cache = loadGeoCache();
+      let changed = false;
+      for (const id of Object.keys(cache)) {
+        const { lat, lng } = cache[id];
+        if (lat && lng && !inTerritoryBounds(lat, lng)) {
+          delete cache[id];
+          changed = true;
+        }
+      }
+      if (changed) localStorage.setItem(GEO_KEY, JSON.stringify(cache));
+    } catch (_) {}
+  }
+
   async function geocodeAddress(address, _retry = 2) {
     if (!address || address.trim().length < 5) return null;
     try {
       const params = new URLSearchParams({
-        format: "json", limit: "1",
+        format: "json", limit: "5",
         q:      address.trim(),
         countrycodes: "us",
+        viewbox: "-97.2,32.0,-88.8,28.3",
+        bounded: "1",
         email:  "bphillips@garlandco.com",
       });
       const res = await fetch(`${GEOCODE_URL}?${params}`, {
@@ -128,24 +171,34 @@
       }
       if (!res.ok) return null;
       const results = await res.json();
-      if (Array.isArray(results) && results[0]?.lat && results[0]?.lon) {
-        return { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), confidence: "verified" };
+      if (Array.isArray(results)) {
+        // Pick the first result that falls inside TX/LA — reject anything elsewhere
+        for (const r of results) {
+          const lat = parseFloat(r.lat);
+          const lng = parseFloat(r.lon);
+          if (inTerritoryBounds(lat, lng)) {
+            return { lat, lng, confidence: "verified" };
+          }
+        }
       }
     } catch (_) {}
     return null;
   }
 
   function buildGeoQuery(account) {
-    if (account.address && account.address.trim().length > 4) return account.address.trim();
-    // Fallback: name + county + state so orgs without addresses can be found
-    const parts = [account.client, account.county ? account.county + " County" : "", account.state || "TX"];
-    return parts.filter(Boolean).join(" ");
+    const addr = (account.address || "").trim();
+    if (addr.length > 4) return addr;
+    return null; // no address → skip geocoding entirely
   }
 
   async function geocodeAccountById(id, query, approximate = false) {
     if (!id || !query) return false;
     const result = await geocodeAddress(query);
-    if (!result) return false;
+    if (!result) {
+      // Save failed marker so pending filter knows this address was tried
+      saveGeoCoord(id, null, null, "failed", query);
+      return false;
+    }
     const confidence = approximate ? "unverified" : result.confidence;
     saveGeoCoord(id, result.lat, result.lng, confidence, query);
     if (_map && _markersGroup) refreshMarkers();
@@ -205,7 +258,9 @@
     const activity = typeof accountActivityStatus === "function"
       ? accountActivityStatus(account) : { label: "Unknown" };
     const actColor = { green: "#1baf7a", yellow: "#eda100", red: "#e55353", dead: "#898781" }[activity.level] || "#898781";
-    const mapsUrl  = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((account.address || account.client || "").trim())}`;
+    const mapsUrl  = account.lat && account.lng
+      ? `https://www.google.com/maps/search/?api=1&query=${account.lat},${account.lng}`
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((account.address || account.client || "").trim())}`;
     const conf     = account.geocodeConfidence || "unverified";
     const confText = { verified: "📍 Verified", manual: "✏️ Manual", unverified: "⚠ Approximate" }[conf] || "⚠ Approximate";
     const color    = entityColor(account.entity);
@@ -220,7 +275,7 @@
       ${account.phone ? `<p class="gmp-field"><a href="tel:${esc(account.phone)}">${esc(account.phone)}</a></p>` : ""}
       ${account.email ? `<p class="gmp-field"><a href="mailto:${esc(account.email)}">${esc(account.email)}</a></p>` : ""}
       <hr class="gmp-divider">
-      ${account.address ? `<p class="gmp-field gmp-address">${esc(account.address)}</p>` : ""}
+      ${account.address ? `<p class="gmp-field gmp-address"><a href="${mapsUrl}" target="_blank" rel="noopener noreferrer">${esc(account.address)}</a></p>` : ""}
       <p class="gmp-meta-row">
         ${account.entity ? `<span>${esc(account.entity)}</span>` : ""}
         ${account.county ? `<span>${esc(account.county)} Co.</span>` : ""}
@@ -336,34 +391,83 @@
   async function applyCountyLayer() {
     if (!_map) return;
     if (_showCounty) {
-      if (!_countyLayer) {
-        // Load topojson-client if not already present
-        if (!window.topojson) {
-          await new Promise((res, rej) => {
-            const s = Object.assign(document.createElement("script"), {
-              src: "https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js",
-              onload: res, onerror: rej,
-            });
-            document.head.appendChild(s);
+      // Always rebuild the layer so territory changes are reflected immediately
+      if (_countyLayer) { _map.removeLayer(_countyLayer); _countyLayer = null; }
+
+      // Load topojson-client if not already present
+      if (!window.topojson) {
+        await new Promise((res, rej) => {
+          const s = Object.assign(document.createElement("script"), {
+            src: "https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js",
+            onload: res, onerror: rej,
           });
-        }
-        // Fetch US Atlas county TopoJSON (~150 KB)
-        const topo   = await fetch("https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json").then(r => r.json());
-        const geojson = window.topojson.feature(topo, topo.objects.counties);
-        _countyLayer  = L.geoJSON(geojson, {
-          style: () => ({
-            color:       "#1e3a5f",
-            weight:      2.5,
-            opacity:     0.75,
-            fillColor:   "#3b82f6",
-            fillOpacity: 0.06,
-          }),
-          attribution: "US Census TIGER",
+          document.head.appendChild(s);
         });
       }
+
+      // Fetch and cache US Atlas county TopoJSON (~150 KB)
+      if (!_countyTopo) {
+        _countyTopo = await fetch("https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json").then(r => r.json());
+      }
+      const geojson = window.topojson.feature(_countyTopo, _countyTopo.objects.counties);
+
+      // Only show Texas (48) and Louisiana (22) counties
+      geojson.features = geojson.features.filter(f => {
+        const id = String(f.id || "");
+        return id.startsWith("48") || id.startsWith("22");
+      });
+
+      // Build territory county set from localStorage + accounts
+      const terr = (() => {
+        try {
+          const ts = JSON.parse(localStorage.getItem("garlandTerritorySettings") || "{}");
+          const fromAccts = (typeof window.cleanAccounts === "function")
+            ? window.cleanAccounts().map(a => (a.county || "").replace(/ County$/i, "").trim().toLowerCase())
+            : [];
+          const fromSettings = (ts.counties || []).map(c => c.replace(/ County$/i, "").trim().toLowerCase());
+          return new Set([...fromAccts, ...fromSettings].filter(Boolean));
+        } catch { return new Set(); }
+      })();
+
+      // Counties with sub-county territory splits get a dark boundary style;
+      // the territory portion is overlaid separately below.
+      const SPLIT_FIPS = new Set(Object.keys(PARTIAL_TERRITORY_POLYS));
+
+      _countyLayer = L.geoJSON(geojson, {
+        style: (feature) => {
+          const id   = String(feature.id || "");
+          const name = (feature.properties?.name || "").toLowerCase();
+          const isTX = id.startsWith("48");
+          const isSplit = SPLIT_FIPS.has(id);
+
+          if (isSplit) {
+            // Show full county with dark outline only — territory portion drawn separately
+            return { color: "#1a1a2e", weight: 2.5, opacity: 0.75, fillColor: "#1a1a2e", fillOpacity: 0.02 };
+          }
+          const isTerritory = terr.size > 0 && isTX && terr.has(name);
+          return isTerritory
+            ? { color: "#7c3aed", weight: 3.5, opacity: 0.9, fillColor: "#7c3aed", fillOpacity: 0.09 }
+            : { color: "#1e3a5f", weight: 2,   opacity: 0.6, fillColor: "#3b82f6", fillOpacity: 0.05 };
+        },
+        attribution: "US Census TIGER",
+      });
       _countyLayer.addTo(_map);
+
+      // Overlay the sub-county territory polygons in purple
+      if (_partialTerritoryLayer) { _map.removeLayer(_partialTerritoryLayer); _partialTerritoryLayer = null; }
+      const partialFeatures = Object.entries(PARTIAL_TERRITORY_POLYS).map(([fips, coords]) => ({
+        type: "Feature",
+        properties: { fips },
+        geometry: { type: "Polygon", coordinates: [coords] },
+      }));
+      _partialTerritoryLayer = L.geoJSON(
+        { type: "FeatureCollection", features: partialFeatures },
+        { style: () => ({ color: "#7c3aed", weight: 3.5, opacity: 0.9, fillColor: "#7c3aed", fillOpacity: 0.09 }) }
+      ).addTo(_map);
+
     } else {
       if (_countyLayer) { _map.removeLayer(_countyLayer); _countyLayer = null; }
+      if (_partialTerritoryLayer) { _map.removeLayer(_partialTerritoryLayer); _partialTerritoryLayer = null; }
     }
   }
 
@@ -435,6 +539,12 @@
   function renderLegendTab(accts, mapped) {
     const total   = accts.length;
     const unmapped = accts.filter(a => !a.lat || !a.lng).length;
+    // pending = accounts whose geocodeAddress doesn't yet match the current query
+    // (failed geocodes save the query as geocodeAddress, so they drop out of pending)
+    const pending = accts.filter(a => {
+      const q = buildGeoQuery(a);
+      return q && (a.geocodeAddress || "") !== q;
+    }).length;
 
     const entityCounts = {};
     for (const a of accts) {
@@ -464,10 +574,10 @@
           value="${esc(_searchQuery)}" autocomplete="off">
       </div>
 
-      ${unmapped && !_geocoding ? `
+      ${pending && !_geocoding ? `
         <div class="map-geocode-wrap">
           <button class="map-geocode-btn" id="mapGeocodeBtn" type="button">
-            📍 Geocode ${unmapped} unmapped address${unmapped !== 1 ? "es" : ""}
+            📍 Geocode ${pending} address${pending !== 1 ? "es" : ""}
           </button>
         </div>` : ""}
       ${_geocoding ? `<div class="map-geocode-wrap"><p id="mapGeocodeProgress" class="map-geocode-progress">Geocoding…</p></div>` : ""}
@@ -491,6 +601,20 @@
           County / Parish Lines
         </label>
       </div>
+
+      ${(function() {
+        const noAddr = accts.filter(a => !buildGeoQuery(a));
+        const failed = accts.filter(a => buildGeoQuery(a) && (!a.lat || !a.lng) && a.geocodeConfidence === "failed");
+        if (!noAddr.length && !failed.length) return "";
+        const rows = [
+          ...noAddr.map(a => `<div class="map-unmapped-row"><span class="map-unmapped-name">${esc(a.client)}</span><span class="map-unmapped-reason">No address on file</span></div>`),
+          ...failed.map(a => `<div class="map-unmapped-row"><span class="map-unmapped-name">${esc(a.client)}</span>${a.geocodeAddress ? `<span class="map-unmapped-addr">${esc(a.geocodeAddress)}</span>` : ""}<span class="map-unmapped-reason">Geocode failed — try re-running Geocode All</span></div>`),
+        ];
+        return `<div class="map-legend-section map-unmapped-section">
+          <h4 class="map-legend-section-title">Not on Map (${rows.length})</h4>
+          ${rows.join("")}
+        </div>`;
+      })()}
     `;
   }
 
@@ -840,7 +964,9 @@
     const plBy     = openPipelineByAccount();
     const plValue  = plBy[account.id] || 0;
     const latest   = typeof latestAccountActivity === "function" ? latestAccountActivity(account) : null;
-    const mapsUrl  = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((account.address || account.client || "").trim())}`;
+    const mapsUrl  = account.lat && account.lng
+      ? `https://www.google.com/maps/search/?api=1&query=${account.lat},${account.lng}`
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((account.address || account.client || "").trim())}`;
 
     const fieldRow = (label, val) => val
       ? `<div class="map-dp-row"><span class="map-dp-label">${label}</span><span class="map-dp-val">${val}</span></div>`
@@ -893,12 +1019,14 @@
   // ── Public API ─────────────────────────────────────────────────────
 
   function render() {
+    pruneOutOfBoundsCoords();
     const view = document.getElementById("liveMapView");
     if (!view) return;
 
     if (!view.querySelector("#mapLegend")) {
       view.innerHTML = `
         <div id="mapLegend" class="map-legend-sidebar"></div>
+        <button id="mapSidebarToggle" class="map-sidebar-toggle" type="button" aria-label="Toggle sidebar" title="Hide/show sidebar">‹</button>
         <div id="leafletMap" class="map-leaflet"></div>
         <div id="mapDetailPanel" class="map-detail-panel">
           <div class="map-detail-topbar">
@@ -908,6 +1036,14 @@
         </div>
       `;
       document.getElementById("mapDetailClose")?.addEventListener("click", () => closeDetailPanel());
+      document.getElementById("mapSidebarToggle")?.addEventListener("click", () => {
+        const sidebar = document.getElementById("mapLegend");
+        const btn     = document.getElementById("mapSidebarToggle");
+        const hidden  = view.classList.toggle("map-sidebar-hidden");
+        btn.textContent = hidden ? "›" : "‹";
+        btn.title = hidden ? "Show sidebar" : "Hide sidebar";
+        setTimeout(() => _map?.invalidateSize(), 260);
+      });
     }
 
     if (typeof L === "undefined") {

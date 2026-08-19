@@ -5,19 +5,43 @@
 
 (function () {
 
-  const STAGES = ["Prospect", "Qualifying", "Proposal Sent", "Won", "Lost"];
+  const STAGES = ["Client", "Meeting", "Bucket", "Follow-up Meeting", "Budget", "Project Planning", "Project Completed"];
   const STAGE_COLORS = {
-    Prospect:      { bg: "#f1f5f9", text: "#475569" },
-    Qualifying:    { bg: "#dbeafe", text: "#1d4ed8" },
-    "Proposal Sent": { bg: "#fef9c3", text: "#92400e" },
-    Won:           { bg: "#bbf7d0", text: "#15803d" },
-    Lost:          { bg: "#fee2e2", text: "#991b1b" },
+    "Client":            { bg: "#f1f5f9", text: "#475569" },
+    "Meeting":           { bg: "#dbeafe", text: "#1d4ed8" },
+    "Bucket":            { bg: "#e0e7ff", text: "#4338ca" },
+    "Follow-up Meeting": { bg: "#fef3c7", text: "#92400e" },
+    "Budget":            { bg: "#fce7f3", text: "#9d174d" },
+    "Project Planning":  { bg: "#d1fae5", text: "#065f46" },
+    "Project Completed": { bg: "#bbf7d0", text: "#15803d" },
+  };
+  const GRAVEYARD_COLOR = { bg: "#1e293b", text: "#64748b" };
+  const RANK_OPTIONS = ["Prospecting", "In Progress", "Meeting", "C", "B", "A", "Dead End"];
+  const RANK_COLORS = {
+    "A":           { bg: "#bbf7d0", text: "#15803d" },
+    "B":           { bg: "#dbeafe", text: "#1d4ed8" },
+    "C":           { bg: "#fef9c3", text: "#b45309" },
+    "Dead End":    { bg: "#f1f5f9", text: "#94a3b8" },
+    "Prospecting": { bg: "#f8fafc", text: "#94a3b8" },
+    "In Progress": { bg: "#e0e7ff", text: "#4338ca" },
+    "Meeting":     { bg: "#fce7f3", text: "#9d174d" },
   };
 
   // ── Data I/O ──────────────────────────────────────────────────────
 
+  const STAGE_MIGRATE = { "Prospect": "Client", "Qualifying": "Meeting", "Proposal Sent": "Bucket", "Won": "Project Completed", "Lost": "Project Completed" };
+
   function load() {
-    try { return JSON.parse(localStorage.getItem("garlandPipeline") || "[]"); }
+    try {
+      const raw = JSON.parse(localStorage.getItem("garlandPipeline") || "[]");
+      let changed = false;
+      const migrated = raw.map(d => {
+        if (STAGE_MIGRATE[d.stage]) { changed = true; return { ...d, stage: STAGE_MIGRATE[d.stage] }; }
+        return d;
+      });
+      if (changed) localStorage.setItem("garlandPipeline", JSON.stringify(migrated));
+      return migrated;
+    }
     catch (_) { return []; }
   }
 
@@ -96,32 +120,29 @@
   let _editId = null;
   let _sortBy = "default"; // "default" | "amount" | "closeDate"
   let _sortDir = -1; // -1 = desc, 1 = asc
+  let _dragId = null;
+  let _showGraveyard = false;
+  let _filterEntity = "";
+  let _filterCounty = "";
 
   // ── Analytics ─────────────────────────────────────────────────────
 
   function analytics(deals) {
-    const closed = deals.filter(d => d.stage === "Won" || d.stage === "Lost");
-    const won    = deals.filter(d => d.stage === "Won");
-    const open   = deals.filter(d => d.stage !== "Won" && d.stage !== "Lost");
-    const winRate = closed.length ? Math.round((won.length / closed.length) * 100) : null;
-    const avgWon  = won.length ? won.reduce((s, d) => s + (parseFloat(d.amount) || 0), 0) / won.length : 0;
-    const pipeline = open.reduce((s, d) => s + (parseFloat(d.amount) || 0), 0);
+    const completed = deals.filter(d => d.stage === "Project Completed");
+    const open      = deals.filter(d => d.stage !== "Project Completed" && d.stage !== "Graveyard");
+    const winRate   = deals.length ? Math.round((completed.length / deals.length) * 100) : null;
+    const avgWon    = completed.length ? completed.reduce((s, d) => s + (parseFloat(d.amount) || 0), 0) / completed.length : 0;
+    const pipeline  = open.reduce((s, d) => s + (parseFloat(d.amount) || 0), 0);
 
     // By entity type
     const byEntity = {};
-    for (const d of won) {
+    for (const d of completed) {
       const e = d.entityType || "Unknown";
       byEntity[e] = (byEntity[e] || 0) + (parseFloat(d.amount) || 0);
     }
     const topEntity = Object.entries(byEntity).sort((a, b) => b[1] - a[1])[0];
 
-    // Lost reasons
-    const reasons = {};
-    for (const d of deals.filter(d => d.stage === "Lost" && d.lostReason)) {
-      reasons[d.lostReason] = (reasons[d.lostReason] || 0) + 1;
-    }
-
-    return { won, closed, open, winRate, avgWon, pipeline, topEntity, reasons };
+    return { won: completed, closed: completed, open, winRate, avgWon, pipeline, topEntity, reasons: {} };
   }
 
   // ── Board render ──────────────────────────────────────────────────
@@ -159,55 +180,97 @@
     return cards;
   }
 
-  function renderBoard(deals) {
+  function renderBoard(deals, acctMap) {
+    const accts = accounts();
+    const entityTypes = [...new Set(accts.map(a => a.entity).filter(Boolean))].sort();
+    const counties    = [...new Set(accts.map(a => a.county).filter(Boolean))].sort();
+
+    // Apply filters
+    let filtered = deals;
+    if (_filterEntity) filtered = filtered.filter(d => {
+      const a = acctMap[d.accountId];
+      return (a?.entity || d.entityType || "") === _filterEntity;
+    });
+    if (_filterCounty) filtered = filtered.filter(d => {
+      const a = acctMap[d.accountId];
+      return (a?.county || d.county || "") === _filterCounty;
+    });
+
     const sortLabel = _sortBy === "amount" ? "$ " + (_sortDir < 0 ? "↓" : "↑")
       : _sortBy === "closeDate" ? "Date " + (_sortDir < 0 ? "↓" : "↑")
       : "Sort";
-    return buildValueBar(deals) +
+
+    const graveyardDeals = sortedDeals(filtered.filter(d => d.stage === "Graveyard"));
+    const graveyardVal   = graveyardDeals.reduce((s, d) => s + (parseFloat(d.amount) || 0), 0);
+
+    return buildValueBar(filtered.filter(d => d.stage !== "Graveyard")) +
       `<div class="pl-board-toolbar">
-        <span class="pl-sort-label">Sort columns:</span>
+        <span class="pl-sort-label">Sort:</span>
         <button class="pl-sort-btn ${_sortBy === "amount" ? "pl-sort-btn--active" : ""}" data-pl-sort="amount" type="button">$ Value</button>
         <button class="pl-sort-btn ${_sortBy === "closeDate" ? "pl-sort-btn--active" : ""}" data-pl-sort="closeDate" type="button">Close Date</button>
         ${_sortBy !== "default" ? `<button class="pl-sort-btn pl-sort-btn--dir" data-pl-sort-dir type="button">${sortLabel}</button>
-        <button class="pl-sort-btn pl-sort-btn--clear" data-pl-sort="default" type="button">✕ Clear</button>` : ""}
+        <button class="pl-sort-btn pl-sort-btn--clear" data-pl-sort="default" type="button">✕</button>` : ""}
+        <span class="pl-filter-sep">|</span>
+        <select class="pl-filter-select" id="plFilterEntity" title="Filter by account type">
+          <option value="">All Types</option>
+          ${entityTypes.map(e => `<option value="${esc(e)}" ${_filterEntity === e ? "selected" : ""}>${esc(e)}</option>`).join("")}
+        </select>
+        <select class="pl-filter-select" id="plFilterCounty" title="Filter by county">
+          <option value="">All Counties</option>
+          ${counties.map(c => `<option value="${esc(c)}" ${_filterCounty === c ? "selected" : ""}>${esc(c)}</option>`).join("")}
+        </select>
+        <button class="pl-graveyard-toggle ${_showGraveyard ? "pl-graveyard-toggle--active" : ""}" data-pl-graveyard type="button" title="Show/hide Graveyard">⚰ Graveyard${graveyardDeals.length ? ` (${graveyardDeals.length})` : ""}</button>
       </div>` +
       `<div class="pl-board">` +
       STAGES.map(stage => {
-        const cards = sortedDeals(deals.filter(d => d.stage === stage));
+        const cards = sortedDeals(filtered.filter(d => d.stage === stage));
         const val = cards.reduce((s, d) => s + (parseFloat(d.amount) || 0), 0);
         const col = STAGE_COLORS[stage] || {};
         return `
-          <div class="pl-col" data-stage="${esc(stage)}">
-            <div class="pl-col-header">
-              <span class="pl-col-name">${esc(stage)}</span>
-              <span class="pl-col-meta">${cards.length} · ${fmtMoney(val)}</span>
+          <div class="pl-col" data-stage="${esc(stage)}" style="border-top:3px solid ${col.text || "#94a3b8"}">
+            <div class="pl-col-header" style="background:${col.bg || "var(--surface)"}">
+              <span class="pl-col-name" style="color:${col.text || "var(--muted)"}">${esc(stage)}</span>
+              <span class="pl-col-meta" style="color:${col.text || "var(--muted)"};opacity:0.75">${cards.length} · ${fmtMoney(val)}</span>
             </div>
             <div class="pl-col-body">
-              ${cards.map(d => dealCard(d, col)).join("") || `<div class="pl-col-empty">No deals</div>`}
+              ${cards.map(d => dealCard(d, col, acctMap)).join("") || `<div class="pl-col-empty">No clients</div>`}
             </div>
           </div>`;
       }).join("") +
+      (_showGraveyard ? `
+        <div class="pl-col pl-col--graveyard" data-stage="Graveyard" style="border-top:3px solid ${GRAVEYARD_COLOR.text}">
+          <div class="pl-col-header" style="background:${GRAVEYARD_COLOR.bg}">
+            <span class="pl-col-name" style="color:${GRAVEYARD_COLOR.text}">⚰ Graveyard</span>
+            <span class="pl-col-meta" style="color:${GRAVEYARD_COLOR.text};opacity:0.75">${graveyardDeals.length} · ${fmtMoney(graveyardVal)}</span>
+          </div>
+          <div class="pl-col-body">
+            ${graveyardDeals.map(d => dealCard(d, GRAVEYARD_COLOR, acctMap)).join("") || `<div class="pl-col-empty" style="color:#64748b">No dead ends</div>`}
+          </div>
+        </div>` : "") +
     `</div>`;
   }
 
-  function dealCard(d, col) {
+  function dealCard(d, col, acctMap) {
     const age = daysSince(d.createdAt);
     const link = linkedLabel(d.linkedType, d.linkedId);
+    const displayName = (d.title && d.title !== d.accountName) ? d.title : d.accountName;
+    const acct = acctMap?.[d.accountId];
+    const rank = acct?.clientRanking || "";
+    const rankCol = RANK_COLORS[rank] || { bg: "#f1f5f9", text: "#94a3b8" };
+    const allStages = [...STAGES, "Graveyard"];
     return `
-      <div class="pl-deal-card" data-deal-id="${esc(d.id)}">
-        <div class="pl-deal-name">${esc(d.title || d.accountName)}</div>
-        <div class="pl-deal-account">${esc(d.accountName)}</div>
-        ${link ? `<div class="pl-linked-badge">↗ ${esc(link)}</div>` : ""}
+      <div class="pl-deal-card" data-deal-id="${esc(d.id)}" data-account-id="${esc(d.accountId || "")}" draggable="true">
+        <div class="pl-deal-name">${esc(displayName)}</div>
         <div class="pl-deal-footer">
-          <span class="pl-deal-amount">${d.amount ? fmtMoney(d.amount) : "—"}</span>
-          <span class="pl-deal-age">${age}d</span>
+          ${rank ? `<span class="pl-rank-badge" data-rank-deal="${esc(d.id)}" data-rank-account="${esc(d.accountId || "")}" style="background:${rankCol.bg};color:${rankCol.text}" title="Click to change rank">${esc(rank)}</span>` : `<span class="pl-rank-badge pl-rank-badge--empty" data-rank-deal="${esc(d.id)}" data-rank-account="${esc(d.accountId || "")}" title="Set rank">—</span>`}
+          <span class="pl-deal-amount">${d.amount ? fmtMoney(d.amount) : ""}</span>
+          ${d.closeDate ? `<span class="pl-deal-close">${fmtDate(d.closeDate)}</span>` : `<span class="pl-deal-age">${age}d</span>`}
         </div>
-        ${d.closeDate ? `<div class="pl-deal-close">Close: ${fmtDate(d.closeDate)}</div>` : ""}
         <div class="pl-deal-actions">
           <select class="pl-stage-select" data-deal-id="${esc(d.id)}" title="Move stage">
-            ${STAGES.map(s => `<option ${s === d.stage ? "selected" : ""}>${esc(s)}</option>`).join("")}
+            ${allStages.map(s => `<option ${s === d.stage ? "selected" : ""}>${esc(s)}</option>`).join("")}
           </select>
-          <button class="pl-edit-btn" data-edit-deal="${esc(d.id)}" type="button" title="Edit">✎</button>
+          <button class="pl-edit-btn" data-edit-deal="${esc(d.id)}" data-edit-account="${esc(d.accountId || "")}" type="button" title="Open account">↗</button>
           <button class="pl-del-btn" data-del-deal="${esc(d.id)}" type="button" title="Delete">✕</button>
         </div>
       </div>`;
@@ -218,7 +281,7 @@
   function renderAnalytics(deals) {
     const a = analytics(deals);
     const byCounty = {};
-    for (const d of deals.filter(x => x.stage === "Won")) {
+    for (const d of deals.filter(x => x.stage === "Project Completed")) {
       const c = d.county || "Unknown";
       byCounty[c] = (byCounty[c] || { count: 0, value: 0 });
       byCounty[c].count++;
@@ -226,14 +289,12 @@
     }
     const countyRows = Object.entries(byCounty).sort((x, y) => y[1].value - x[1].value);
 
-    const reasonRows = Object.entries(a.reasons).sort((x, y) => y[1] - x[1]);
-
     return `
       <div class="pl-analytics">
         <div class="pl-kpi-row">
           <div class="pl-kpi">
             <div class="pl-kpi-num">${a.winRate !== null ? a.winRate + "%" : "—"}</div>
-            <div class="pl-kpi-label">Win Rate</div>
+            <div class="pl-kpi-label">Completion Rate</div>
           </div>
           <div class="pl-kpi pl-kpi--accent">
             <div class="pl-kpi-num">${fmtMoney(a.pipeline)}</div>
@@ -241,35 +302,26 @@
           </div>
           <div class="pl-kpi">
             <div class="pl-kpi-num">${fmtMoney(a.avgWon)}</div>
-            <div class="pl-kpi-label">Avg. Deal Won</div>
+            <div class="pl-kpi-label">Avg. Project Value</div>
           </div>
           <div class="pl-kpi pl-kpi--green">
             <div class="pl-kpi-num">${a.won.length}</div>
-            <div class="pl-kpi-label">Deals Won</div>
+            <div class="pl-kpi-label">Projects Completed</div>
           </div>
           <div class="pl-kpi">
-            <div class="pl-kpi-num">${a.closed.length - a.won.length}</div>
-            <div class="pl-kpi-label">Deals Lost</div>
+            <div class="pl-kpi-num">${a.open.length}</div>
+            <div class="pl-kpi-label">Active Deals</div>
           </div>
         </div>
 
         <div class="pl-analytics-grid">
           <div class="pl-analytics-card">
-            <h4 class="pl-analytics-title">Won by County</h4>
+            <h4 class="pl-analytics-title">Completed by County</h4>
             ${countyRows.length ? countyRows.map(([county, s]) => `
               <div class="pl-analytics-row">
                 <span>${esc(county)}</span>
                 <span>${s.count} deal${s.count !== 1 ? "s" : ""} · ${fmtMoney(s.value)}</span>
-              </div>`).join("") : '<p class="pl-empty">No won deals yet.</p>'}
-          </div>
-
-          <div class="pl-analytics-card">
-            <h4 class="pl-analytics-title">Loss Reasons</h4>
-            ${reasonRows.length ? reasonRows.map(([reason, count]) => `
-              <div class="pl-analytics-row">
-                <span>${esc(reason)}</span>
-                <span>${count}×</span>
-              </div>`).join("") : '<p class="pl-empty">No lost deals with reasons yet.</p>'}
+              </div>`).join("") : '<p class="pl-empty">No completed deals yet.</p>'}
           </div>
 
           <div class="pl-analytics-card">
@@ -292,13 +344,54 @@
       </div>`;
   }
 
+  // ── Auto-seed all accounts into Client stage ──────────────────────
+
+  function ensureAllClientsHaveDeals() {
+    const accts = accounts();
+    if (!accts.length) return;
+    const deals = load();
+    const existingAccountIds = new Set(deals.map(d => d.accountId).filter(Boolean));
+    const existingNames = new Set(deals.map(d => String(d.accountName || "").toLowerCase().trim()).filter(Boolean));
+
+    const newDeals = [];
+    for (const acct of accts) {
+      if (!acct.client) continue;
+      if (acct.clientRanking === "Dead End") continue;
+      if (acct.id && existingAccountIds.has(acct.id)) continue;
+      if (existingNames.has(String(acct.client).toLowerCase().trim())) continue;
+      newDeals.push({
+        id: uid(),
+        accountId: acct.id || "",
+        accountName: acct.client,
+        county: acct.county || "",
+        entityType: acct.entity || "",
+        title: "",
+        amount: "",
+        stage: "Client",
+        closeDate: "",
+        probability: "",
+        notes: "",
+        linkedType: "",
+        linkedId: "",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    }
+    if (newDeals.length) {
+      save([...deals, ...newDeals]);
+    }
+  }
+
   // ── Main render ───────────────────────────────────────────────────
 
   function render() {
     const el = document.getElementById("pipelineView");
     if (!el) return;
+    ensureAllClientsHaveDeals();
     const deals = load();
-    const total = deals.filter(d => !["Won", "Lost"].includes(d.stage))
+    const acctMap = {};
+    for (const a of accounts()) { acctMap[a.id] = a; }
+    const total = deals.filter(d => d.stage !== "Project Completed" && d.stage !== "Graveyard")
       .reduce((s, d) => s + (parseFloat(d.amount) || 0), 0);
 
     el.innerHTML = `
@@ -317,14 +410,14 @@
           </div>
         </div>
         <div class="pl-content">
-          ${_tab === "board" ? renderBoard(deals) : renderAnalytics(deals)}
+          ${_tab === "board" ? renderBoard(deals, acctMap) : renderAnalytics(deals)}
         </div>
       </div>`;
 
-    wireEvents(el, deals);
+    wireEvents(el, deals, acctMap);
   }
 
-  function wireEvents(el, deals) {
+  function wireEvents(el, deals, acctMap) {
     el.querySelectorAll("[data-tab]").forEach(btn => {
       btn.addEventListener("click", () => { _tab = btn.dataset.tab; render(); });
     });
@@ -338,10 +431,31 @@
     });
     el.querySelector("[data-pl-sort-dir]")?.addEventListener("click", () => { _sortDir *= -1; render(); });
 
+    el.querySelector("[data-pl-graveyard]")?.addEventListener("click", () => {
+      _showGraveyard = !_showGraveyard;
+      render();
+    });
+
+    el.querySelector("#plFilterEntity")?.addEventListener("change", e => {
+      _filterEntity = e.target.value;
+      render();
+    });
+    el.querySelector("#plFilterCounty")?.addEventListener("change", e => {
+      _filterCounty = e.target.value;
+      render();
+    });
+
     el.querySelector("#plAddDealBtn")?.addEventListener("click", () => openDealDialog(null));
 
     el.querySelectorAll("[data-edit-deal]").forEach(btn => {
-      btn.addEventListener("click", () => openDealDialog(btn.dataset.editDeal));
+      btn.addEventListener("click", () => {
+        const acctId = btn.dataset.editAccount;
+        if (acctId && typeof window.showDetail === "function") {
+          window.showDetail("account", acctId);
+        } else {
+          openDealDialog(btn.dataset.editDeal);
+        }
+      });
     });
 
     el.querySelectorAll("[data-del-deal]").forEach(btn => {
@@ -360,14 +474,93 @@
         const deal = all.find(d => d.id === sel.dataset.dealId);
         if (!deal) return;
         const newStage = sel.value;
-        const needsReason = newStage === "Lost" && !deal.lostReason;
-        if (needsReason) {
-          const reason = prompt("Reason for loss (optional):");
-          if (reason !== null) deal.lostReason = reason.trim();
+        if (newStage === "Project Completed") deal.completedAt = new Date().toISOString();
+        if (newStage === "Graveyard" && deal.accountId) {
+          window.gripApp?.persistRecordEdit("account", deal.accountId, "clientRanking", "Dead End", false);
         }
-        if (newStage === "Won") deal.wonAt = new Date().toISOString();
-        if (newStage === "Lost") deal.lostAt = new Date().toISOString();
         deal.stage = newStage;
+        deal.updatedAt = new Date().toISOString();
+        save(all);
+        render();
+      });
+    });
+
+    // ── Rank badge click → inline select ─────────────────────────────
+    el.querySelectorAll("[data-rank-deal]").forEach(badge => {
+      badge.addEventListener("click", e => {
+        e.stopPropagation();
+        const dealId   = badge.dataset.rankDeal;
+        const accountId = badge.dataset.rankAccount;
+        const sel = document.createElement("select");
+        sel.className = "pl-rank-select-inline";
+        RANK_OPTIONS.forEach(r => {
+          const o = document.createElement("option");
+          o.value = r; o.textContent = r;
+          const acct = acctMap?.[accountId];
+          if ((acct?.clientRanking || "") === r) o.selected = true;
+          sel.appendChild(o);
+        });
+        badge.replaceWith(sel);
+        sel.focus();
+        const commit = () => {
+          const newRank = sel.value;
+          if (accountId) {
+            window.gripApp?.persistRecordEdit("account", accountId, "clientRanking", newRank, false);
+            if (newRank === "Dead End") {
+              const all = load();
+              const deal = all.find(d => d.id === dealId);
+              if (deal && deal.stage !== "Graveyard") {
+                deal.stage = "Graveyard";
+                deal.updatedAt = new Date().toISOString();
+                save(all);
+                _showGraveyard = true;
+              }
+            }
+          }
+          render();
+        };
+        sel.addEventListener("change", commit);
+        sel.addEventListener("blur", () => setTimeout(() => { if (document.contains(sel)) render(); }, 150));
+      });
+    });
+
+    // ── Drag-and-drop ─────────────────────────────────────────────────
+    el.querySelectorAll(".pl-deal-card[draggable]").forEach(card => {
+      card.addEventListener("dragstart", e => {
+        _dragId = card.dataset.dealId;
+        e.dataTransfer.effectAllowed = "move";
+        setTimeout(() => card.classList.add("pl-drag-ghost"), 0);
+      });
+      card.addEventListener("dragend", () => {
+        _dragId = null;
+        card.classList.remove("pl-drag-ghost");
+        el.querySelectorAll(".pl-col-drop-over").forEach(c => c.classList.remove("pl-col-drop-over"));
+      });
+    });
+
+    el.querySelectorAll(".pl-col-body").forEach(body => {
+      body.addEventListener("dragover", e => {
+        if (!_dragId) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        body.classList.add("pl-col-drop-over");
+      });
+      body.addEventListener("dragleave", e => {
+        if (!body.contains(e.relatedTarget)) body.classList.remove("pl-col-drop-over");
+      });
+      body.addEventListener("drop", e => {
+        e.preventDefault();
+        body.classList.remove("pl-col-drop-over");
+        const targetStage = body.closest("[data-stage]")?.dataset.stage;
+        if (!_dragId || !targetStage) return;
+        const all = load();
+        const deal = all.find(d => d.id === _dragId);
+        if (!deal || deal.stage === targetStage) return;
+        if (targetStage === "Project Completed") deal.completedAt = new Date().toISOString();
+        if (targetStage === "Graveyard" && deal.accountId) {
+          window.gripApp?.persistRecordEdit("account", deal.accountId, "clientRanking", "Dead End", false);
+        }
+        deal.stage = targetStage;
         deal.updatedAt = new Date().toISOString();
         save(all);
         render();
@@ -410,7 +603,7 @@
     if (form && existing) {
       form.elements.namedItem("title").value = existing.title || "";
       form.elements.namedItem("amount").value = existing.amount || "";
-      form.elements.namedItem("stage").value = existing.stage || "Prospect";
+      form.elements.namedItem("stage").value = existing.stage || "Client";
       form.elements.namedItem("closeDate").value = existing.closeDate || "";
       form.elements.namedItem("probability").value = existing.probability || "";
       form.elements.namedItem("notes").value = existing.notes || "";
@@ -450,7 +643,7 @@
           entityType: acct?.entity || deals[idx].entityType,
           title,
           amount: formData.get("amount") || "",
-          stage: formData.get("stage") || "Prospect",
+          stage: formData.get("stage") || "Client",
           closeDate: formData.get("closeDate") || "",
           probability: formData.get("probability") || "",
           notes: formData.get("notes") || "",
@@ -493,7 +686,67 @@
 
   // ── Public API ────────────────────────────────────────────────────
 
-  window.gripPipeline = { render, openDealDialog };
+  function promoteToBucket(proposal, proposalId) {
+    const norm = s => String(s || "").toLowerCase().trim();
+    const clientName = proposal?.client || "";
+    if (!clientName) return;
+
+    const accts = accounts();
+    const acct = accts.find(a => norm(a.client) === norm(clientName));
+
+    const deals = load();
+    const BUCKET_IDX = STAGES.indexOf("Bucket");
+
+    // Find existing deal for this account
+    const existing = acct
+      ? deals.find(d => d.accountId === acct.id)
+      : deals.find(d => norm(d.accountName) === norm(clientName));
+
+    if (existing) {
+      const currentIdx = STAGES.indexOf(existing.stage);
+      if (existing.stage === "Graveyard") return; // never auto-promote from graveyard
+      if (currentIdx >= BUCKET_IDX) return; // already at Bucket or beyond
+      existing.stage = "Bucket";
+      existing.updatedAt = new Date().toISOString();
+      save(deals);
+    } else {
+      deals.push({
+        id: uid(),
+        accountId: acct?.id || "",
+        accountName: acct?.client || clientName,
+        county: acct?.county || "",
+        entityType: acct?.entity || "",
+        title: proposal?.project || clientName,
+        amount: "",
+        stage: "Bucket",
+        closeDate: "",
+        probability: "",
+        notes: "Auto-promoted from approved proposal.",
+        linkedType: "proposal",
+        linkedId: proposalId || "",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      save(deals);
+    }
+    render();
+  }
+
+  function moveDealToGraveyardForAccount(accountId) {
+    if (!accountId) return;
+    const all = load();
+    let changed = false;
+    for (const deal of all) {
+      if (deal.accountId === accountId && deal.stage !== "Graveyard" && deal.stage !== "Project Completed") {
+        deal.stage = "Graveyard";
+        deal.updatedAt = new Date().toISOString();
+        changed = true;
+      }
+    }
+    if (changed) { save(all); _showGraveyard = true; render(); }
+  }
+
+  window.gripPipeline = { render, openDealDialog, promoteToBucket, moveDealToGraveyardForAccount };
 
   function initListeners() {
     document.getElementById("plDealForm")?.addEventListener("submit", e => {

@@ -1894,6 +1894,30 @@ function applyRequestedDataCleanup() {
   localStorage.setItem(cleanupKey, "done");
 }
 
+function applyMissingAddressFixes() {
+  const fixKey = "garlandMissingAddressFixV1";
+  if (localStorage.getItem(fixKey) === "done") return;
+
+  const FIXES = [
+    { client: "Brazosport ISD",           address: "301 W Brazoswood Dr, Clute, TX 77531" },
+    { client: "Phillips 66",              address: "8189 Old FM 524, Old Ocean, TX 77463" },
+    { client: "NUCOR STEEL JEWETT",       address: "8812 US Highway 79 W, Jewett, TX 75846" },
+    { client: "Magnolia Fire Department", address: "18215 Buddy Riley Blvd, Magnolia, TX 77354" },
+    { client: "MONTEREY MUSHROOM PLANT",  address: "5816 TX-75 S, Madisonville, TX 77864" },
+    { client: "New Waverly ISD",          address: "355 Front St, New Waverly, TX 77358" },
+    { client: "Waller-Harris ESD",        address: "612 Walnut St, Waller, TX 77484" },
+  ];
+
+  const accts = typeof cleanAccounts === "function" ? cleanAccounts() : [];
+  for (const fix of FIXES) {
+    const acct = accts.find((a) => normalize(a.client) === normalize(fix.client));
+    if (!acct || acct.address) continue;
+    persistRecordEdit("account", acct.id, "address", fix.address, false);
+  }
+
+  localStorage.setItem(fixKey, "done");
+}
+
 function addDays(date, days) {
   const copy = new Date(date);
   copy.setDate(copy.getDate() + days);
@@ -6057,6 +6081,12 @@ function persistRecordEdit(type, id, key, value, refresh = true) {
     else if (savedCrm.edits[collection]?.[id]) savedCrm.edits[collection][id].stageClosedAt = closedNow;
   }
   saveCrm();
+  if (type === "proposal" && key === "stage" && cleanedValue === "Proposals Approved") {
+    setTimeout(() => window.gripPipeline?.promoteToBucket(record, id), 100);
+  }
+  if (type === "account" && key === "clientRanking" && cleanedValue === "Dead End") {
+    setTimeout(() => window.gripPipeline?.moveDealToGraveyardForAccount(id), 100);
+  }
   if (type === "account" && key === "address" && cleanedValue && String(cleanedValue).trim().length > 5) {
     setTimeout(() => window.gripMap?.geocodeAccountById(id, cleanedValue), 300);
   }
@@ -11980,6 +12010,7 @@ standardizeStageLabels();
 standardizeProjectTypeLabels();
 standardizeAbcScoreLabels();
 applyRequestedDataCleanup();
+applyMissingAddressFixes();
 migrateSheetNotesToActivities();
 renderFilters();
 renderInchFractionOptions();
@@ -12055,6 +12086,9 @@ setTimeout(() => { if (window.gripToday) { setView("today"); window.gripToday.re
   byId("closePreDossierDialog")?.addEventListener("click", () => byId("preDossierDialog")?.close());
   byId("closePreDossierBtn")?.addEventListener("click", () => byId("preDossierDialog")?.close());
 })();
+
+// ── Public app bridge (for pipeline.js to call persistRecordEdit) ──
+window.gripApp = { persistRecordEdit };
 
 // ── Offline banner ────────────────────────────────────────────────
 window.addEventListener("offline", () => { const b = byId("gripOfflineBanner"); if (b) b.hidden = false; });

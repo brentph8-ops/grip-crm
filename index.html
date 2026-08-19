@@ -1167,19 +1167,18 @@
           <div class="form-row">
             <label class="form-label">Stage
               <select name="stage" class="form-input">
-                <option>Prospect</option>
-                <option>Qualifying</option>
-                <option>Proposal Sent</option>
-                <option>Won</option>
-                <option>Lost</option>
+                <option>Client</option>
+                <option>Meeting</option>
+                <option>Bucket</option>
+                <option>Follow-up Meeting</option>
+                <option>Budget</option>
+                <option>Project Planning</option>
+                <option>Project Completed</option>
               </select>
             </label>
             <label class="form-label">Expected Close <input name="closeDate" class="form-input" type="date" /></label>
           </div>
           <label class="form-label">Notes <textarea name="notes" class="form-textarea" rows="3"></textarea></label>
-          <label class="form-label">Loss Reason <small class="form-hint">If applicable</small>
-            <input name="lostReason" class="form-input" placeholder="e.g. Budget, Timing, Competitor" />
-          </label>
           <div class="modal-footer">
             <button type="button" class="secondary-button" id="cancelPipelineDeal">Cancel</button>
             <button type="submit" class="primary-button">Save Deal</button>
@@ -2578,8 +2577,40 @@
     <script src="src/territory.js"></script>
     <script src="src/map.js"></script>
     <script>
+      // On every page load: wipe geo cache if the cache version is stale,
+      // then prune any remaining coordinates outside SE Texas / Louisiana.
+      // This runs before any map code so wrong-state pins are never displayed.
+      (function() {
+        var GEO_KEY    = 'garlandGeocoords';
+        var VER_KEY    = 'grip-geo-version';
+        var CURRENT    = '55';
+
+        // Version bump → wipe entire geo cache so everything re-geocodes cleanly
+        if (localStorage.getItem(VER_KEY) !== CURRENT) {
+          localStorage.removeItem(GEO_KEY);
+          localStorage.setItem(VER_KEY, CURRENT);
+        }
+
+        // Bounds prune (catches any stale entries that slipped through)
+        try {
+          var cache = JSON.parse(localStorage.getItem(GEO_KEY) || '{}');
+          var changed = false;
+          Object.keys(cache).forEach(function(id) {
+            var e = cache[id];
+            var lat = parseFloat(e.lat), lng = parseFloat(e.lng);
+            if (lat && lng && !(lat >= 28.3 && lat <= 32.0 && lng >= -97.2 && lng <= -88.8)) {
+              delete cache[id];
+              changed = true;
+            }
+          });
+          if (changed) localStorage.setItem(GEO_KEY, JSON.stringify(cache));
+        } catch(_) {}
+      })();
+
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js').catch(function(err) {
+        // updateViaCache:'none' forces the browser to always fetch sw.js fresh,
+        // so version upgrades activate without waiting for the browser HTTP cache to expire.
+        navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(function(err) {
           console.warn('GRIP SW registration failed:', err);
         });
         navigator.serviceWorker.addEventListener('message', function(event) {
