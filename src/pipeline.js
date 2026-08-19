@@ -253,7 +253,6 @@
 
   function dealCard(d, col, acctMap) {
     const age = daysSince(d.createdAt);
-    const link = linkedLabel(d.linkedType, d.linkedId);
     const displayName = (d.title && d.title !== d.accountName) ? d.title : d.accountName;
     // Look up by accountId first, fall back to name match
     const norm = s => String(s || "").toLowerCase().trim();
@@ -261,8 +260,6 @@
       || (d.accountName ? Object.values(acctMap || {}).find(a => norm(a.client) === norm(d.accountName)) : null);
     const rank = acct?.clientRanking || "";
     const rankCol = RANK_COLORS[rank] || { bg: "#f1f5f9", text: "#94a3b8" };
-    // Graveyard column shows normal stages (to restore); normal columns never show Graveyard option
-    const stageOptions = d.stage === "Graveyard" ? STAGES : STAGES;
     const rankBadge = rank
       ? `<span class="pl-rank-badge" data-rank-deal="${esc(d.id)}" data-rank-account="${esc(d.accountId || "")}" style="background:${rankCol.bg};color:${rankCol.text}" title="Click to change rank">${esc(rank)}</span>`
       : `<span class="pl-rank-badge pl-rank-badge--empty" data-rank-deal="${esc(d.id)}" data-rank-account="${esc(d.accountId || "")}" title="Click to set rank">Set rank</span>`;
@@ -276,7 +273,7 @@
         </div>
         <div class="pl-deal-actions">
           <select class="pl-stage-select" data-deal-id="${esc(d.id)}" title="Move stage">
-            ${stageOptions.map(s => `<option ${s === d.stage ? "selected" : ""}>${esc(s)}</option>`).join("")}
+            ${STAGES.map(s => `<option ${s === d.stage ? "selected" : ""}>${esc(s)}</option>`).join("")}
           </select>
           <button class="pl-edit-btn" data-edit-deal="${esc(d.id)}" data-edit-account="${esc(d.accountId || "")}" type="button" title="Open account">↗</button>
           <button class="pl-del-btn" data-del-deal="${esc(d.id)}" type="button" title="Delete">✕</button>
@@ -606,6 +603,8 @@
         if (targetStage === "Project Completed") deal.completedAt = new Date().toISOString();
         if (targetStage === "Graveyard" && deal.accountId) {
           window.gripApp?.persistRecordEdit("account", deal.accountId, "clientRanking", "Dead End", false);
+        } else if (deal.stage === "Graveyard" && deal.accountId) {
+          window.gripApp?.persistRecordEdit("account", deal.accountId, "clientRanking", "Prospecting", false);
         }
         deal.stage = targetStage;
         deal.updatedAt = new Date().toISOString();
@@ -633,6 +632,7 @@
       });
     }
     setTimeout(fitBoardHeight, 0);
+    if (window._plResizeHandler) window.removeEventListener("resize", window._plResizeHandler);
     window._plResizeHandler = fitBoardHeight;
     window.addEventListener("resize", fitBoardHeight);
   }
