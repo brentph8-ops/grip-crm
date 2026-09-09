@@ -4055,22 +4055,14 @@ function applyPhoneModeDefaults() {
 }
 
 function syncMobilePreviewButton() {
+  const mobile = isMobileOrPreview();
   const shell = byId("appShell");
-  const button = byId("mobileVersionButton");
   const toggleBtn = byId("mobileHeaderToggle");
   const compactBar = byId("mobileCompactBar");
-  shell?.classList.toggle("mobile-preview", state.mobilePreview);
-  if (button) {
-    const label = state.mobilePreview ? "Desktop" : "Mobile";
-    const fullLabel = `${label} Version`;
-    const text = button.querySelector(".mobile-version-label");
-    if (text) text.textContent = `${label} Version`;
-    button.setAttribute("aria-label", fullLabel);
-    button.setAttribute("title", fullLabel);
-  }
-  if (toggleBtn) toggleBtn.hidden = !state.mobilePreview;
-  if (compactBar) compactBar.hidden = !state.mobilePreview;
-  if (!state.mobilePreview) closeMobileFullMenu();
+  shell?.classList.toggle("mobile-preview", mobile);
+  if (toggleBtn) toggleBtn.hidden = !mobile;
+  if (compactBar) compactBar.hidden = !mobile;
+  if (!mobile) closeMobileFullMenu();
 }
 
 function closeMobileFullMenu() {
@@ -4112,7 +4104,7 @@ function toggleMobileHeader() {
 
 function restoreMobileHeaderState() {
   try {
-    if (localStorage.getItem("gripMobileHeaderCollapsed") === "1" && state.mobilePreview) {
+    if (localStorage.getItem("gripMobileHeaderCollapsed") === "1" && isMobileOrPreview()) {
       byId("appShell")?.classList.add("header-collapsed");
     }
   } catch (_) {}
@@ -10687,7 +10679,8 @@ function bindEvents() {
     setAccountMode(button.dataset.accountMode);
   });
   byId("territorySettingsButton").addEventListener("click", openTerritorySettings);
-  byId("mobileVersionButton").addEventListener("click", toggleMobilePreview);
+  // Auto-switch layout when viewport crosses the mobile breakpoint
+  window.matchMedia("(max-width: 760px)").addEventListener("change", () => { syncMobilePreviewButton(); render(); });
   byId("mobileHeaderToggle")?.addEventListener("click", toggleMobileHeader);
   byId("mobileCompactMenuBtn")?.addEventListener("click", toggleMobileFullMenu);
   byId("mobileFullMenu")?.addEventListener("click", (e) => {
