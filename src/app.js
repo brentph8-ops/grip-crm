@@ -207,8 +207,8 @@ const defaultProjectType = "New Roof/Reroof";
 const projectTypes = ["New Roof/Reroof", "Recover", "Restoration"];
 const contractorWarrantyOptions = ["Not selected", "2-year contractor warranty", "3-year contractor warranty", "4-year contractor warranty", "5-year contractor warranty"];
 const windUpliftUrl = "https://winduplift.garlandhq.com/index-dashboard.php";
-const taskTypes = ["Call", "Email", "Follow-Up", "Project Related", "Proposal Related"];
-const taskPriorities = ["Low", "Normal", "High", "Urgent"];
+const taskTypes = ["Call", "Follow-Up", "Email", "Actionable"];
+const taskPriorities = ["Low", "Medium", "High"];
 const taskStatuses = ["Open", "In Progress", "Waiting", "Completed", "Cancelled"];
 const taskNextActions = [
   "Call Contact",
@@ -3053,12 +3053,13 @@ function resetTaskForm(task = null) {
   form.elements.next_action.value = task?.next_action || "";
   form.elements.assigned_user.value = task?.assigned_user || taskDefaultAssignedUser();
   form.elements.completed_outcome.value = task?.completed_outcome || "";
-  fillSelect("taskPriorityInput", taskPriorities, task?.priority || "Normal");
-  fillSelect("taskTypeInput", taskTypes, task?.task_type || "Follow-Up");
+  const prio = task?.priority || "Low";
+  byId("taskForm").querySelectorAll('[name="priority"]').forEach(r => { r.checked = r.value === prio; });
+  const ttype = task?.task_type || "Follow-Up";
+  byId("taskForm").querySelectorAll('[name="task_type"]').forEach(r => { r.checked = r.value === ttype; });
   fillSelect("taskReminderInput", taskReminderTypes, task?.reminder_settings?.type || "None");
   fillSelect("taskRecurringInput", taskRecurringTypes, task?.recurring_settings?.type || "None");
   fillSelect("taskStatusInput", taskStatuses, task?.status || "Open");
-  byId("taskNextActionOptions").innerHTML = taskNextActions.map((item) => `<option value="${escapeHtml(item)}"></option>`).join("");
   byId("taskOutcomeOptions").innerHTML = taskCompletedOutcomes.map((item) => `<option value="${escapeHtml(item)}"></option>`).join("");
   if (task?.account_name) {
     form.elements.accountMode.value = "existing";
@@ -3074,11 +3075,16 @@ function resetTaskForm(task = null) {
 }
 
 function openTaskDialog(taskId = "", prefillAccount = "") {
-  resetTaskForm(taskId ? findTask(taskId) : null);
+  const task = taskId ? findTask(taskId) : null;
+  resetTaskForm(task);
   if (prefillAccount && !taskId) {
     byId("taskForm").elements.accountMode.value = "existing";
     byId("taskAccountSearchInput").value = prefillAccount;
     syncTaskAccountMode();
+  }
+  const details = byId("taskMoreDetails");
+  if (details) {
+    details.open = !!(task && (task.reminder_settings?.type && task.reminder_settings.type !== "None") || task?.attachments?.length);
   }
   openDialog("taskDialog");
   byId("taskTitleInput")?.focus();
@@ -3086,8 +3092,10 @@ function openTaskDialog(taskId = "", prefillAccount = "") {
 
 function syncTaskAccountMode() {
   const mode = new FormData(byId("taskForm")).get("accountMode") || "unassigned";
-  byId("taskForm").querySelector("[data-task-existing-account]").hidden = mode !== "existing";
-  byId("taskForm").querySelector("[data-task-new-account]").hidden = mode !== "new";
+  const newEl = byId("taskForm").querySelector("[data-task-new-account]");
+  if (newEl) newEl.hidden = mode !== "new";
+  const addBtn = byId("taskAddAccountBtn");
+  if (addBtn) addBtn.hidden = mode === "new";
 }
 
 function applyTaskTemplate(name) {
@@ -10810,11 +10818,21 @@ function bindEvents() {
   byId("taskForm").addEventListener("change", (event) => {
     if (event.target.name === "accountMode") syncTaskAccountMode();
     if (event.target.id === "taskAccountSearchInput") {
-      fillSelect("taskProjectInput", taskProjectOptions(event.target.value), "");
+      const val = event.target.value.trim();
+      byId("taskForm").elements.accountMode.value = val ? "existing" : "unassigned";
+      fillSelect("taskProjectInput", taskProjectOptions(val), "");
     }
   });
   byId("taskForm").addEventListener("input", (event) => {
-    if (event.target.id === "taskAccountSearchInput") fillSelect("taskProjectInput", taskProjectOptions(event.target.value), "");
+    if (event.target.id === "taskAccountSearchInput") {
+      const val = event.target.value.trim();
+      byId("taskForm").elements.accountMode.value = val ? "existing" : "unassigned";
+      fillSelect("taskProjectInput", taskProjectOptions(val), "");
+    }
+  });
+  byId("taskAddAccountBtn")?.addEventListener("click", () => {
+    byId("taskForm").elements.accountMode.value = "new";
+    syncTaskAccountMode();
   });
   byId("taskForm").addEventListener("click", (event) => {
     const template = event.target.closest("[data-task-template]");

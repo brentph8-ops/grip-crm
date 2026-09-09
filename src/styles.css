@@ -1148,12 +1148,197 @@ textarea {
   justify-content: center;
 }
 
-/* ── Task form sections ─────────────────────────────────────────── */
+/* ── Task form — simplified ─────────────────────────────────────── */
+.task-field-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.task-field-block:first-of-type { border-top: none; }
+
+.task-field-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+}
+
+.task-title-input,
+.task-desc-input,
+.task-account-input {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.92rem;
+  padding: 8px 11px;
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--surface, #fff);
+  color: var(--ink);
+}
+.task-title-input { font-size: 1rem; font-weight: 600; }
+.task-desc-input { resize: vertical; min-height: 54px; font-size: 0.88rem; }
+.task-title-input:focus, .task-desc-input:focus, .task-account-input:focus {
+  outline: none; border-color: var(--blue);
+}
+
+/* Priority & type pill groups */
+.task-pill-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.task-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  padding: 0 13px;
+  min-height: 32px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  background: var(--surface, #fff);
+  color: var(--ink);
+  user-select: none;
+  transition: background 0.1s, border-color 0.1s;
+}
+.task-pill input[type="radio"] { display: none; }
+
+/* Priority — Low (blue) */
+.task-pill--low:has(input:checked) {
+  background: #e3f1ff; border-color: var(--blue); color: var(--blue);
+}
+.task-pill--low:has(input:checked)::before { content: "●"; font-size: 0.6rem; color: var(--blue); }
+
+/* Priority — Medium (yellow/amber) */
+.task-pill--medium:has(input:checked) {
+  background: #fef3c7; border-color: #d97706; color: #92400e;
+}
+.task-pill--medium:has(input:checked)::before { content: "●"; font-size: 0.6rem; color: #d97706; }
+
+/* Priority — High (red) */
+.task-pill--high:has(input:checked) {
+  background: #fee2e2; border-color: #ef4444; color: #dc2626;
+}
+.task-pill--high:has(input:checked)::before { content: "●"; font-size: 0.6rem; color: #ef4444; }
+
+/* Task type pills (neutral selected state) */
+.task-pill--type:has(input:checked) {
+  background: #e3f1ff; border-color: var(--blue); color: var(--blue);
+}
+
+/* Due date row */
+.task-due-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.task-pill--due {
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  padding: 0 11px;
+  min-height: 30px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  background: var(--surface, #fff);
+  color: var(--blue);
+}
+.task-pill--due:hover { border-color: var(--blue); }
+.task-date-input {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.84rem;
+  padding: 5px 8px;
+  min-height: 30px;
+  flex: 1 1 120px;
+  min-width: 120px;
+  max-width: 170px;
+}
+
+/* Account search */
+.task-add-account-btn {
+  border: none;
+  background: none;
+  color: #94a3b8;
+  font-size: 0.76rem;
+  cursor: pointer;
+  text-align: left;
+  padding: 2px 0;
+}
+.task-add-account-btn:hover { color: var(--blue); }
+
+.task-new-account-fields {
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+}
+.task-new-account-fields label { gap: 4px; }
+.task-new-account-fields span { font-size: 0.72rem; font-weight: 700; color: var(--muted); }
+.task-new-account-fields input,
+.task-new-account-fields select { min-height: 34px; }
+
+/* Reminders details */
+.task-more-details {
+  border-top: 1px solid var(--line);
+  margin-top: 4px;
+}
+.task-more-details > summary {
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+  padding: 10px 0 6px;
+  list-style: none;
+  user-select: none;
+}
+.task-more-details > summary::-webkit-details-marker { display: none; }
+.task-more-details > summary::after { content: " ▾"; }
+.task-more-details[open] > summary::after { content: " ▴"; }
+.task-more-inner { padding-bottom: 8px; }
+.task-remind-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.task-remind-grid label { display: grid; gap: 4px; }
+.task-remind-grid span { font-size: 0.72rem; font-weight: 700; color: var(--muted); }
+.task-remind-grid input,
+.task-remind-grid select { font-size: 0.84rem; min-height: 34px; }
+
+/* Compact attachment label */
+.task-attach-label {
+  display: grid;
+  gap: 4px;
+  cursor: pointer;
+}
+.task-attach-label span {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.task-attach-label small {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* Legacy section styles (kept for compatibility) */
 .task-section {
   border-top: 1px solid var(--line);
   padding: 16px 0 4px;
 }
-
 .task-section-label {
   font-size: 10px;
   font-weight: 700;
@@ -1162,97 +1347,25 @@ textarea {
   color: var(--muted);
   margin-bottom: 12px;
 }
-
-.task-template-strip,
-.task-date-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.task-template-strip { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.task-date-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.task-template-strip button, .task-date-buttons button {
+  border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--blue);
+  cursor: pointer; font-size: 0.76rem; font-weight: 800; min-height: 30px; padding: 0 10px;
 }
-
-.task-template-strip {
-  margin-bottom: 14px;
-}
-
-.task-template-strip button,
-.task-date-buttons button {
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: #fff;
-  color: var(--blue);
-  cursor: pointer;
-  font-size: 0.76rem;
-  font-weight: 800;
-  min-height: 30px;
-  padding: 0 10px;
-}
-
-.task-template-strip button:hover,
-.task-date-buttons button:hover {
-  border-color: var(--orange);
-  color: var(--orange);
-}
-
+.task-template-strip button:hover, .task-date-buttons button:hover { border-color: var(--orange); color: var(--orange); }
 .form-grid .task-account-mode {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-  margin: 0;
-  padding: 7px 8px;
+  border: 1px solid var(--line); border-radius: 8px; background: #fff;
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0; padding: 7px 8px;
 }
-
-.form-grid .task-account-mode legend {
-  color: #000;
-  font-size: 0.72rem;
-  font-weight: 850;
-  padding: 0 3px;
-}
-
+.form-grid .task-account-mode legend { color: #000; font-size: 0.72rem; font-weight: 850; padding: 0 3px; }
 .form-grid .task-account-mode label {
-  align-items: center;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  color: #000;
-  display: inline-flex;
-  font-size: 0.78rem;
-  gap: 4px;
-  min-height: 28px;
-  padding: 0 9px;
-  width: auto;
+  align-items: center; border: 1px solid var(--line); border-radius: 999px; color: #000;
+  display: inline-flex; font-size: 0.78rem; gap: 4px; min-height: 28px; padding: 0 9px; width: auto;
 }
-
-.form-grid .task-account-mode label:has(input:checked) {
-  background: #e3f1ff;
-  border-color: var(--blue);
-  color: var(--blue);
-  font-weight: 850;
-}
-
-.form-grid .task-account-mode input[type="radio"] {
-  display: none;
-}
-
-.task-account-search {
-  align-self: end;
-}
-
-.task-new-account-fields {
-  gap: 8px;
-  padding: 8px;
-}
-
-.task-new-account-fields label {
-  gap: 4px;
-}
-
-.task-new-account-fields input,
-.task-new-account-fields select {
-  min-height: 36px;
-}
+.form-grid .task-account-mode label:has(input:checked) { background: #e3f1ff; border-color: var(--blue); color: var(--blue); font-weight: 850; }
+.form-grid .task-account-mode input[type="radio"] { display: none; }
+.task-account-search { align-self: end; }
 
 .task-drop-zone {
   border: 1px dashed var(--line);
