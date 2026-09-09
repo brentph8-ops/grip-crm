@@ -9,6 +9,6 @@
 window.GRIP_SUPABASE_URL     = "https://azrmxqrufdviffgytxws.supabase.co";
 window.GRIP_SUPABASE_ANON    = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF6cm14cXJ1ZmR2aWZmZ3l0eHdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NzEwMTIsImV4cCI6MjA5NTQ0NzAxMn0.fnLxA9iLPRwZ9A5daTEf-yBeWX6LZJ9LAfSHeuo3jg8";
 
-// Only this Google account may access GRIP.
-// Change to your own email if you ever transfer ownership.
-window.GRIP_AUTHORIZED_EMAIL = "bphillips@garlandco.com";
+// Garland Google accounts authorized to access GRIP.
+// Add emails to the array to grant additional users access.
+window.GRIP_AUTHORIZED_EMAIL = ["bphillips@garlandco.com", "tmeyers@garlandco.com"];

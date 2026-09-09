@@ -579,15 +579,16 @@
 
       if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
         if (!user) return;
-        // ── Single-user access guard ─────────────────────────────
+        // ── Access guard ─────────────────────────────────────────
         const authorizedEmail = window.GRIP_AUTHORIZED_EMAIL;
-        if (authorizedEmail && user.email !== authorizedEmail) {
+        const authorizedList = Array.isArray(authorizedEmail) ? authorizedEmail : (authorizedEmail ? [authorizedEmail] : []);
+        if (authorizedList.length && !authorizedList.includes(user.email)) {
           _userSetupDone = false;
           await client.auth.signOut().catch(() => {});
           showAuthOverlay(true);
           const errEl = document.getElementById("gripAuthError");
           if (errEl) {
-            errEl.textContent = `Access denied — signed in as ${user.email || "unknown"}, but this app requires ${authorizedEmail}. Try signing out of all Google accounts first.`;
+            errEl.textContent = `Access denied — ${user.email || "unknown"} does not have access to this app. Contact your administrator.`;
             errEl.hidden = false;
           }
           const btn = document.getElementById("gripGoogleSignInButton");
@@ -638,9 +639,8 @@
       try {
         Object.keys(localStorage).filter(k => k.includes("supabase") || k.includes("pkce") || k.includes("code_verifier")).forEach(k => localStorage.removeItem(k));
       } catch (_) {}
-      const hd = window.GRIP_AUTHORIZED_EMAIL
-        ? window.GRIP_AUTHORIZED_EMAIL.split("@")[1]
-        : undefined;
+      const _authEmail = Array.isArray(window.GRIP_AUTHORIZED_EMAIL) ? window.GRIP_AUTHORIZED_EMAIL[0] : window.GRIP_AUTHORIZED_EMAIL;
+      const hd = _authEmail ? _authEmail.split("@")[1] : undefined;
       // Use the base URL without query params/hash to avoid redirect mismatch
       const redirectTo = window.location.origin + window.location.pathname;
       client.auth.signInWithOAuth({
