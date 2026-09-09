@@ -33,9 +33,10 @@
 
   function greeting() {
     const h = new Date().getHours();
-    if (h < 12) return "Good morning, Brent";
-    if (h < 17) return "Good afternoon, Brent";
-    return "Good evening, Brent";
+    const name = localStorage.getItem("gripUserFirstName") || "Brent";
+    if (h < 12) return `Good morning, ${name}`;
+    if (h < 17) return `Good afternoon, ${name}`;
+    return `Good evening, ${name}`;
   }
 
   // ── Data readers ──────────────────────────────────────────────────

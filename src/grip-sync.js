@@ -503,6 +503,9 @@
     _userSetupDone = true;
 
     updateUserDisplay(user);
+    const fullName = user?.user_metadata?.full_name || user?.user_metadata?.name || "";
+    const firstName = fullName.split(" ")[0] || "";
+    if (firstName) localStorage.setItem("gripUserFirstName", firstName);
     showAuthOverlay(false);
     updateSyncIndicator("syncing");
     subscribeToRemoteChanges(user);
