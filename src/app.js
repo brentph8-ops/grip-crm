@@ -7281,7 +7281,7 @@ function projectQuickContent(record) {
     ${editableField("project", record.id, "client", "Client", record.client)}
     ${editableField("project", record.id, "address", "Project Address", record.address)}
     ${editableField("project", record.id, "nextFollowUp", "Follow-up Date", record.nextFollowUp)}
-    ${field("Start", record.anticipatedStartDate)}
+    ${editableField("project", record.id, "anticipatedStartDate", "Start Quarter", record.anticipatedStartDate)}
     ${editableField("project", record.id, "materials", "Materials", record.materials ? moneyWithCents.format(Number(record.materials) || 0) : "")}
     ${editableField("project", record.id, "squareFeet", "SQ/FT", record.squareFeet)}
     ${editableField("project", record.id, "projectCommission", "Commission", projectCommission(record) ? moneyWithCents.format(projectCommission(record)) : "")}
@@ -10135,9 +10135,7 @@ function handleProjectSubmit(event) {
       { label: "Client", value: form.get("client") },
       { label: "ABC Score", value: form.get("abcList") },
       { label: "Project Name", value: form.get("projectName") },
-      { label: "Project Address", value: form.get("address") },
       { label: "Project Stage", value: form.get("stage") },
-      { label: "Project Type", value: form.get("projectType") },
     ])
   ) {
     return;
@@ -10164,7 +10162,7 @@ function handleProjectSubmit(event) {
     client: form.get("client") || "",
     projectName: form.get("projectName") || "",
     address: form.get("address") || "",
-    anticipatedStartDate: `${form.get("startQuarter")} ${form.get("startYear")}`,
+    anticipatedStartDate: [form.get("startQuarter"), form.get("startYear")].filter(Boolean).join(" "),
     nextFollowUp: form.get("nextFollowUp") || "",
     biddingContractors: state.selectedProjectContractors.join(", "),
     materials: Number(form.get("materials") || 0),
