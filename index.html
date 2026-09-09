@@ -451,6 +451,8 @@
                 <button class="sort-tab" data-layout="list" type="button">List</button>
                 <button class="sort-tab" data-layout="kanban" type="button">Kanban</button>
               </div>
+              <button class="secondary-button" id="exportProjectsCsvButton" type="button">Export CSV</button>
+              <button class="secondary-button" id="exportProjectsPdfButton" type="button">Export PDF</button>
               <button class="primary-button create-button" id="newProjectButton" type="button">+ Project</button>
             </div>
           </div>
@@ -1924,54 +1926,60 @@
               <span>Project type</span>
               <select id="projectTypeInput" name="projectType"></select>
             </label>
-            <label>
-              <span>Warranty type</span>
-              <select id="systemWarrantyTypeInput" name="systemWarrantyType"></select>
-            </label>
-            <label id="systemMaterialField">
+            <label id="systemMaterialField" hidden>
               <span id="systemMaterialLabel">Existing / material type</span>
               <select id="systemMaterialInput" name="systemMaterial"></select>
             </label>
-            <label id="systemProductField">
-              <span id="systemProductLabel">System</span>
-              <select id="systemProductInput" name="systemProduct"></select>
+            <label id="systemPopulateRow" class="system-populate-row" hidden>
+              <input type="checkbox" id="populateSystemsCheck" />
+              <span>Populate system details</span>
             </label>
-            <label>
-              <span>Warranty term</span>
-              <select id="systemWarrantyTermInput" name="systemWarrantyTerm"></select>
-            </label>
-            <label id="systemCapSheetField">
-              <span>Cap sheet</span>
-              <select id="systemCapSheetInput" name="systemCapSheet"></select>
-            </label>
-            <label id="systemCapAdhesiveField">
-              <span>Cap sheet adhesive</span>
-              <select id="systemCapAdhesiveInput" name="systemCapAdhesive"></select>
-            </label>
-            <label id="systemBaseSheetField">
-              <span>Base sheet</span>
-              <select id="systemBaseSheetInput" name="systemBaseSheet"></select>
-            </label>
-            <label id="systemBaseAdhesiveField">
-              <span>Base sheet adhesive</span>
-              <select id="systemBaseAdhesiveInput" name="systemBaseAdhesive"></select>
-            </label>
-            <label id="systemSurfacingField">
-              <span>Surfacing</span>
-              <select id="systemSurfacingInput" name="systemSurfacing"></select>
-            </label>
-            <label>
-              <span>Primer</span>
-              <input id="systemPrimerInput" name="systemPrimer" readonly />
-            </label>
-            <label>
-              <span>Contractor warranty</span>
-              <select id="contractorWarrantyInput" name="contractorWarranty"></select>
-            </label>
-            <label class="full-field">
-              <span>System notes</span>
-              <textarea id="systemNotesInput" name="systemNotes" readonly></textarea>
-            </label>
+            <div id="systemFieldsGroup" hidden>
+              <label>
+                <span>Warranty type</span>
+                <select id="systemWarrantyTypeInput" name="systemWarrantyType"></select>
+              </label>
+              <label id="systemProductField">
+                <span id="systemProductLabel">System</span>
+                <select id="systemProductInput" name="systemProduct"></select>
+              </label>
+              <label>
+                <span>Warranty term</span>
+                <select id="systemWarrantyTermInput" name="systemWarrantyTerm"></select>
+              </label>
+              <label id="systemCapSheetField">
+                <span>Cap sheet</span>
+                <select id="systemCapSheetInput" name="systemCapSheet"></select>
+              </label>
+              <label id="systemCapAdhesiveField">
+                <span>Cap sheet adhesive</span>
+                <select id="systemCapAdhesiveInput" name="systemCapAdhesive"></select>
+              </label>
+              <label id="systemBaseSheetField">
+                <span>Base sheet</span>
+                <select id="systemBaseSheetInput" name="systemBaseSheet"></select>
+              </label>
+              <label id="systemBaseAdhesiveField">
+                <span>Base sheet adhesive</span>
+                <select id="systemBaseAdhesiveInput" name="systemBaseAdhesive"></select>
+              </label>
+              <label id="systemSurfacingField">
+                <span>Surfacing</span>
+                <select id="systemSurfacingInput" name="systemSurfacing"></select>
+              </label>
+              <label>
+                <span>Primer</span>
+                <input id="systemPrimerInput" name="systemPrimer" readonly />
+              </label>
+              <label>
+                <span>Contractor warranty</span>
+                <select id="contractorWarrantyInput" name="contractorWarranty"></select>
+              </label>
+              <label class="full-field">
+                <span>System notes</span>
+                <textarea id="systemNotesInput" name="systemNotes" readonly></textarea>
+              </label>
+            </div>
           </div>
         </section>
 

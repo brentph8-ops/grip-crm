@@ -4311,6 +4311,68 @@ function activityTimelineItem(item) {
   </article>`;
 }
 
+function exportProjectsCSV() {
+  const projects = cleanProjects().filter((item) => !projectAutoArchived(item)).sort(sortProjects);
+  const fields = [
+    ["Client",          (p) => p.client],
+    ["Project Name",    (p) => p.projectName],
+    ["Stage",           (p) => p.stage],
+    ["Project Type",    (p) => p.projectType],
+    ["ABC Score",       (p) => p.abcList],
+    ["Start Quarter",   (p) => p.anticipatedStartDate],
+    ["Sq Ft",           (p) => p.squareFeet],
+    ["Materials",       (p) => p.materials],
+    ["Commission",      (p) => p.projectCommission],
+    ["Warranty Type",   (p) => p.systemWarrantyType],
+    ["Material Type",   (p) => p.systemMaterial],
+    ["System",          (p) => p.systemProduct],
+    ["Warranty Term",   (p) => p.systemWarrantyTerm],
+    ["Next Follow-up",  (p) => p.nextFollowUp],
+    ["Address",         (p) => p.address],
+  ];
+  const esc = (v) => { const s = String(v ?? ""); return /[,"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const csv = [fields.map(([h]) => esc(h)).join(","), ...projects.map((p) => fields.map(([, fn]) => esc(fn(p))).join(","))].join("\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+  const a = Object.assign(document.createElement("a"), { href: url, download: `GRIP-Projects-${new Date().toISOString().slice(0, 10)}.csv` });
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportProjectsPDF() {
+  const projects = cleanProjects().filter((item) => !projectAutoArchived(item)).sort(sortProjects);
+  const rows = projects.map((p) => `<tr>
+    <td>${escapeHtml(p.client || "")}</td>
+    <td>${escapeHtml(p.projectName || "")}</td>
+    <td>${escapeHtml(p.stage || "")}</td>
+    <td>${escapeHtml(p.projectType || "")}</td>
+    <td>${escapeHtml(p.abcList || "")}</td>
+    <td>${escapeHtml(p.anticipatedStartDate || "")}</td>
+    <td>${escapeHtml(String(p.squareFeet || ""))}</td>
+    <td>${p.materials ? moneyWithCents.format(Number(p.materials)) : ""}</td>
+    <td>${escapeHtml(p.systemMaterial || "")}</td>
+    <td>${escapeHtml(p.systemWarrantyType || "")}</td>
+  </tr>`).join("");
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>GRIP Projects</title><style>
+    body{font-family:system-ui,sans-serif;font-size:11px;margin:20px}
+    h1{font-size:15px;margin:0 0 2px}p{margin:0 0 12px;color:#666;font-size:10px}
+    table{width:100%;border-collapse:collapse}
+    th{background:#1a1a2e;color:#fff;padding:6px 8px;text-align:left;font-size:10px;white-space:nowrap}
+    td{padding:5px 8px;border-bottom:1px solid #e2e8f0;vertical-align:top}
+    tr:nth-child(even) td{background:#f8fafc}
+    @media print{body{margin:0}}
+  </style></head><body>
+  <h1>GRIP — Projects</h1>
+  <p>Exported ${new Date().toLocaleDateString()} · ${projects.length} project${projects.length !== 1 ? "s" : ""}</p>
+  <table><thead><tr>
+    <th>Client</th><th>Project</th><th>Stage</th><th>Type</th><th>ABC</th>
+    <th>Start</th><th>Sq Ft</th><th>Materials</th><th>Material Type</th><th>Warranty</th>
+  </tr></thead><tbody>${rows}</tbody></table>
+  <script>window.onload=()=>{window.print()}<\/script>
+  </body></html>`;
+  const win = window.open("", "_blank");
+  if (win) { win.document.write(html); win.document.close(); }
+}
+
 function renderProjects() {
   const records = cleanProjects().filter((item) => {
     return (
@@ -9876,26 +9938,42 @@ function renderSystemBuilder() {
   if (!byId("projectTypeInput")) return;
   const selectedProjectType = normalizeProjectTypeLabel(byId("projectTypeInput").value || defaultProjectType);
   fillSelect("projectTypeInput", projectTypes, selectedProjectType);
+
+  const materialField  = byId("systemMaterialField");
+  const populateRow    = byId("systemPopulateRow");
+  const fieldsGroup    = byId("systemFieldsGroup");
+  const populateCheck  = byId("populateSystemsCheck");
+
   if (!selectedProjectType || selectedProjectType === "N/A") {
-    ["systemWarrantyTypeInput","systemMaterialInput","systemProductInput","systemWarrantyTermInput",
-     "systemCapSheetInput","systemCapAdhesiveInput","systemBaseSheetInput","systemBaseAdhesiveInput",
-     "systemSurfacingInput","contractorWarrantyInput"].forEach(id => fillSystemSelect(id, [], ""));
-    byId("systemPrimerInput").value = "";
-    byId("systemNotesInput").value = "";
-    applySystemBuilderMode(selectedProjectType);
+    if (materialField)  materialField.hidden  = true;
+    if (populateRow)    populateRow.hidden    = true;
+    if (fieldsGroup)    fieldsGroup.hidden    = true;
+    if (populateCheck)  populateCheck.checked = false;
     return;
   }
-  const catalog = currentProjectSystemCatalog();
+
+  // Show material field and populate toggle
+  if (materialField) materialField.hidden = false;
+  if (populateRow)   populateRow.hidden   = false;
   applySystemBuilderMode(selectedProjectType);
+
+  // Fill material options regardless of checkbox
+  const catalog = currentProjectSystemCatalog();
   const previousMaterial = byId("systemMaterialInput")?.value || "";
-  const previousProduct = byId("systemProductInput")?.value || "";
-  const previousCapSheet = byId("systemCapSheetInput")?.value || "";
-  const previousCapAdhesive = byId("systemCapAdhesiveInput")?.value || "";
-  const previousBaseSheet = byId("systemBaseSheetInput")?.value || "";
-  const previousBaseAdhesive = byId("systemBaseAdhesiveInput")?.value || "";
-  const previousSurfacing = byId("systemSurfacingInput")?.value || "";
-  fillSystemSelect("systemWarrantyTypeInput", catalog.warrantyTypes, byId("systemWarrantyTypeInput")?.value || "");
   fillSystemSelect("systemMaterialInput", catalog.materials.map((item) => item.name), previousMaterial);
+
+  // System detail fields only shown when checkbox is checked
+  const shouldPopulate = Boolean(populateCheck?.checked);
+  if (fieldsGroup) fieldsGroup.hidden = !shouldPopulate;
+  if (!shouldPopulate) return;
+
+  const previousProduct      = byId("systemProductInput")?.value      || "";
+  const previousCapSheet     = byId("systemCapSheetInput")?.value     || "";
+  const previousCapAdhesive  = byId("systemCapAdhesiveInput")?.value  || "";
+  const previousBaseSheet    = byId("systemBaseSheetInput")?.value    || "";
+  const previousBaseAdhesive = byId("systemBaseAdhesiveInput")?.value || "";
+  const previousSurfacing    = byId("systemSurfacingInput")?.value    || "";
+  fillSystemSelect("systemWarrantyTypeInput", catalog.warrantyTypes, byId("systemWarrantyTypeInput")?.value || "");
   const material = currentProjectSystemMaterial();
   fillSystemSelect("systemProductInput", material.systems.map((item) => item.product), previousProduct);
   const system = currentProjectSystem();
@@ -10056,6 +10134,8 @@ function resetProjectForm() {
   byId("projectCommissionInput").value = "";
   byId("projectWiseTrophyInput").value = "";
   byId("projectTypeInput").value = defaultProjectType;
+  const populateCheck = byId("populateSystemsCheck");
+  if (populateCheck) populateCheck.checked = false;
   byId("projectClientInfoStatus").textContent = "Select a client to populate account contact details, or use these fields to fill missing account information.";
   state.selectedProjectContractors = [];
   byId("projectContractorPickerBody").hidden = true;
@@ -11095,6 +11175,8 @@ function bindEvents() {
     resetProjectForm();
     openDialog("projectDialog");
   });
+  byId("exportProjectsCsvButton").addEventListener("click", exportProjectsCSV);
+  byId("exportProjectsPdfButton").addEventListener("click", exportProjectsPDF);
   byId("newAccountButton").addEventListener("click", () => openAccountDialog());
   byId("cancelAccountButton").addEventListener("click", () => byId("accountDialog").close());
   byId("clearAccountButton").addEventListener("click", () => {
@@ -11118,8 +11200,8 @@ function bindEvents() {
   byId("projectClientSearch").addEventListener("input", updateProjectClientAddress);
   [
     "projectTypeInput",
-    "systemWarrantyTypeInput",
     "systemMaterialInput",
+    "systemWarrantyTypeInput",
     "systemProductInput",
     "systemWarrantyTermInput",
     "systemCapSheetInput",
@@ -11131,6 +11213,7 @@ function bindEvents() {
   ].forEach((id) => {
     byId(id).addEventListener("change", renderSystemBuilder);
   });
+  byId("populateSystemsCheck").addEventListener("change", renderSystemBuilder);
   byId("differentProjectAddressButton").addEventListener("click", () => {
     byId("projectAddressInput").readOnly = false;
     byId("projectAddressInput").focus();

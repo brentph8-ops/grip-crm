@@ -150,15 +150,12 @@
     } catch (_) {}
   }
 
-  async function geocodeAddress(address, _retry = 2) {
-    if (!address || address.trim().length < 5) return null;
+  async function geocodeViaNominatim(address, _retry = 2) {
     try {
       const params = new URLSearchParams({
         format: "json", limit: "5",
         q:      address.trim(),
         countrycodes: "us",
-        viewbox: "-97.2,32.0,-88.8,28.3",
-        bounded: "1",
         email:  "bphillips@garlandco.com",
       });
       const res = await fetch(`${GEOCODE_URL}?${params}`, {
@@ -167,22 +164,48 @@
       });
       if (res.status === 429 && _retry > 0) {
         await new Promise(r => setTimeout(r, 4000));
-        return geocodeAddress(address, _retry - 1);
+        return geocodeViaNominatim(address, _retry - 1);
       }
       if (!res.ok) return null;
       const results = await res.json();
       if (Array.isArray(results)) {
-        // Pick the first result that falls inside TX/LA — reject anything elsewhere
         for (const r of results) {
           const lat = parseFloat(r.lat);
           const lng = parseFloat(r.lon);
-          if (inTerritoryBounds(lat, lng)) {
-            return { lat, lng, confidence: "verified" };
-          }
+          if (inTerritoryBounds(lat, lng)) return { lat, lng, confidence: "verified" };
         }
       }
     } catch (_) {}
     return null;
+  }
+
+  async function geocodeViaCensus(address) {
+    try {
+      const params = new URLSearchParams({
+        address: address.trim(),
+        benchmark: "Public_AR_Current",
+        format: "json",
+      });
+      const res = await fetch(`https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?${params}`, {
+        signal: AbortSignal.timeout(12000),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      const match = data?.result?.addressMatches?.[0];
+      if (!match) return null;
+      const lat = parseFloat(match.coordinates.y);
+      const lng = parseFloat(match.coordinates.x);
+      if (inTerritoryBounds(lat, lng)) return { lat, lng, confidence: "verified" };
+    } catch (_) {}
+    return null;
+  }
+
+  async function geocodeAddress(address) {
+    if (!address || address.trim().length < 5) return null;
+    // Try Nominatim first (broader — no bounded box), then Census Bureau as fallback
+    const nominatim = await geocodeViaNominatim(address);
+    if (nominatim) return nominatim;
+    return geocodeViaCensus(address);
   }
 
   function buildGeoQuery(account) {
