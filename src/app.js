@@ -182,19 +182,19 @@ const projectStages = [
   "Waiting On Material Order",
   "Material Ordered",
   "Work Scheduled",
-  "Work Completed",
+  "Work In Progress",
   "On Hold",
-  "Project Won",
+  "Project Completed",
   "Dead Project",
 ];
 
-const PROJECT_TERMINAL_STAGES = new Set(["Project Won", "Dead Project"]);
+const PROJECT_TERMINAL_STAGES = new Set(["Project Completed", "Dead Project"]);
 const PROJECT_WON_ARCHIVE_MS = 365 * 86400000;
 
 function projectAutoArchived(item) {
   if (!PROJECT_TERMINAL_STAGES.has(item.stage)) return false;
   if (item.stage === "Dead Project") return true;
-  // Project Won: archive after 1 year. Fall back to createdAt for records
+  // Project Completed: archive after 1 year. Fall back to createdAt for records
   // that were moved to this stage before stageClosedAt stamping was added.
   const closedDate = item.stageClosedAt || item.createdAt;
   if (!closedDate) return false;
@@ -203,8 +203,8 @@ function projectAutoArchived(item) {
 
 const abcScores = ["Job Won", "A (90%)", "B (50%)", "C (25%)"];
 const accountRankOptions = ["Prospecting", "In Progress", "Meeting", "C", "B", "A", "Dead End"];
-const defaultProjectType = "New Roof/Reroof";
-const projectTypes = ["New Roof/Reroof", "Recover", "Restoration"];
+const defaultProjectType = "N/A";
+const projectTypes = ["N/A", "New Roof/Reroof", "Recover", "Restoration"];
 const contractorWarrantyOptions = ["Not selected", "2-year contractor warranty", "3-year contractor warranty", "4-year contractor warranty", "5-year contractor warranty"];
 const windUpliftUrl = "https://winduplift.garlandhq.com/index-dashboard.php";
 const taskTypes = ["Call", "Follow-Up", "Email", "Actionable"];
@@ -3747,7 +3747,7 @@ function renderDashboard() {
   const nextYear = thisYear + 1;
   const currentYearProjects = projects.filter((project) => projectYear(project) === thisYear);
   const nextYearProjects = projects.filter((project) => projectYear(project) === nextYear);
-  const completedProjects = projects.filter((project) => project.stage === "Work Completed");
+  const completedProjects = projects.filter((project) => project.stage === "Project Completed");
   const topContractors = contractorRecords();
   const thisYearMaterials = currentYearProjects.reduce((sum, project) => sum + projectMaterials(project), 0);
   const thisYearCommission = currentYearProjects.reduce((sum, project) => sum + projectCommission(project), 0);
@@ -3795,8 +3795,8 @@ function renderDashboard() {
     dashboardPanel(`Projects ${thisYear}`, projectMoneyRows(currentYearProjects, "projects", String(thisYear))),
     dashboardPanel(`Projects ${nextYear}`, projectMoneyRows(nextYearProjects, "projects", String(nextYear))),
     dashboardPanel("Projects Completed", [
-      metricRow("Completed Count", completedProjects.length, "projects", "projectStage", "Work Completed"),
-      metricRow("Completed Materials", moneyWithCents.format(completedProjects.reduce((sum, project) => sum + projectMaterials(project), 0)), "projects", "projectStage", "Work Completed"),
+      metricRow("Completed Count", completedProjects.length, "projects", "projectStage", "Project Completed"),
+      metricRow("Completed Materials", moneyWithCents.format(completedProjects.reduce((sum, project) => sum + projectMaterials(project), 0)), "projects", "projectStage", "Project Completed"),
     ]),
     dashboardPanel("Proposal Health", [
       metricRow("Open Proposals", openProposals.length, "proposals"),
@@ -9873,8 +9873,18 @@ function contractorWarrantyChoices(warrantyType) {
 
 function renderSystemBuilder() {
   if (!byId("projectTypeInput")) return;
-  const catalog = currentProjectSystemCatalog();
   const selectedProjectType = normalizeProjectTypeLabel(byId("projectTypeInput").value || defaultProjectType);
+  fillSelect("projectTypeInput", projectTypes, selectedProjectType);
+  if (!selectedProjectType || selectedProjectType === "N/A") {
+    ["systemWarrantyTypeInput","systemMaterialInput","systemProductInput","systemWarrantyTermInput",
+     "systemCapSheetInput","systemCapAdhesiveInput","systemBaseSheetInput","systemBaseAdhesiveInput",
+     "systemSurfacingInput","contractorWarrantyInput"].forEach(id => fillSystemSelect(id, [], ""));
+    byId("systemPrimerInput").value = "";
+    byId("systemNotesInput").value = "";
+    applySystemBuilderMode(selectedProjectType);
+    return;
+  }
+  const catalog = currentProjectSystemCatalog();
   applySystemBuilderMode(selectedProjectType);
   const previousMaterial = byId("systemMaterialInput")?.value || "";
   const previousProduct = byId("systemProductInput")?.value || "";
@@ -9883,7 +9893,6 @@ function renderSystemBuilder() {
   const previousBaseSheet = byId("systemBaseSheetInput")?.value || "";
   const previousBaseAdhesive = byId("systemBaseAdhesiveInput")?.value || "";
   const previousSurfacing = byId("systemSurfacingInput")?.value || "";
-  fillSelect("projectTypeInput", projectTypes, selectedProjectType);
   fillSystemSelect("systemWarrantyTypeInput", catalog.warrantyTypes, byId("systemWarrantyTypeInput")?.value || "");
   fillSystemSelect("systemMaterialInput", catalog.materials.map((item) => item.name), previousMaterial);
   const material = currentProjectSystemMaterial();
@@ -10042,7 +10051,7 @@ function resetProjectForm() {
   byId("projectScoreInput").value = "C (25%)";
   byId("projectStageInput").value = "Prospecting";
   byId("projectStartYearInput").value = String(today.getFullYear());
-  byId("projectAddressInput").readOnly = true;
+  byId("projectAddressInput").readOnly = false;
   byId("projectCommissionInput").value = "";
   byId("projectWiseTrophyInput").value = "";
   byId("projectTypeInput").value = defaultProjectType;
@@ -10058,7 +10067,7 @@ function updateProjectClientAddress() {
   const account = findAccountByName(byId("projectClientSearch").value.trim());
   const form = byId("projectForm");
   const address = byId("projectAddressInput");
-  if (account?.address && address.readOnly !== false) address.value = account.address;
+  if (account?.address && !address.value.trim()) address.value = account.address;
   applyAccountValuesToForm(form, account, ["poc", "title", "phone", "email"]);
   byId("projectClientInfoStatus").textContent = account
     ? "Existing client found. Blank account contact fields can be filled from this project."
@@ -11796,8 +11805,8 @@ function bindEvents() {
     const bar = document.createElement("div");
     bar.id = "projectDropBar";
     bar.innerHTML = `
-      <div class="proposal-drop-target" data-project-drop="Project Won">
-        <span class="drop-icon">🏆</span>Project Won
+      <div class="proposal-drop-target" data-project-drop="Project Completed">
+        <span class="drop-icon">🏆</span>Project Completed
       </div>
       <div class="proposal-drop-target" data-project-drop="Dead Project">
         <span class="drop-icon">💀</span>Dead Project
