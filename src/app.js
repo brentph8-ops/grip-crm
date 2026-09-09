@@ -4054,6 +4054,10 @@ function applyPhoneModeDefaults() {
   return false;
 }
 
+function isMobileOrPreview() {
+  return state.mobilePreview || Boolean(window.matchMedia && window.matchMedia("(max-width: 760px)").matches);
+}
+
 function syncMobilePreviewButton() {
   const mobile = isMobileOrPreview();
   const shell = byId("appShell");
