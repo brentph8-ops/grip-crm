@@ -613,6 +613,12 @@
             📍 Geocode ${pending} address${pending !== 1 ? "es" : ""}
           </button>
         </div>` : ""}
+      ${!_geocoding ? `
+        <div class="map-geocode-wrap">
+          <button class="map-geocode-btn map-remap-btn" id="mapRemapBtn" type="button">
+            🔄 Remap All
+          </button>
+        </div>` : ""}
       ${_geocoding ? `<div class="map-geocode-wrap"><p id="mapGeocodeProgress" class="map-geocode-progress">Geocoding…</p></div>` : ""}
 
       ${entityHtml ? `<div class="map-legend-section">
@@ -825,6 +831,23 @@
           await geocodeAll((done, total) => {
             const el = document.getElementById("mapGeocodeProgress");
             if (el) el.textContent = `Geocoding… ${done}/${total}`;
+          });
+        } finally {
+          _geocoding = false;
+          refreshMarkers();
+          renderSidebar(accounts(), countMapped());
+        }
+      });
+      sidebar.querySelector("#mapRemapBtn")?.addEventListener("click", async () => {
+        if (_geocoding) return;
+        if (!confirm("Clear all cached map locations and re-geocode every account from scratch?")) return;
+        try { localStorage.removeItem(GEO_KEY); } catch (_) {}
+        _geocoding = true;
+        renderSidebar(accts, mapped);
+        try {
+          await geocodeAll((done, total) => {
+            const el = document.getElementById("mapGeocodeProgress");
+            if (el) el.textContent = `Remapping… ${done}/${total}`;
           });
         } finally {
           _geocoding = false;

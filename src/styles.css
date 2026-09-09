@@ -7523,6 +7523,7 @@ button#gripSyncStatus:hover { opacity: 0.75; }
 
 .map-geocode-btn:hover { filter: brightness(1.08); }
 .map-geocode-btn:disabled { opacity: 0.6; cursor: default; }
+.map-remap-btn { background: var(--surface, #f8fafc); color: var(--ink, #1e293b); border: 1px solid var(--line, #e2e8f0); }
 
 .map-geocode-progress {
   font-size: 12px;
