@@ -1031,7 +1031,7 @@
 
   function render() {
     pruneOutOfBoundsCoords();
-    const view = document.getElementById("liveMapView");
+    const view = document.getElementById("territoryView") || document.getElementById("liveMapView");
     if (!view) return;
 
     if (!view.querySelector("#mapLegend")) {

@@ -502,6 +502,14 @@
     if (_userSetupDone) return;
     _userSetupDone = true;
 
+    // If a different user signs in on this device, clear the previous user's local data
+    const storedUserId = localStorage.getItem("gripCurrentUserId");
+    if (storedUserId && storedUserId !== user.id) {
+      for (const key of SYNC_KEYS) localStorage.removeItem(key);
+      localStorage.removeItem("gripUserFirstName");
+    }
+    localStorage.setItem("gripCurrentUserId", user.id);
+
     updateUserDisplay(user);
     const fullName = user?.user_metadata?.full_name || user?.user_metadata?.name || "";
     const firstName = fullName.split(" ")[0] || "";

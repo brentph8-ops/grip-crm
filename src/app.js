@@ -10520,8 +10520,7 @@ function setView(view) {
   if (view === "outreach") { if (window.gripOutreach) window.gripOutreach.render(); }
   if (view === "today")     { if (window.gripToday)    window.gripToday.render(); }
   if (view === "pipeline")  { if (window.gripPipeline) window.gripPipeline.render(); }
-  if (view === "territory") { if (window.gripTerritory) window.gripTerritory.render(); }
-  if (view === "liveMap")   { if (window.gripMap)      window.gripMap.render(); }
+  if (view === "territory" || view === "liveMap") { if (window.gripMap) window.gripMap.render(); }
   const _viewTitles = { today: "Today", dashboard: "Dashboard", pipeline: "Pipeline", territory: "Territory", accounts: "Accounts", projects: "Projects", punchList: "Punch List", takeoffEstimator: "Takeoff Estimator", warrantySummary: "Warranty Summary Chart", proposals: "Proposals", scopeDatabase: "Scope of Work", tasks: "Tasks", callList: "Call List", followUpQueue: "Follow-Up Queue", activityLog: "Activity Log", newsReport: "Your News Report", contractors: "Contractors", noteTaker: "Note Taker", outreach: "Assistant", liveMap: "Live Account Map" };
   const _resolvedTitle = _viewTitles[view] || view;
   byId("viewTitle").textContent = _resolvedTitle;
