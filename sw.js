@@ -2,7 +2,7 @@
 // GRIP Service Worker — offline caching + PWA support
 // ─────────────────────────────────────────────────────────────────
 
-const CACHE = 'grip-v69';
+const CACHE = 'grip-v70';
 
 const PRECACHE = [
   '/',
