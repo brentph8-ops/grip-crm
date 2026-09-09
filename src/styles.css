@@ -7348,19 +7348,22 @@ button#gripSyncStatus:hover { opacity: 0.75; }
    ───────────────────────────────────────────────────────────────── */
 
 /* Remove workspace padding when map view is active, using negative margins */
-#liveMapView {
+#liveMapView,
+#territoryView {
   flex-direction: row;
   overflow: hidden;
   margin: -26px;
 }
 
-#liveMapView.is-active {
+#liveMapView.is-active,
+#territoryView.is-active {
   display: flex;
 }
 
 /* On mobile the workspace padding is less; adjust there too */
 @media (max-width: 767px) {
-  #liveMapView {
+  #liveMapView,
+  #territoryView {
     margin: -12px;
   }
 }
@@ -7392,15 +7395,18 @@ button#gripSyncStatus:hover { opacity: 0.75; }
 .map-sidebar-toggle:hover { color: var(--text, #1e293b); background: var(--bg-hover, #f1f5f9); }
 
 /* Collapsed state */
-#liveMapView.map-sidebar-hidden .map-legend-sidebar {
+#liveMapView.map-sidebar-hidden .map-legend-sidebar,
+#territoryView.map-sidebar-hidden .map-legend-sidebar {
   width: 0;
   min-width: 0;
   overflow: hidden;
   border-right: none;
   transition: width 0.25s ease;
 }
-#liveMapView.map-legend-sidebar { transition: width 0.25s ease; }
-#liveMapView.map-sidebar-hidden .map-sidebar-toggle { left: 0; border-left: 1px solid var(--line, #e2e8f0); border-radius: 0 6px 6px 0; }
+#liveMapView.map-legend-sidebar,
+#territoryView.map-legend-sidebar { transition: width 0.25s ease; }
+#liveMapView.map-sidebar-hidden .map-sidebar-toggle,
+#territoryView.map-sidebar-hidden .map-sidebar-toggle { left: 0; border-left: 1px solid var(--line, #e2e8f0); border-radius: 0 6px 6px 0; }
 
 /* Dark mode */
 :root:not([data-theme="light"]) .map-sidebar-toggle,
@@ -8024,7 +8030,7 @@ button#gripSyncStatus:hover { opacity: 0.75; }
 .map-county-add-btn:hover { background: var(--bg-hover, #f1f5f9); }
 
 /* ─── Account detail slide-in panel ─── */
-#liveMapView { position: relative; }
+#liveMapView, #territoryView { position: relative; }
 
 .map-detail-panel {
   position: absolute;
