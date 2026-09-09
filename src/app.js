@@ -4334,7 +4334,7 @@ function renderProjects() {
 }
 
 function takeoffCatalogForType(type) {
-  return systemBuilderCatalog[normalizeProjectTypeLabel(type || defaultProjectType)] || systemBuilderCatalog[defaultProjectType];
+  return systemBuilderCatalog[normalizeProjectTypeLabel(type || FALLBACK_CATALOG_TYPE)] || systemBuilderCatalog[FALLBACK_CATALOG_TYPE];
 }
 
 function takeoffMaterial(catalog, value) {
@@ -5344,7 +5344,7 @@ function loadTakeoffProject(projectId) {
   if (!project) {
     byId("takeoffNameInput").value = "";
     byId("takeoffSqftInput").value = "";
-    byId("takeoffProjectTypeInput").value = defaultProjectType;
+    byId("takeoffProjectTypeInput").value = FALLBACK_CATALOG_TYPE;
     renderTakeoffEstimator();
     return;
   }
@@ -9550,9 +9550,10 @@ function renderProjectContractorChecklist() {
   }
 }
 
+const FALLBACK_CATALOG_TYPE = "New Roof/Reroof";
 function currentProjectSystemCatalog() {
-  const type = normalizeProjectTypeLabel(byId("projectTypeInput")?.value || defaultProjectType);
-  return systemBuilderCatalog[type] || systemBuilderCatalog[defaultProjectType];
+  const type = normalizeProjectTypeLabel(byId("projectTypeInput")?.value || FALLBACK_CATALOG_TYPE);
+  return systemBuilderCatalog[type] || systemBuilderCatalog[FALLBACK_CATALOG_TYPE];
 }
 
 function currentProjectSystemMaterial() {
