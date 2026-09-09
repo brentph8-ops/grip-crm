@@ -3104,8 +3104,10 @@ function applyTaskTemplate(name) {
   const form = byId("taskForm");
   form.elements.title.value = name;
   form.elements.description.value = template.description || "";
-  byId("taskTypeInput").value = template.task_type || "Follow-Up";
-  byId("taskPriorityInput").value = template.priority || "Normal";
+  const ttype = template.task_type || "Follow-Up";
+  form.querySelectorAll('[name="task_type"]').forEach(r => { r.checked = r.value === ttype; });
+  const prio = template.priority || "Low";
+  form.querySelectorAll('[name="priority"]').forEach(r => { r.checked = r.value === prio; });
   byId("taskNextActionInput").value = template.next_action || "";
 }
 
@@ -10848,6 +10850,8 @@ function bindEvents() {
     saveTaskFromForm(event.currentTarget);
   });
   byId("cancelTaskButton").addEventListener("click", () => byId("taskDialog").close());
+  byId("taskDialog").addEventListener("cancel", () => byId("taskDialog").close());
+  byId("taskDialog").addEventListener("keydown", (e) => { if (e.key === "Escape") byId("taskDialog").close(); });
   byId("clearTaskButton").addEventListener("click", () => resetTaskForm());
   byId("taskAttachmentInput").addEventListener("change", (event) => {
     addTaskDraftFiles(event.target.files);
