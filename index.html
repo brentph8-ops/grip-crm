@@ -2565,7 +2565,7 @@
       if ('serviceWorker' in navigator) {
         // updateViaCache:'none' forces the browser to always fetch sw.js fresh,
         // so version upgrades activate without waiting for the browser HTTP cache to expire.
-        navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(function(err) {
+        navigator.serviceWorker.register('/grip-crm/sw.js', { updateViaCache: 'none', scope: '/grip-crm/' }).catch(function(err) {
           console.warn('GRIP SW registration failed:', err);
         });
         navigator.serviceWorker.addEventListener('message', function(event) {

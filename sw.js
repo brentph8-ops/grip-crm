@@ -2,28 +2,30 @@
 // GRIP Service Worker — offline caching + PWA support
 // ─────────────────────────────────────────────────────────────────
 
-const CACHE = 'grip-v82';
+const CACHE = 'grip-v83';
+
+const BASE = '/grip-crm';
 
 const PRECACHE = [
-  '/',
-  '/index.html',
-  '/contractor.html',
-  '/src/styles.css',
-  '/src/app.js',
-  '/src/data.js',
-  '/src/grip-sync.js',
-  '/src/supabase-client.js',
-  '/src/contractor.js',
-  '/src/outreach.js',
-  '/src/today.js',
-  '/src/pipeline.js',
-  '/src/territory.js',
-  '/src/map.js',
-  '/src/leaflet.min.js',
-  '/src/leaflet.min.css',
-  '/manifest.json',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
+  `${BASE}/`,
+  `${BASE}/index.html`,
+  `${BASE}/contractor.html`,
+  `${BASE}/src/styles.css`,
+  `${BASE}/src/app.js`,
+  `${BASE}/src/data.js`,
+  `${BASE}/src/grip-sync.js`,
+  `${BASE}/src/supabase-client.js`,
+  `${BASE}/src/contractor.js`,
+  `${BASE}/src/outreach.js`,
+  `${BASE}/src/today.js`,
+  `${BASE}/src/pipeline.js`,
+  `${BASE}/src/territory.js`,
+  `${BASE}/src/map.js`,
+  `${BASE}/src/leaflet.min.js`,
+  `${BASE}/src/leaflet.min.css`,
+  `${BASE}/manifest.json`,
+  `${BASE}/icons/icon-192.png`,
+  `${BASE}/icons/icon-512.png`,
 ];
 
 // ── Install: pre-cache all app shell assets ───────────────────────
