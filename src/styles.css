@@ -8201,3 +8201,61 @@ button#gripSyncStatus:hover { opacity: 0.75; }
 :root[data-theme="dark"] .map-dp-note { color: #e2e8f0; }
 :root[data-theme="dark"] .map-dp-row { color: #e2e8f0; }
 
+/* ══════════════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE FIXES — Pipeline & general polish
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Pipeline topbar: wrap left/right sections at narrow widths */
+@media (max-width: 560px) {
+  .pl-topbar {
+    flex-wrap: wrap;
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .pl-topbar-left {
+    flex: 1 0 100%;
+    align-items: center;
+  }
+
+  .pl-topbar-right {
+    flex: 1 0 100%;
+    justify-content: space-between;
+  }
+
+  .pl-tab,
+  .pl-add-btn {
+    white-space: nowrap;
+  }
+
+  /* Board toolbar wraps cleanly */
+  .pl-board-toolbar {
+    padding: 6px 12px 4px;
+    gap: 6px;
+  }
+
+  /* Proposal toolbar wraps */
+  .proposals-toolbar {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+}
+
+/* Ensure tab buttons and key action buttons never wrap text */
+.pl-tab,
+.pl-add-btn,
+.mini-button,
+.quick-filter {
+  white-space: nowrap;
+}
+
+/* Pipeline column header accents — slightly stronger contrast */
+.pl-col-header {
+  border-bottom: 2px solid rgba(0,0,0,0.06);
+}
+
+/* Follow-Up Queue "missing" label — subtle red tint */
+.fuq-urgency-missing {
+  color: #dc2626;
+}
+
