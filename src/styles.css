@@ -8265,9 +8265,9 @@ button#gripSyncStatus:hover { opacity: 0.75; }
 }
 
 /* Structured address city/state/zip row */
-.address-csz { display: grid; grid-template-columns: 1fr 5rem 7rem; gap: 8px; }
+.address-csz { display: grid; grid-template-columns: 1fr 7rem 7rem; gap: 8px; }
 .address-csz label { display: grid; gap: 4px; }
-@media (max-width: 480px) { .address-csz { grid-template-columns: 1fr 4rem 6rem; } }
+@media (max-width: 480px) { .address-csz { grid-template-columns: 1fr 6rem 6rem; } }
 
 /* Graveyard accounts section */
 .graveyard-section { margin-top: 24px; }

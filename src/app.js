@@ -164,6 +164,65 @@ function buildFullAddress(acct) {
   if (changed) try { localStorage.setItem("garlandCrmData", JSON.stringify(savedCrm)); } catch(e) {}
 })();
 
+// ── One-time patch: inject verified addresses + coordinates ───────
+(function fixKnownAccountAddresses() {
+  const FIXES = [
+    { client: "Lone Star College - North Harris",
+      street: "2700 W W Thorne Blvd", city: "Houston", state: "TX", zip: "77073",
+      lat: 30.0024774, lng: -95.3839376 },
+    { client: "Lone Star College - CyFair",
+      street: "9191 Barker Cypress Rd", city: "Cypress", state: "TX", zip: "77433",
+      lat: 29.9101601, lng: -95.6917631 },
+    { client: "Lone Star College - Montgomery",
+      street: "3200 College Park Dr", city: "Conroe", state: "TX", zip: "77384",
+      lat: 30.2104348, lng: -95.4675519 },
+    { client: "Lone Star College - Tomball",
+      street: "30555 Tomball Pkwy", city: "Tomball", state: "TX", zip: "77375",
+      lat: 30.1121787, lng: -95.6450489 },
+    { client: "Lone Star - Tomball",
+      street: "30555 Tomball Pkwy", city: "Tomball", state: "TX", zip: "77375",
+      lat: 30.1121787, lng: -95.6450489 },
+    { client: "Lone Star College - University Park",
+      street: "20515 Tomball Pkwy", city: "Houston", state: "TX", zip: "77070",
+      lat: 29.9939473, lng: -95.5828857 },
+    { client: "Lone Star College - UP",
+      street: "20515 Tomball Pkwy", city: "Houston", state: "TX", zip: "77070",
+      lat: 29.9939473, lng: -95.5828857 },
+    { client: "Lone Star - University Park",
+      street: "20515 Tomball Pkwy", city: "Houston", state: "TX", zip: "77070",
+      lat: 29.9939473, lng: -95.5828857 },
+    { client: "Lone Star College - System Office",
+      street: "5000 Research Forest Dr", city: "The Woodlands", state: "TX", zip: "77381",
+      lat: 30.1868012, lng: -95.4880929 },
+    { client: "Lone Star - System Office",
+      street: "5000 Research Forest Dr", city: "The Woodlands", state: "TX", zip: "77381",
+      lat: 30.1868012, lng: -95.4880929 },
+  ];
+  let crmChanged = false;
+  const geoCache = readStorageJson("garlandGeocoords", {});
+  for (const fix of FIXES) {
+    const acct = data.accounts.find(a => normalize(a.client) === normalize(fix.client));
+    if (!acct) continue;
+    if (acct.street === fix.street && geoCache[acct.id]?.lat === fix.lat) continue;
+    const addr = [fix.street, fix.city, fix.state + " " + fix.zip].join(", ");
+    Object.assign(acct, { street: fix.street, city: fix.city, state: fix.state, zip: fix.zip, address: addr });
+    const patch = { street: fix.street, city: fix.city, state: fix.state, zip: fix.zip, address: addr };
+    if (acct.sourceRow === "Local") {
+      const local = savedCrm.accounts.find(a => a.id === acct.id);
+      if (local) Object.assign(local, patch);
+    } else {
+      if (!savedCrm.edits.accounts[acct.id]) savedCrm.edits.accounts[acct.id] = {};
+      Object.assign(savedCrm.edits.accounts[acct.id], patch);
+    }
+    geoCache[acct.id] = { lat: fix.lat, lng: fix.lng, geocodeConfidence: "verified", geocodeAddress: addr };
+    crmChanged = true;
+  }
+  if (crmChanged) {
+    try { localStorage.setItem("garlandCrmData", JSON.stringify(savedCrm)); } catch(e) {}
+    try { localStorage.setItem("garlandGeocoords", JSON.stringify(geoCache)); } catch(e) {}
+  }
+})();
+
 const proposalStages = [
   "Working on Ramp & SOW",
   "Sent Ramp & Budget to Client",
