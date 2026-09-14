@@ -2929,7 +2929,7 @@ function showPunchListDetail(list) {
   setDetailsHidden(false);
   const stats = punchStats([list]);
   byId("detailContent").innerHTML = `
-    <div class="detail-actions">
+    <div class="detail-sticky-header"><div class="detail-actions">
       <div>
         <h3>${escapeHtml(list.title)}</h3>
         <p>${escapeHtml([list.project_name, list.client_name].filter(Boolean).join(" | "))}</p>
@@ -2937,7 +2937,7 @@ function showPunchListDetail(list) {
       <div class="detail-header-actions">
         <button class="edit-button" data-open-punch-dialog="${escapeHtml(list.punch_list_id)}" type="button">Edit</button>
       </div>
-    </div>
+    </div></div>
     <div class="field-grid">
       ${field("Status", list.status)}
       ${field("Project", list.project_name)}
@@ -3253,7 +3253,7 @@ function showTaskDetail(task) {
   setDetailsHidden(false);
   const dueLevel = taskDueLevel(task);
   byId("detailContent").innerHTML = `
-    <div class="detail-actions">
+    <div class="detail-sticky-header"><div class="detail-actions">
       <div>
         <h3>${escapeHtml(task.title || "Task")}</h3>
         <p>${escapeHtml([task.account_name || "Unassigned", taskDueLabel(task)].filter(Boolean).join(" | "))}</p>
@@ -3261,7 +3261,7 @@ function showTaskDetail(task) {
       <div class="detail-header-actions">
         <button class="edit-button" data-open-task-dialog="${escapeHtml(task.task_id)}" type="button">Edit</button>
       </div>
-    </div>
+    </div></div>
     <div class="field-grid">
       ${field("Due Date", taskDueLabel(task))}
       ${field("Priority", task.priority)}
@@ -6003,15 +6003,26 @@ function editableField(type, id, key, label, value, options = null) {
 }
 
 function detailHeader(type, id, title, subtitle = "") {
-  return `<div class="detail-actions">
+  return `<div class="detail-sticky-header"><div class="detail-actions">
     <div>
       <h3>${title}</h3>
       ${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ""}
     </div>
     <div class="detail-header-actions">
+      <span id="detailSaveStatus" class="detail-save-status" aria-live="polite"></span>
       <button class="edit-button" data-edit-record="${type}" data-edit-id="${escapeHtml(id)}" type="button">Edit</button>
     </div>
-  </div>`;
+  </div></div>`;
+}
+
+function showDetailSaveStatus(statusText) {
+  const el = byId("detailSaveStatus");
+  if (!el) return;
+  clearTimeout(el._saveTimer);
+  el.textContent = statusText;
+  if (statusText === "Saved") {
+    el._saveTimer = setTimeout(() => { el.textContent = ""; }, 2500);
+  }
 }
 
 function followUpEvent(type, record) {
@@ -6388,14 +6399,21 @@ function beginInlineEdit(fieldEl) {
   editor.focus();
   if (editor.select) editor.select();
 
-  const save = () => persistRecordEdit(type, id, key, editor.value);
+  let _saved = false;
+  const save = () => {
+    if (_saved) return;
+    _saved = true;
+    persistRecordEdit(type, id, key, editor.value);
+    showDetailSaveStatus("Saved");
+  };
   saveButton.addEventListener("click", save);
+  editor.addEventListener("blur", save);
   editor.addEventListener("input", () => {
     if (key === "phone") editor.value = formatPhoneNumber(editor.value);
   });
   editor.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") save();
-    if (event.key === "Escape") showDetail(type, id);
+    if (event.key === "Enter") { event.preventDefault(); save(); }
+    if (event.key === "Escape") { _saved = true; showDetail(type, id); }
   });
 }
 
@@ -6592,12 +6610,13 @@ function showAccountDetail(record) {
   const proposalCounts = accountProposalCounts(record);
 
   byId("detailContent").innerHTML = `
-    <div class="detail-actions">
+    <div class="detail-sticky-header"><div class="detail-actions">
       <div>
         <h3><span class="activity-dot ${activity.level}"></span>${escapeHtml(record.client)}</h3>
         ${latest ? `<p>${escapeHtml(activity.label)}</p>` : "<p>No activity logged yet.</p>"}
       </div>
       <div class="detail-header-actions">
+        <span id="detailSaveStatus" class="detail-save-status" aria-live="polite"></span>
         <button class="mini-button" data-add-task-account="${escapeHtml(record.client)}" type="button">+ Task</button>
         <button class="mini-button" data-quick-deal-account="${escapeHtml(record.id)}" type="button">+ Pipeline</button>
         <button class="mini-button log-activity-btn" data-log-activity-account="${escapeHtml(record.id)}" data-log-activity-name="${escapeHtml(record.client)}" type="button">📞 Log Activity</button>
@@ -6605,7 +6624,7 @@ function showAccountDetail(record) {
         <button class="mini-button" data-dossier-account="${escapeHtml(record.id)}" type="button">📋 Dossier</button>
         <button class="edit-button" data-edit-record="account" data-edit-id="${escapeHtml(record.id)}" type="button">Edit</button>
       </div>
-    </div>
+    </div></div>
     <div class="field-grid">
       ${field("Open Proposal Count", proposalCounts.open)}
       ${field("Won Proposal Count", proposalCounts.won)}
@@ -11881,6 +11900,11 @@ function bindEvents() {
       renderCallList();
       return;
     }
+    const inlineField = event.target.closest(".editable-field");
+    if (inlineField && byId("detailContent")?.contains(inlineField)) {
+      beginInlineEdit(inlineField);
+      return;
+    }
     const openAccountButton = event.target.closest("[data-open-account-dialog]");
     if (openAccountButton) {
       openAccountDialog(openAccountButton.dataset.openAccountDialog);
@@ -11949,15 +11973,11 @@ function bindEvents() {
   });
   document.body.addEventListener("dblclick", (event) => {
     const recordCardEl = event.target.closest("[data-type][data-id]");
-    if (recordCardEl && !event.target.closest(".editable-field")) {
-      if (recordCardEl.dataset.type === "account") openAccountProfileDialog(recordCardEl.dataset.id);
-      else if (["project", "proposal", "contractor"].includes(recordCardEl.dataset.type)) {
-        openRecordQuickDialog(recordCardEl.dataset.type, recordCardEl.dataset.id);
-      }
-      return;
+    if (!recordCardEl || event.target.closest(".editable-field")) return;
+    if (recordCardEl.dataset.type === "account") openAccountProfileDialog(recordCardEl.dataset.id);
+    else if (["project", "proposal", "contractor"].includes(recordCardEl.dataset.type)) {
+      openRecordQuickDialog(recordCardEl.dataset.type, recordCardEl.dataset.id);
     }
-    const editable = event.target.closest(".editable-field");
-    if (editable) beginInlineEdit(editable);
   });
   byId("cancelAccountProfileButton").addEventListener("click", () => byId("accountProfileDialog").close());
   document.body.addEventListener("click", (event) => {
@@ -12448,6 +12468,85 @@ setTimeout(() => { if (window.gripToday) { setView("today"); window.gripToday.re
     state.showGraveyardAccounts = !state.showGraveyardAccounts;
     renderAccounts();
   });
+})();
+
+// ── Street address autocomplete (Nominatim) ───────────────────────
+(function initAddressAutocomplete() {
+  const STATE_ABBR = {
+    Alabama:"AL",Alaska:"AK",Arizona:"AZ",Arkansas:"AR",California:"CA",
+    Colorado:"CO",Connecticut:"CT",Delaware:"DE",Florida:"FL",Georgia:"GA",
+    Hawaii:"HI",Idaho:"ID",Illinois:"IL",Indiana:"IN",Iowa:"IA",
+    Kansas:"KS",Kentucky:"KY",Louisiana:"LA",Maine:"ME",Maryland:"MD",
+    Massachusetts:"MA",Michigan:"MI",Minnesota:"MN",Mississippi:"MS",Missouri:"MO",
+    Montana:"MT",Nebraska:"NE",Nevada:"NV","New Hampshire":"NH","New Jersey":"NJ",
+    "New Mexico":"NM","New York":"NY","North Carolina":"NC","North Dakota":"ND",Ohio:"OH",
+    Oklahoma:"OK",Oregon:"OR",Pennsylvania:"PA","Rhode Island":"RI","South Carolina":"SC",
+    "South Dakota":"SD",Tennessee:"TN",Texas:"TX",Utah:"UT",Vermont:"VT",
+    Virginia:"VA",Washington:"WA","West Virginia":"WV",Wisconsin:"WI",Wyoming:"WY",
+    "District of Columbia":"DC",
+  };
+
+  function wire(streetInput, getForm) {
+    if (!streetInput || streetInput.dataset.acwired) return;
+    streetInput.dataset.acwired = "1";
+    const wrapper = streetInput.closest("label") || streetInput.parentElement;
+    wrapper.style.position = "relative";
+    const list = document.createElement("ul");
+    list.className = "addr-suggestions";
+    list.hidden = true;
+    wrapper.appendChild(list);
+
+    let _timer;
+    const dismiss = () => { list.hidden = true; list.innerHTML = ""; };
+
+    streetInput.addEventListener("input", () => {
+      clearTimeout(_timer);
+      const q = streetInput.value.trim();
+      if (q.length < 5) { dismiss(); return; }
+      _timer = setTimeout(async () => {
+        try {
+          const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=6&countrycodes=us`;
+          const res = await fetch(url, { headers: { "Accept-Language": "en-US,en", "User-Agent": "GRIP-CRM" } });
+          const results = await res.json();
+          list.innerHTML = "";
+          const items = results.filter(r => r.address?.road);
+          if (!items.length) { dismiss(); return; }
+          items.forEach(r => {
+            const addr = r.address;
+            const street = (addr.house_number ? addr.house_number + " " : "") + (addr.road || "");
+            const city = addr.city || addr.town || addr.village || addr.hamlet || addr.suburb || "";
+            const state = STATE_ABBR[addr.state] || addr.state || "";
+            const zip = (addr.postcode || "").split("-")[0];
+            const li = document.createElement("li");
+            li.className = "addr-suggestion-item";
+            li.textContent = [street, city, state, zip].filter(Boolean).join(", ");
+            li.addEventListener("mousedown", e => {
+              e.preventDefault();
+              streetInput.value = street;
+              const form = typeof getForm === "function" ? getForm() : getForm;
+              if (form?.elements.city) form.elements.city.value = city;
+              if (form?.elements.state) form.elements.state.value = state;
+              if (form?.elements.zip) form.elements.zip.value = zip;
+              dismiss();
+              streetInput.dispatchEvent(new Event("change"));
+            });
+            list.appendChild(li);
+          });
+          list.hidden = !items.length;
+        } catch (_) { dismiss(); }
+      }, 420);
+    });
+    streetInput.addEventListener("blur", () => setTimeout(dismiss, 180));
+    streetInput.addEventListener("keydown", e => { if (e.key === "Escape") dismiss(); });
+  }
+
+  // Account dialog
+  const accountForm = byId("accountForm");
+  if (accountForm?.elements.street) wire(accountForm.elements.street, accountForm);
+
+  // Proposal new-client inline form
+  const proposalStreet = byId("proposalForm")?.querySelector('input[name="street"]');
+  if (proposalStreet) wire(proposalStreet, () => byId("proposalForm"));
 })();
 
 // ── Public app bridge (for pipeline.js to call persistRecordEdit) ──

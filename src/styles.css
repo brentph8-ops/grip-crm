@@ -3274,12 +3274,36 @@ textarea {
   line-height: 1.45;
 }
 
+.detail-sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #fbfcfa;
+  margin: -18px -18px 16px;
+  padding: 18px 18px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.detail-save-status {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #15803d;
+  opacity: 0;
+  transition: opacity 0.25s;
+  pointer-events: none;
+  white-space: nowrap;
+  align-self: center;
+}
+.detail-save-status:not(:empty) {
+  opacity: 1;
+}
+
 .detail-actions {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 0;
 }
 
 .detail-actions p {
@@ -5789,6 +5813,10 @@ textarea {
     border-left: 0;
     transform: translateX(100%);
   }
+  .detail-sticky-header {
+    margin: -12px -12px 12px;
+    padding: 12px 12px 10px;
+  }
 
   .app-shell.details-hidden .detail-drawer {
     display: block;
@@ -8270,6 +8298,34 @@ button#gripSyncStatus:hover { opacity: 0.75; }
 @media (max-width: 480px) { .address-csz { grid-template-columns: 1fr 6rem 6rem; } }
 
 /* Graveyard accounts section */
+.addr-suggestions {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  z-index: 200;
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  max-height: 220px;
+  overflow-y: auto;
+}
+.addr-suggestion-item {
+  padding: 8px 12px;
+  font-size: 0.83rem;
+  cursor: pointer;
+  line-height: 1.35;
+  color: var(--ink);
+}
+.addr-suggestion-item:hover {
+  background: var(--accent, #125fad);
+  color: #fff;
+}
+
 .graveyard-section { margin-top: 24px; }
 .graveyard-section-header {
   font-size: 0.85rem;
