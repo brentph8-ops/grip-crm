@@ -447,7 +447,11 @@
     for (const a of accounts()) { acctMap[a.id] = a; }
     const activeDeals = deals.filter(d => d.stage !== "Project Completed" && d.stage !== "Graveyard");
     const total = activeDeals.reduce((s, d) => s + (parseFloat(d.amount) || 0), 0);
+    const activeAccountIds = new Set(activeDeals.map(d => d.accountId).filter(Boolean));
     const acctCount = new Set(activeDeals.map(d => d.accountId || d.accountName).filter(Boolean)).size;
+    const countA = [...activeAccountIds].filter(id => (acctMap[id]?.clientRanking || "").toLowerCase() === "a").length;
+    const countB = [...activeAccountIds].filter(id => (acctMap[id]?.clientRanking || "").toLowerCase() === "b").length;
+    const countC = [...activeAccountIds].filter(id => (acctMap[id]?.clientRanking || "").toLowerCase() === "c").length;
 
     el.innerHTML = `
       <div class="pl-page">
@@ -456,6 +460,9 @@
             <h2 class="pl-headline">Pipeline</h2>
             <span class="pl-pipeline-value">${fmtMoney(total)} open</span>
             <span class="pl-pipeline-value">${acctCount} account${acctCount !== 1 ? "s" : ""}</span>
+            ${countA ? `<span class="acct-rank-badge rank-a">A: ${countA}</span>` : ""}
+            ${countB ? `<span class="acct-rank-badge rank-b">B: ${countB}</span>` : ""}
+            ${countC ? `<span class="acct-rank-badge rank-c">C: ${countC}</span>` : ""}
           </div>
           <div class="pl-topbar-right">
             <div class="pl-tab-group">

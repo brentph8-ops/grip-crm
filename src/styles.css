@@ -7124,12 +7124,13 @@ button#gripSyncStatus:hover { opacity: 0.75; }
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 14px 18px; border-bottom: 1px solid var(--line); background: var(--surface); flex-shrink: 0;
 }
-.pl-topbar-left { display: flex; align-items: baseline; gap: 12px; }
+.pl-topbar-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .pl-topbar-right { display: flex; align-items: center; gap: 10px; }
 .pl-headline { font-size: 18px; font-weight: 800; color: var(--ink); margin: 0; letter-spacing: -0.02em; }
 .pl-pipeline-value { font-size: 13px; color: var(--muted); font-weight: 600; }
-.pl-tab-group { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-.pl-tab { font-size: 12px; font-weight: 600; padding: 5px 14px; border: none; background: transparent; color: var(--muted); cursor: pointer; }
+.pl-tab-group { display: flex; border-radius: 8px; overflow: hidden; background: rgba(0,0,0,0.07); padding: 3px; gap: 2px; }
+.pl-tab { font-size: 12px; font-weight: 600; padding: 5px 14px; border: none; background: transparent; color: var(--ink); cursor: pointer; border-radius: 6px; transition: background .12s; }
+.pl-tab:not(.pl-tab--active):hover { background: rgba(0,0,0,0.06); }
 .pl-tab--active { background: var(--accent); color: #fff; }
 .pl-add-btn {
   font-size: 12px; font-weight: 700; padding: 6px 14px; border-radius: 8px;
