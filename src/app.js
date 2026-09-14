@@ -7103,7 +7103,7 @@ function renderCallList() {
           const done = state.callLists.completed[key];
           return `<div class="call-item ${done ? "is-complete" : ""}">
             <input type="checkbox" data-call-account="${account.id}" data-call-day="${day}" ${done ? "checked" : ""} />
-            <button class="call-account-button" data-open-call-account="${account.id}" type="button">
+            <button class="call-account-button" data-open-account-dialog="${account.id}" type="button" title="Edit account">
               <strong>${escapeHtml(account.client)}</strong>
               <small>${escapeHtml([account.poc, account.phone, account.email].filter(Boolean).join(" • "))}</small>
             </button>
