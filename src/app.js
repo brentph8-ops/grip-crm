@@ -6508,6 +6508,7 @@ function showAccountDetail(record) {
       <div class="detail-header-actions">
         <button class="mini-button" data-add-task-account="${escapeHtml(record.client)}" type="button">+ Task</button>
         <button class="mini-button" data-quick-deal-account="${escapeHtml(record.id)}" type="button">+ Pipeline</button>
+        <button class="mini-button log-activity-btn" data-log-activity-account="${escapeHtml(record.id)}" data-log-activity-name="${escapeHtml(record.client)}" type="button">📞 Log Activity</button>
         <button class="mini-button" data-roof-notes-account="${escapeHtml(record.id)}" type="button">🏗 Roof Notes</button>
         <button class="mini-button" data-dossier-account="${escapeHtml(record.id)}" type="button">📋 Dossier</button>
         <button class="edit-button" data-edit-record="account" data-edit-id="${escapeHtml(record.id)}" type="button">Edit</button>
@@ -11535,6 +11536,17 @@ function bindEvents() {
       }, 80);
       return;
     }
+    const logActivityBtn = event.target.closest("[data-log-activity-account]");
+    if (logActivityBtn) {
+      const dlg = byId("logActivityDialog");
+      byId("logActivityAccountId").value = logActivityBtn.dataset.logActivityAccount;
+      byId("logActivityAccountName").textContent = logActivityBtn.dataset.logActivityName || "";
+      byId("logActivityNotes").value = "";
+      byId("logActivityType").selectedIndex = 0;
+      dlg?.showModal();
+      setTimeout(() => byId("logActivityNotes")?.focus(), 60);
+      return;
+    }
     const roofNotesBtn = event.target.closest("[data-roof-notes-account]");
     if (roofNotesBtn) {
       openRoofNotesDialog(roofNotesBtn.dataset.roofNotesAccount);
@@ -12251,6 +12263,65 @@ setTimeout(() => { if (window.gripToday) { setView("today"); window.gripToday.re
   // Pre-visit dossier close
   byId("closePreDossierDialog")?.addEventListener("click", () => byId("preDossierDialog")?.close());
   byId("closePreDossierBtn")?.addEventListener("click", () => byId("preDossierDialog")?.close());
+
+  // ── Log Activity dialog ───────────────────────────────────────────
+  byId("closeLogActivityDialog")?.addEventListener("click", () => byId("logActivityDialog")?.close());
+  byId("cancelLogActivity")?.addEventListener("click", () => byId("logActivityDialog")?.close());
+  byId("logActivityForm")?.addEventListener("submit", function(e) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const accountId = fd.get("accountId");
+    const activityType = fd.get("activityType") || "";
+    const notes = (fd.get("notes") || "").trim();
+    if (!accountId || !notes) return;
+    addAccountActivity(accountId, notes, true, { source: activityType });
+    byId("logActivityDialog")?.close();
+    e.target.reset();
+  });
+
+  // ── Clear filter buttons ──────────────────────────────────────────
+  document.body.addEventListener("click", function(e) {
+    const btn = e.target.closest("[data-clear-filters]");
+    if (!btn) return;
+    const view = btn.dataset.clearFilters;
+    if (view === "accounts") {
+      state.filters.rank = "All rankings";
+      state.filters.entity = "All entities";
+      state.filters.county = "All counties";
+      state.filters.accountActivity = "All activity";
+    } else if (view === "tasks") {
+      state.filters.taskDue = "all";
+      state.filters.taskAccount = "All accounts";
+      state.filters.taskType = "All task types";
+      state.filters.taskPriority = "All priorities";
+      state.filters.taskStatus = "Open tasks";
+      state.filters.taskAssigned = "All users";
+      state.filters.taskSearch = "";
+      state.filters.taskSort = "dueDate";
+    } else if (view === "projects") {
+      state.filters.projectStage = "All project stages";
+      state.filters.projectRank = "All project rankings";
+      state.filters.projectContractor = "All contractors";
+    } else if (view === "proposals") {
+      state.filters.proposalStage = "All proposal stages";
+      state.filters.contractor = "All contractors";
+      state.filters.proposalBidStatus = "All bid statuses";
+    } else if (view === "followUp") {
+      state.filters.queueType = "all";
+      state.filters.queueUrgency = "all";
+    } else if (view === "activity") {
+      state.filters.activityAccount = "All accounts";
+      state.filters.activityEntity = "All entities";
+      state.filters.activityCounty = "All counties";
+      state.filters.activityRep = "All reps";
+      state.filters.activityDate = "all";
+    } else if (view === "callList") {
+      state.filters.callListSort = "name";
+      state.filters.callListDirection = "asc";
+    }
+    renderFilters();
+    render();
+  });
 })();
 
 // ── Public app bridge (for pipeline.js to call persistRecordEdit) ──

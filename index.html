@@ -97,18 +97,20 @@
               Warranty Summary
             </button>
           </div>
-          <button class="nav-button" data-view="proposals" type="button">
-            <span class="nav-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false">
-                <path d="M14.7 2.5 22 9.8l-2.8 2.8-2.1-2.1-8.7 8.7c-.7.7-1.8.7-2.5 0l-1.1-1.1c-.7-.7-.7-1.8 0-2.5l8.7-8.7-1.9-1.9 3.1-2.5Zm-7.5 15 8.3-8.3-1.1-1.1-8.3 8.3 1.1 1.1Z" />
-              </svg>
-            </span>
-            Proposals
-          </button>
-          <button class="nav-button" data-view="scopeDatabase" type="button">
-            <span class="nav-icon nav-letter-icon nav-letter-icon-wide" aria-hidden="true">SOW</span>
-            Scope of Work
-          </button>
+          <div class="nav-projects-group">
+            <button class="nav-button" data-view="proposals" type="button">
+              <span class="nav-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <path d="M14.7 2.5 22 9.8l-2.8 2.8-2.1-2.1-8.7 8.7c-.7.7-1.8.7-2.5 0l-1.1-1.1c-.7-.7-.7-1.8 0-2.5l8.7-8.7-1.9-1.9 3.1-2.5Zm-7.5 15 8.3-8.3-1.1-1.1-8.3 8.3 1.1 1.1Z" />
+                </svg>
+              </span>
+              Proposals
+            </button>
+            <button class="nav-button nav-sub-button" data-view="scopeDatabase" type="button">
+              <span class="nav-icon nav-letter-icon nav-letter-icon-wide" aria-hidden="true">SOW</span>
+              Scope of Work
+            </button>
+          </div>
           <button class="nav-button" data-view="tasks" type="button">
             <span aria-hidden="true">☑</span>
             Tasks
@@ -297,6 +299,7 @@
               <div class="filter-field" data-label="Priority"><select id="taskPriorityFilter" aria-label="Filter tasks by priority"></select></div>
               <div class="filter-field" data-label="Status"><select id="taskStatusFilter" aria-label="Filter tasks by status"></select></div>
               <div class="filter-field" data-label="Assigned"><select id="taskAssignedFilter" aria-label="Filter tasks by assigned user"></select></div>
+              <button class="mini-button utility-mini" data-clear-filters="tasks" type="button">Clear</button>
             </div>
             <div class="toolbar-group">
               <select id="taskSortFilter" aria-label="Sort tasks">
@@ -334,6 +337,7 @@
                 <option value="soon">Next 7 days</option>
                 <option value="missing">No next step</option>
               </select></div>
+              <button class="mini-button utility-mini" data-clear-filters="followUp" type="button">Clear</button>
             </div>
             <div class="toolbar-group">
               <button class="secondary-button" id="copyWeeklyReviewButton" type="button">Copy Weekly Review</button>
@@ -353,6 +357,7 @@
               <div class="filter-field" data-label="Entity"><select id="entityFilter" aria-label="Filter by entity type"></select></div>
               <div class="filter-field" data-label="County"><select id="countyFilter" aria-label="Filter by county"></select></div>
               <div class="filter-field" data-label="Activity"><select id="accountActivityFilter" aria-label="Filter by account activity"></select></div>
+              <button class="mini-button utility-mini" data-clear-filters="accounts" type="button">Clear</button>
             </div>
             <div class="toolbar-group">
               <select id="accountSortFilter" aria-label="Sort accounts">
@@ -401,6 +406,7 @@
                 <option value="30">Last 30 days</option>
                 <option value="45">Last 45 days</option>
               </select>
+              <button class="mini-button utility-mini" data-clear-filters="activity" type="button">Clear</button>
             </div>
             <div class="toolbar-group">
               <button class="sort-direction-button" id="activitySortDirection" data-direction="desc" type="button" aria-label="Toggle activity sort direction">↓</button>
@@ -434,6 +440,7 @@
               <div class="filter-field" data-label="Stage"><select id="projectStageFilter" aria-label="Filter by project stage"></select></div>
               <div class="filter-field" data-label="Rank"><select id="projectRankFilter" aria-label="Filter by project rank"></select></div>
               <div class="filter-field" data-label="Contractor"><select id="projectContractorFilter" aria-label="Filter by project contractor"></select></div>
+              <button class="mini-button utility-mini" data-clear-filters="projects" type="button">Clear</button>
             </div>
             <div class="toolbar-group">
               <select id="projectSortFilter" aria-label="Sort projects">
@@ -812,6 +819,7 @@
               <div class="filter-field" data-label="Stage"><select id="proposalStageFilter" aria-label="Filter by proposal stage"></select></div>
               <div class="filter-field" data-label="Contractor"><select id="contractorFilter" aria-label="Filter by awarded contractor"></select></div>
               <div class="filter-field" data-label="Bid Status"><select id="proposalBidStatusFilter" aria-label="Filter by bid status"></select></div>
+              <button class="mini-button utility-mini" data-clear-filters="proposals" type="button">Clear</button>
             </div>
             <div class="toolbar-group">
               <div class="sort-tabs" aria-label="Sort proposals">
@@ -904,6 +912,7 @@
               <option value="activity">Last Activity</option>
             </select></div>
             <button class="sort-direction-button" id="callListSortDirection" data-direction="asc" type="button" aria-label="Toggle call list sort direction">↑</button>
+            <button class="mini-button utility-mini" data-clear-filters="callList" type="button">Clear</button>
             <span class="view-toggle" data-view-toggle="callList" aria-label="Call list layout">
               <button class="sort-tab is-active" data-layout="tile" type="button">Tile</button>
               <button class="sort-tab" data-layout="list" type="button">List</button>
@@ -1129,6 +1138,36 @@
           <div class="modal-footer">
             <button type="button" class="secondary-button" id="cancelQuickVisitLog">Cancel</button>
             <button type="submit" class="primary-button">Log Visit</button>
+          </div>
+        </form>
+      </dialog>
+
+      <!-- ── Log Activity Dialog ──────────────────────────────────── -->
+      <dialog id="logActivityDialog" class="modal-dialog">
+        <div class="modal-header">
+          <h3>Log Activity</h3>
+          <button id="closeLogActivityDialog" class="modal-close" type="button" aria-label="Close">×</button>
+        </div>
+        <form id="logActivityForm" class="modal-form">
+          <input type="hidden" id="logActivityAccountId" name="accountId" />
+          <p id="logActivityAccountName" class="form-hint" style="margin:0 0 12px;font-weight:600;font-size:0.9rem;color:var(--ink)"></p>
+          <label class="form-label">Activity Type
+            <select name="activityType" id="logActivityType" class="form-input">
+              <option>Phone Call</option>
+              <option>Email</option>
+              <option>Site Visit</option>
+              <option>Meeting</option>
+              <option>Text</option>
+              <option>Proposal Delivered</option>
+              <option>Other</option>
+            </select>
+          </label>
+          <label class="form-label">Notes
+            <textarea name="notes" id="logActivityNotes" class="form-textarea" rows="4" placeholder="Brief summary…" required></textarea>
+          </label>
+          <div class="modal-footer">
+            <button type="button" class="secondary-button" id="cancelLogActivity">Cancel</button>
+            <button type="submit" class="primary-button">Log Activity</button>
           </div>
         </form>
       </dialog>
