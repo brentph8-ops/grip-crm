@@ -326,7 +326,7 @@
       <div class="gmp-fix-wrap" data-fix-id="${esc(account.id)}">
         <button class="gmp-fix-btn" type="button">✏️ Fix Location</button>
         <div class="gmp-fix-form" style="display:none">
-          <input class="gmp-fix-input" type="text" value="${esc(account.address || account.client || "")}" placeholder="Enter address or place name…">
+          <input class="gmp-fix-input" type="text" value="${esc(buildGeoQuery(account) || account.address || account.client || "")}" placeholder="Enter address or place name…">
           <button class="gmp-fix-go" type="button">Search</button>
           <p class="gmp-fix-status"></p>
         </div>

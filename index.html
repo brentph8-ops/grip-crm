@@ -1529,10 +1529,28 @@
               <span>Follow-up date</span>
               <input name="nextFollowUp" type="date" />
             </label>
-            <label>
-              <span>Address</span>
-              <input name="address" />
+            <label class="full-field">
+              <span>Street Address</span>
+              <input name="street" placeholder="123 Main St" />
             </label>
+            <label class="full-field">
+              <span>Suite / Apt</span>
+              <input name="suite" placeholder="Suite 100" />
+            </label>
+            <div class="full-field address-csz">
+              <label>
+                <span>City</span>
+                <input name="city" />
+              </label>
+              <label>
+                <span>State</span>
+                <input name="state" placeholder="TX" maxlength="2" />
+              </label>
+              <label>
+                <span>ZIP</span>
+                <input name="zip" placeholder="77001" />
+              </label>
+            </div>
             <label>
               <span>POC</span>
               <input name="poc" />
@@ -1664,9 +1682,27 @@
             <input name="email" type="email" />
           </label>
           <label class="full-field">
-            <span>Address</span>
-            <input name="address" />
+            <span>Street Address</span>
+            <input name="street" placeholder="123 Main St" />
           </label>
+          <label class="full-field">
+            <span>Suite / Apt</span>
+            <input name="suite" placeholder="Suite 100, Apt 2B…" />
+          </label>
+          <div class="full-field address-csz">
+            <label>
+              <span>City</span>
+              <input name="city" />
+            </label>
+            <label>
+              <span>State</span>
+              <input name="state" placeholder="TX" maxlength="2" />
+            </label>
+            <label>
+              <span>ZIP</span>
+              <input name="zip" placeholder="77001" />
+            </label>
+          </div>
           <label class="full-field">
             <span>Add activity</span>
             <textarea class="note-box" name="activity" placeholder="Add a note while you are here"></textarea>

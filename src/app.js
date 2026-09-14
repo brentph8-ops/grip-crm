@@ -134,23 +134,30 @@ function splitAddress(addr) {
   return { street, city, state, zip };
 }
 function buildFullAddress(acct) {
-  const s = [acct.street, acct.city, [acct.state, acct.zip].filter(Boolean).join(" ")].filter(Boolean);
+  const s = [acct.street, acct.suite, acct.city, [acct.state, acct.zip].filter(Boolean).join(" ")].filter(Boolean);
   return s.join(", ");
 }
 
-// ── One-time migration: split address → street/city/state/zip ────
+// ── One-time migration: split address → street/suite/city/state/zip ─
 (function migrateAddressFields() {
   let changed = false;
   for (const acct of data.accounts) {
-    if (acct.street !== undefined || !acct.address) continue;
-    const { street, city, state, zip } = splitAddress(acct.address);
-    acct.street = street; acct.city = city; acct.state = state; acct.zip = zip;
+    const needsSplit = acct.street === undefined && acct.address;
+    const needsSuite = acct.suite === undefined;
+    if (!needsSplit && !needsSuite) continue;
+    let street = acct.street || "", city = acct.city || "", state = acct.state || "", zip = acct.zip || "";
+    if (needsSplit) {
+      ({ street, city, state, zip } = splitAddress(acct.address));
+      acct.street = street; acct.city = city; acct.state = state; acct.zip = zip;
+    }
+    if (needsSuite) { acct.suite = ""; }
+    const patch = needsSplit ? { street, suite: acct.suite, city, state, zip } : { suite: "" };
     if (acct.sourceRow === "Local") {
       const local = savedCrm.accounts.find(a => a.id === acct.id);
-      if (local) Object.assign(local, { street, city, state, zip });
+      if (local) Object.assign(local, patch);
     } else {
       if (!savedCrm.edits.accounts[acct.id]) savedCrm.edits.accounts[acct.id] = {};
-      Object.assign(savedCrm.edits.accounts[acct.id], { street, city, state, zip });
+      Object.assign(savedCrm.edits.accounts[acct.id], patch);
     }
     changed = true;
   }
@@ -7272,7 +7279,7 @@ function openCallActivityDialog(accountId, day = "", completeCall = false) {
       ${account.email ? `<div class="field"><span>Email</span><strong><a href="mailto:${escapeHtml(account.email)}">${escapeHtml(account.email)}</a></strong></div>` : ""}
       ${field("Entity", account.entity)}
       ${field("County", account.county)}
-      ${field("Address", account.address)}
+      ${field("Address", buildFullAddress(account))}
       ${field("Last Activity", latest ? `${compactDate(latest.createdAt)} - ${latest.note || latest.source || ""}` : "No activity logged yet")}
     </div>
   `;
@@ -7465,7 +7472,11 @@ function openAccountDialog(accountId = "") {
   form.elements.title.value = account?.title || "";
   form.elements.phone.value = formatPhoneNumber(account?.phone) || "";
   form.elements.email.value = account?.email || "";
-  form.elements.address.value = account?.address || "";
+  form.elements.street.value = account?.street || "";
+  form.elements.suite.value = account?.suite || "";
+  form.elements.city.value = account?.city || "";
+  form.elements.state.value = account?.state || "";
+  form.elements.zip.value = account?.zip || "";
   byId("deleteAccountDialogButton").hidden = !account;
   byId("accountDialogActivity").innerHTML = account
     ? accountActivityEntries(account).slice(0, 5).map(activityEntry).join("") || `<p class="empty-state">No activity logged yet.</p>`
@@ -7486,8 +7497,13 @@ function saveAccountFromDialog(form) {
     title: form.get("title") || "",
     phone: formatPhoneNumber(form.get("phone")) || "",
     email: form.get("email") || "",
-    address: form.get("address") || "",
+    street: form.get("street") || "",
+    suite: form.get("suite") || "",
+    city: form.get("city") || "",
+    state: form.get("state") || "",
+    zip: form.get("zip") || "",
   };
+  payload.address = buildFullAddress(payload);
   let accountId = id;
   if (id) {
     Object.entries(payload).forEach(([key, value]) => persistRecordEdit("account", id, key, value, false));
@@ -7830,7 +7846,7 @@ function accountProfileHtml(account) {
         <div class="box"><small>Point of Contact</small>${escapeHtml(account.poc || "Not listed")}</div>
         <div class="box"><small>Phone</small>${escapeHtml(account.phone || "Not listed")}</div>
         <div class="box"><small>Email</small>${escapeHtml(account.email || "Not listed")}</div>
-        <div class="box"><small>Address</small>${escapeHtml(account.address || "Not listed")}</div>
+        <div class="box"><small>Address</small>${escapeHtml(buildFullAddress(account) || "Not listed")}</div>
         <div class="box"><small>Shared Rep</small>${escapeHtml(account.sharedRep || "None")}</div>
         <div class="box"><small>Next Follow-Up</small>${escapeHtml(compactDate(account.nextFollowUp) || "Not set")}</div>
       </div>
@@ -10081,7 +10097,11 @@ function updateNewClientVisibility() {
   form.elements.entity.value = account.entity || "";
   form.elements.county.value = account.county || "";
   form.elements.clientRanking.value = account.clientRanking || "Prospecting";
-  form.elements.address.value = account.address || "";
+  form.elements.street.value = account.street || "";
+  form.elements.suite.value = account.suite || "";
+  form.elements.city.value = account.city || "";
+  form.elements.state.value = account.state || "";
+  form.elements.zip.value = account.zip || "";
   form.elements.poc.value = account.poc || "";
   form.elements.title.value = account.title || "";
   form.elements.phone.value = formatPhoneNumber(account.phone) || "";
@@ -10089,8 +10109,8 @@ function updateNewClientVisibility() {
 }
 
 function clearAccountFields(form) {
-  ["entity", "county", "address", "poc", "title", "phone", "email"].forEach((name) => {
-    form.elements[name].value = "";
+  ["entity", "county", "street", "suite", "city", "state", "zip", "poc", "title", "phone", "email"].forEach((name) => {
+    if (form.elements[name]) form.elements[name].value = "";
   });
   form.elements.clientRanking.value = "Prospecting";
 }
@@ -10121,7 +10141,12 @@ function backfillAccountFromWork(client, values = {}) {
       county: values.county || "",
       action: "N/A",
       client: cleanedClient,
-      address: values.address || "",
+      street: values.street || "",
+      suite: values.suite || "",
+      city: values.city || "",
+      state: values.state || "",
+      zip: values.zip || "",
+      address: buildFullAddress({ street: values.street, suite: values.suite, city: values.city, state: values.state, zip: values.zip }),
       poc: values.poc || "",
       title: values.title || "",
       phone: formatPhoneNumber(values.phone) || "",
@@ -10259,7 +10284,6 @@ function handleProjectSubmit(event) {
     return;
   }
   backfillAccountFromWork(form.get("client"), {
-    address: form.get("address") || "",
     ...accountBackfillPayload(form, ["poc", "title", "phone", "email"]),
   });
   const project = {
@@ -10324,7 +10348,11 @@ function handleProposalSubmit(event) {
     clientRanking: form.get("clientRanking") || "Prospecting",
     entity: form.get("entity") || "",
     county: form.get("county") || "",
-    address: form.get("address") || "",
+    street: form.get("street") || "",
+    suite: form.get("suite") || "",
+    city: form.get("city") || "",
+    state: form.get("state") || "",
+    zip: form.get("zip") || "",
     nextFollowUp: form.get("nextFollowUp") || "",
     ...accountBackfillPayload(form, ["poc", "title", "phone", "email"]),
   });
