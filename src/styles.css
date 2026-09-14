@@ -8263,3 +8263,18 @@ button#gripSyncStatus:hover { opacity: 0.75; }
   color: #dc2626;
 }
 
+/* Graveyard accounts section */
+.graveyard-section { margin-top: 24px; }
+.graveyard-section-header {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--muted, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 6px 0 10px;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  margin: 0 0 12px;
+  grid-column: 1 / -1;
+}
+.rank-graveyard { background: #f3f4f6; color: #374151; }
+

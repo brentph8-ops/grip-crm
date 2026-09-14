@@ -992,6 +992,7 @@ const state = {
   takeoffMode: "builder",
   activeTakeoffEstimateId: "",
   accountMode: "browse",
+  showGraveyardAccounts: false,
   layouts: {
     accounts: "tile",
     projects: "tile",
@@ -1206,6 +1207,11 @@ function isMeaningfulProposal(proposal) {
 
 function cleanAccounts() {
   return data.accounts.filter(isMeaningfulAccount);
+}
+
+function graveyardAccountIds() {
+  const deals = JSON.parse(localStorage.getItem("garlandPipeline") || "[]");
+  return new Set(deals.filter(d => d.stage === "Graveyard").map(d => d.accountId).filter(Boolean));
 }
 
 function cleanProjects() {
@@ -4231,7 +4237,9 @@ function contractorCard(item) {
 }
 
 function renderAccounts() {
-  const records = cleanAccounts().filter((item) => {
+  const gyd = graveyardAccountIds();
+  const allActive = cleanAccounts().filter(a => !gyd.has(a.id));
+  const records = allActive.filter((item) => {
     return (
       includesSearch(item) &&
       dataQualityMatch("account", item) &&
@@ -4253,19 +4261,30 @@ function renderAccounts() {
     state.layouts.accounts === "kanban" ? (item) => item.entity || item.clientRanking : null
   );
   byId("accountsManageList").innerHTML = records.length ? records.map(manageAccountRow).join("") : empty("No accounts match this view.");
+  const gydToggle = document.querySelector("[data-accounts-graveyard]");
+  if (gydToggle) gydToggle.classList.toggle("is-active", state.showGraveyardAccounts);
+  const gydAccounts = cleanAccounts().filter(a => gyd.has(a.id));
+  const gydSection = byId("accountsGraveyardSection");
+  if (gydSection) {
+    gydSection.hidden = !state.showGraveyardAccounts;
+    if (state.showGraveyardAccounts) {
+      gydSection.innerHTML = `<h3 class="graveyard-section-header">⚰ Graveyard (${gydAccounts.length})</h3>` +
+        (gydAccounts.length ? gydAccounts.map(accountCard).join("") : `<p class="empty-state">No accounts in graveyard.</p>`);
+    }
+  }
   const countBar = byId("accountsCountBar");
   if (countBar) {
-    const all = cleanAccounts();
-    const total = all.length;
-    const countA = all.filter(a => normalize(a.clientRanking) === "a").length;
-    const countB = all.filter(a => normalize(a.clientRanking) === "b").length;
-    const countC = all.filter(a => normalize(a.clientRanking) === "c").length;
+    const total = allActive.length;
+    const countA = allActive.filter(a => normalize(a.clientRanking) === "a").length;
+    const countB = allActive.filter(a => normalize(a.clientRanking) === "b").length;
+    const countC = allActive.filter(a => normalize(a.clientRanking) === "c").length;
     const filtered = records.length === total ? "" : `${records.length} of ${total}`;
     countBar.innerHTML = `
       ${filtered ? `<span>${filtered} account${total !== 1 ? "s" : ""}</span>` : `<span>${total} account${total !== 1 ? "s" : ""}</span>`}
       <span class="acct-rank-badge rank-a">A: ${countA}</span>
       <span class="acct-rank-badge rank-b">B: ${countB}</span>
-      <span class="acct-rank-badge rank-c">C: ${countC}</span>`;
+      <span class="acct-rank-badge rank-c">C: ${countC}</span>
+      ${gydAccounts.length ? `<span class="acct-rank-badge rank-graveyard">⚰ ${gydAccounts.length}</span>` : ""}`;
     countBar.hidden = false;
   }
 }
@@ -6981,7 +7000,8 @@ function renderCallList() {
   if (!byId("callListDay")) return;
   const day = state.callListDay || byId("callListDay").value || todayCallDay();
   byId("callListDay").value = day;
-  const accounts = accountsForCallDay(day);
+  const gydIds = graveyardAccountIds();
+  const accounts = accountsForCallDay(day).filter(a => !gydIds.has(a.id));
   const dateLabel = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   byId("callListTitle").textContent = `${day} Calls`;
   byId("callListCount").textContent = `${accounts.length} accounts`;
@@ -12302,6 +12322,7 @@ setTimeout(() => { if (window.gripToday) { setView("today"); window.gripToday.re
       state.filters.entity = "All entities";
       state.filters.county = "All counties";
       state.filters.accountActivity = "All activity";
+      state.showGraveyardAccounts = false;
     } else if (view === "tasks") {
       state.filters.taskDue = "all";
       state.filters.taskAccount = "All accounts";
@@ -12334,6 +12355,11 @@ setTimeout(() => { if (window.gripToday) { setView("today"); window.gripToday.re
     }
     renderFilters();
     render();
+  });
+  document.body.addEventListener("click", function(e) {
+    if (!e.target.closest("[data-accounts-graveyard]")) return;
+    state.showGraveyardAccounts = !state.showGraveyardAccounts;
+    renderAccounts();
   });
 })();
 
