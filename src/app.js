@@ -4255,10 +4255,17 @@ function renderAccounts() {
   byId("accountsManageList").innerHTML = records.length ? records.map(manageAccountRow).join("") : empty("No accounts match this view.");
   const countBar = byId("accountsCountBar");
   if (countBar) {
-    const total = cleanAccounts().length;
-    countBar.textContent = records.length === total
-      ? `${total} account${total !== 1 ? "s" : ""}`
-      : `${records.length} of ${total} account${total !== 1 ? "s" : ""}`;
+    const all = cleanAccounts();
+    const total = all.length;
+    const countA = all.filter(a => normalize(a.clientRanking) === "a").length;
+    const countB = all.filter(a => normalize(a.clientRanking) === "b").length;
+    const countC = all.filter(a => normalize(a.clientRanking) === "c").length;
+    const filtered = records.length === total ? "" : `${records.length} of ${total}`;
+    countBar.innerHTML = `
+      ${filtered ? `<span>${filtered} account${total !== 1 ? "s" : ""}</span>` : `<span>${total} account${total !== 1 ? "s" : ""}</span>`}
+      <span class="acct-rank-badge rank-a">A: ${countA}</span>
+      <span class="acct-rank-badge rank-b">B: ${countB}</span>
+      <span class="acct-rank-badge rank-c">C: ${countC}</span>`;
     countBar.hidden = false;
   }
 }
@@ -10731,6 +10738,12 @@ function bindEvents() {
     const more = event.target.closest("#mobileMoreButton");
     if (more) {
       toggleMobileMoreMenu();
+      return;
+    }
+    const graveyardBtn = event.target.closest("[data-pipeline-graveyard]");
+    if (graveyardBtn) {
+      setView("pipeline");
+      setTimeout(() => { if (window.gripPipeline) window.gripPipeline.openGraveyard(); }, 80);
       return;
     }
     const button = event.target.closest("[data-view]");

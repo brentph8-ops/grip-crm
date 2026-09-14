@@ -445,8 +445,9 @@
     const deals = load();
     const acctMap = {};
     for (const a of accounts()) { acctMap[a.id] = a; }
-    const total = deals.filter(d => d.stage !== "Project Completed" && d.stage !== "Graveyard")
-      .reduce((s, d) => s + (parseFloat(d.amount) || 0), 0);
+    const activeDeals = deals.filter(d => d.stage !== "Project Completed" && d.stage !== "Graveyard");
+    const total = activeDeals.reduce((s, d) => s + (parseFloat(d.amount) || 0), 0);
+    const acctCount = new Set(activeDeals.map(d => d.accountId || d.accountName).filter(Boolean)).size;
 
     el.innerHTML = `
       <div class="pl-page">
@@ -454,6 +455,7 @@
           <div class="pl-topbar-left">
             <h2 class="pl-headline">Pipeline</h2>
             <span class="pl-pipeline-value">${fmtMoney(total)} open</span>
+            <span class="pl-pipeline-value">${acctCount} account${acctCount !== 1 ? "s" : ""}</span>
           </div>
           <div class="pl-topbar-right">
             <div class="pl-tab-group">
@@ -878,7 +880,8 @@
     if (changed) { save(all); _showGraveyard = true; render(); }
   }
 
-  window.gripPipeline = { render, openDealDialog, promoteToBucket, moveDealToGraveyardForAccount, syncAllRanksFromStages };
+  function openGraveyard() { _showGraveyard = true; render(); }
+  window.gripPipeline = { render, openDealDialog, promoteToBucket, moveDealToGraveyardForAccount, syncAllRanksFromStages, openGraveyard };
 
   function initListeners() {
     document.getElementById("plDealForm")?.addEventListener("submit", e => {
