@@ -7626,12 +7626,33 @@ button#gripSyncStatus:hover { opacity: 0.75; }
 
 /* Pin key */
 .map-confidence-key { font-size: 12px; }
-.map-unmapped-section { max-height: 220px; overflow-y: auto; }
+.map-unmapped-section { max-height: 260px; overflow-y: auto; }
 .map-unmapped-row { display: flex; flex-direction: column; padding: 5px 0; border-bottom: 1px solid var(--line, #e2e8f0); font-size: 12px; gap: 2px; }
 .map-unmapped-row:last-child { border-bottom: none; }
 .map-unmapped-name { color: #1e293b; font-weight: 600; font-size: 12px; }
 .map-unmapped-addr { color: #475569; font-size: 10px; }
 .map-unmapped-reason { color: #dc2626; font-size: 10px; font-weight: 600; }
+.map-unmapped-row-top { display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap; }
+.map-unmapped-fix-btn {
+  margin-left: auto; flex-shrink: 0;
+  font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: 4px;
+  border: 1px solid var(--line, #e2e8f0); background: var(--panel, #fff);
+  color: #125fad; cursor: pointer; line-height: 1.6;
+}
+.map-unmapped-fix-btn:hover { background: #eff6ff; }
+.map-unmapped-fix-form { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.map-unmapped-fix-input {
+  font-size: 11px; padding: 4px 6px; border-radius: 5px;
+  border: 1px solid var(--line, #e2e8f0); background: var(--panel, #fff);
+  color: var(--ink); width: 100%; box-sizing: border-box;
+}
+.map-unmapped-fix-go {
+  font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 5px;
+  border: none; background: #125fad; color: #fff; cursor: pointer; align-self: flex-start;
+}
+.map-unmapped-fix-go:hover { background: #0e4d8a; }
+.map-unmapped-fix-go:disabled { opacity: 0.6; cursor: not-allowed; }
+.map-unmapped-fix-status { font-size: 10px; color: #e55353; margin: 0; min-height: 13px; }
 
 .map-conf-row {
   display: flex;

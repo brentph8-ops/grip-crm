@@ -647,7 +647,18 @@
         if (!noAddr.length && !failed.length) return "";
         const rows = [
           ...noAddr.map(a => `<div class="map-unmapped-row"><span class="map-unmapped-name">${esc(a.client)}</span><span class="map-unmapped-reason">No address on file</span></div>`),
-          ...failed.map(a => `<div class="map-unmapped-row"><span class="map-unmapped-name">${esc(a.client)}</span>${a.geocodeAddress ? `<span class="map-unmapped-addr">${esc(a.geocodeAddress)}</span>` : ""}<span class="map-unmapped-reason">Geocode failed — try re-running Geocode All</span></div>`),
+          ...failed.map(a => `<div class="map-unmapped-row map-unmapped-row--failed" data-unmapped-id="${esc(a.id)}">
+            <div class="map-unmapped-row-top">
+              <span class="map-unmapped-name">${esc(a.client)}</span>
+              ${a.geocodeAddress ? `<span class="map-unmapped-addr">${esc(a.geocodeAddress)}</span>` : ""}
+              <button class="map-unmapped-fix-btn" type="button" title="Fix geocode for this account">Fix</button>
+            </div>
+            <div class="map-unmapped-fix-form" hidden>
+              <input class="map-unmapped-fix-input" type="text" value="${esc(a.geocodeAddress || buildGeoQuery(a) || a.client || "")}" placeholder="Enter address or place name…">
+              <button class="map-unmapped-fix-go" type="button">Search</button>
+              <p class="map-unmapped-fix-status"></p>
+            </div>
+          </div>`),
         ];
         return `<div class="map-legend-section map-unmapped-section">
           <h4 class="map-legend-section-title">Not on Map (${rows.length})</h4>
@@ -858,6 +869,42 @@
       sidebar.querySelector("#mapCountyToggle")?.addEventListener("change", async e => {
         _showCounty = e.target.checked;
         await applyCountyLayer();
+      });
+
+      // "Not on Map" fix buttons
+      sidebar.querySelectorAll(".map-unmapped-row--failed").forEach(row => {
+        const fixBtn  = row.querySelector(".map-unmapped-fix-btn");
+        const fixForm = row.querySelector(".map-unmapped-fix-form");
+        const fixInp  = row.querySelector(".map-unmapped-fix-input");
+        const fixGo   = row.querySelector(".map-unmapped-fix-go");
+        const fixStat = row.querySelector(".map-unmapped-fix-status");
+        const id = row.dataset.unmappedId;
+
+        fixBtn?.addEventListener("click", () => {
+          fixForm.hidden = !fixForm.hidden;
+          if (!fixForm.hidden) fixInp?.focus();
+        });
+
+        const doSearch = async () => {
+          const q = fixInp?.value.trim();
+          if (!q) return;
+          fixGo.textContent = "Searching…";
+          fixGo.disabled = true;
+          fixStat.textContent = "";
+          const result = await geocodeAddress(q);
+          if (result) {
+            saveGeoCoord(id, result.lat, result.lng, "manual", q);
+            refreshMarkers();
+            renderSidebar(accounts(), countMapped());
+          } else {
+            fixStat.textContent = "Not found — try a more specific address.";
+            fixGo.textContent = "Search";
+            fixGo.disabled = false;
+          }
+        };
+
+        fixGo?.addEventListener("click", doSearch);
+        fixInp?.addEventListener("keydown", e => { if (e.key === "Enter") doSearch(); });
       });
     }
 
