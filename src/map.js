@@ -223,16 +223,21 @@
     return null;
   }
 
-  async function geocodeAccountById(id, query, approximate = false) {
+  async function geocodeAccountById(id, query, approximate = false, nameFallback = null) {
     if (!id || !query) return false;
-    const result = await geocodeAddress(query);
+    let result = await geocodeAddress(query);
+    let usedQuery = query;
+    // If address lookup failed, try the business name + city/state as a fallback
+    if (!result && nameFallback && nameFallback !== query) {
+      result = await geocodeAddress(nameFallback);
+      if (result) usedQuery = nameFallback;
+    }
     if (!result) {
-      // Save failed marker so pending filter knows this address was tried
       saveGeoCoord(id, null, null, "failed", query);
       return false;
     }
     const confidence = approximate ? "unverified" : result.confidence;
-    saveGeoCoord(id, result.lat, result.lng, confidence, query);
+    saveGeoCoord(id, result.lat, result.lng, confidence, usedQuery);
     if (_map && _markersGroup) refreshMarkers();
     return true;
   }
@@ -248,7 +253,8 @@
       try {
         const q           = buildGeoQuery(a);
         const approximate = !a.address || a.address.trim().length <= 4;
-        await geocodeAccountById(a.id, q, approximate);
+        const nameFallback = [a.client, a.city, a.state].filter(Boolean).join(", ");
+        await geocodeAccountById(a.id, q, approximate, nameFallback);
       } catch (e) {
         console.warn("GRIP geocode error for", a.client, e);
       }
@@ -891,13 +897,24 @@
           fixGo.textContent = "Searching…";
           fixGo.disabled = true;
           fixStat.textContent = "";
-          const result = await geocodeAddress(q);
+          let result = await geocodeAddress(q);
+          let usedQuery = q;
+          if (!result) {
+            // Auto-retry with business name + city/state
+            const acctData = accounts().find(ac => ac.id === id);
+            const nameQ = acctData ? [acctData.client, acctData.city, acctData.state].filter(Boolean).join(", ") : null;
+            if (nameQ && nameQ !== q) {
+              fixStat.textContent = "Trying by business name…";
+              result = await geocodeAddress(nameQ);
+              if (result) usedQuery = nameQ;
+            }
+          }
           if (result) {
-            saveGeoCoord(id, result.lat, result.lng, "manual", q);
+            saveGeoCoord(id, result.lat, result.lng, "manual", usedQuery);
             refreshMarkers();
             renderSidebar(accounts(), countMapped());
           } else {
-            fixStat.textContent = "Not found — try a more specific address.";
+            fixStat.textContent = "Not found — try a more specific address or business name.";
             fixGo.textContent = "Search";
             fixGo.disabled = false;
           }
