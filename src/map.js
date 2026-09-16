@@ -472,6 +472,13 @@
       // the territory portion is overlaid separately below.
       const SPLIT_FIPS = new Set(Object.keys(PARTIAL_TERRITORY_POLYS));
 
+      // Build account-per-county lookup for tooltips
+      const acctsByCounty = {};
+      for (const a of accounts()) {
+        const k = (a.county || "").replace(/ County$/i, "").trim().toLowerCase();
+        if (k) acctsByCounty[k] = (acctsByCounty[k] || 0) + 1;
+      }
+
       _countyLayer = L.geoJSON(geojson, {
         style: (feature) => {
           const id   = String(feature.id || "");
@@ -480,13 +487,24 @@
           const isSplit = SPLIT_FIPS.has(id);
 
           if (isSplit) {
-            // Show full county with dark outline only — territory portion drawn separately
             return { color: "#1a1a2e", weight: 2.5, opacity: 0.75, fillColor: "#1a1a2e", fillOpacity: 0.02 };
           }
           const isTerritory = terr.size > 0 && isTX && terr.has(name);
           return isTerritory
             ? { color: "#7c3aed", weight: 3.5, opacity: 0.9, fillColor: "#7c3aed", fillOpacity: 0.09 }
             : { color: "#1e3a5f", weight: 2,   opacity: 0.6, fillColor: "#3b82f6", fillOpacity: 0.05 };
+        },
+        onEachFeature: (feature, layer) => {
+          const rawName = feature.properties?.name || "";
+          const nameKey = rawName.toLowerCase();
+          if (!rawName) return;
+          const count = acctsByCounty[nameKey] || 0;
+          layer.bindTooltip(
+            count
+              ? `<strong>${rawName} Co.</strong><br>${count} account${count !== 1 ? "s" : ""}`
+              : `<strong>${rawName} Co.</strong>`,
+            { sticky: true, className: "grip-county-tooltip" }
+          );
         },
         attribution: "US Census TIGER",
       });
@@ -586,10 +604,23 @@
     }).length;
 
     const entityCounts = {};
+    const rankingCounts = {};
     for (const a of accts) {
       if (!a.lat || !a.lng) continue;
       if (a.entity) entityCounts[a.entity] = (entityCounts[a.entity] || 0) + 1;
+      const r = a.clientRanking || "Unranked";
+      rankingCounts[r] = (rankingCounts[r] || 0) + 1;
     }
+
+    const RANK_ORDER = ["A", "B", "C", "Meeting", "In Progress", "Prospecting", "Dead End", "Unranked"];
+    const rankingHtml = RANK_ORDER.filter(r => rankingCounts[r]).map(r => {
+      const c = RANKING_COLORS[r] || UNRANKED_COLOR;
+      return `<button class="map-legend-row${_hiddenRankings.has(r) ? " map-legend-row--off" : ""}" data-leg-rank="${esc(r)}" type="button">
+        <span class="map-legend-dot" style="background:${c}"></span>
+        <span class="map-legend-label">${esc(r)}</span>
+        <span class="map-legend-count">${rankingCounts[r]}</span>
+      </button>`;
+    }).join("");
 
     const entityHtml = Object.entries(entityCounts).sort((a, b) => b[1] - a[1]).map(([entity, count]) => {
       const c      = entityColor(entity);
@@ -603,8 +634,13 @@
 
     return `
       <div class="map-sidebar-header">
-        <h2 class="map-sidebar-title">Live Account Map</h2>
-        <p class="map-sidebar-sub">${mapped} of ${total} accounts mapped</p>
+        <div class="map-sidebar-header-row">
+          <div>
+            <h2 class="map-sidebar-title">Live Account Map</h2>
+            <p class="map-sidebar-sub">${mapped} of ${total} accounts mapped</p>
+          </div>
+          ${mapped > 0 ? `<button class="map-fit-btn" id="mapFitBtn" type="button" title="Fit all accounts in view">⊡ Fit</button>` : ""}
+        </div>
       </div>
 
       <div class="map-search-wrap">
@@ -626,6 +662,11 @@
           </button>
         </div>` : ""}
       ${_geocoding ? `<div class="map-geocode-wrap"><p id="mapGeocodeProgress" class="map-geocode-progress">Geocoding…</p></div>` : ""}
+
+      ${rankingHtml ? `<div class="map-legend-section">
+        <h4 class="map-legend-section-title">Status / Ranking</h4>
+        ${rankingHtml}
+      </div>` : ""}
 
       ${entityHtml ? `<div class="map-legend-section">
         <h4 class="map-legend-section-title">Entity Type</h4>
@@ -820,9 +861,29 @@
 
     // Legend tab events
     if (_tab === "legend") {
+      sidebar.querySelector("#mapFitBtn")?.addEventListener("click", () => {
+        try {
+          if (!_map || !_markersGroup) return;
+          const bounds = typeof _markersGroup.getBounds === "function" && _markersGroup.getBounds();
+          if (bounds && bounds.isValid()) _map.fitBounds(bounds, { padding: [30, 30] });
+        } catch (_) {}
+      });
+
       sidebar.querySelector("#mapSearch")?.addEventListener("input", e => {
         _searchQuery = e.target.value;
         refreshMarkers();
+        // Zoom to matching results
+        if (_searchQuery.length > 1 && _map) {
+          const hits = accts.filter(a => isVisible(a) && a.lat && a.lng);
+          if (hits.length === 1) {
+            _map.flyTo([hits[0].lat, hits[0].lng], 14, { duration: 0.8 });
+          } else if (hits.length > 1 && hits.length <= 25) {
+            try {
+              const b = L.latLngBounds(hits.map(a => [parseFloat(a.lat), parseFloat(a.lng)]));
+              if (b.isValid()) _map.fitBounds(b, { padding: [40, 40], maxZoom: 13 });
+            } catch (_) {}
+          }
+        }
       });
       sidebar.querySelectorAll("[data-leg-rank]").forEach(btn => {
         btn.addEventListener("click", () => {
@@ -1122,9 +1183,29 @@
 
   // ── Map init ───────────────────────────────────────────────────────
 
-  function initMap() {
+  async function initMap() {
     const el = document.getElementById("leafletMap");
     if (!el || _map) return;
+
+    // Load Leaflet.markercluster for grouped pins in dense areas
+    if (!window.L?.MarkerClusterGroup) {
+      try {
+        await new Promise((res, rej) => {
+          ["https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.css",
+           "https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"]
+          .forEach(href => {
+            const l = document.createElement("link");
+            l.rel = "stylesheet"; l.href = href;
+            document.head.appendChild(l);
+          });
+          const s = document.createElement("script");
+          s.src = "https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js";
+          s.onload = res;
+          s.onerror = () => { console.warn("GRIP: markercluster failed to load — using plain layer"); res(); };
+          document.head.appendChild(s);
+        });
+      } catch (_) {}
+    }
 
     _map = L.map("leafletMap", { center: MAP_CENTER, zoom: MAP_ZOOM, zoomControl: true });
 
@@ -1133,7 +1214,17 @@
       maxZoom: 19,
     }).addTo(_map);
 
-    _markersGroup = L.layerGroup().addTo(_map);
+    _markersGroup = (window.L?.MarkerClusterGroup
+      ? L.markerClusterGroup({
+          maxClusterRadius: 50,
+          spiderfyOnMaxZoom: true,
+          showCoverageOnHover: false,
+          chunkedLoading: true,
+          disableClusteringAtZoom: 14,
+        })
+      : L.layerGroup()
+    ).addTo(_map);
+
     refreshMarkers();
   }
 
@@ -1190,6 +1281,18 @@
       setTimeout(() => _map.invalidateSize(), 50);
     }
   }
+
+  // Refresh map pins when geocoords arrive from another device
+  const _prevGeoHandler = window._gripHandleRemoteUpdate;
+  window._gripHandleRemoteUpdate = function (key) {
+    if (key === "garlandGeocoords" || key === "garlandCrmData") {
+      if (_map && _markersGroup) {
+        refreshMarkers();
+        renderSidebar(accounts(), countMapped());
+      }
+    }
+    if (typeof _prevGeoHandler === "function") _prevGeoHandler(key);
+  };
 
   window.gripMap = { render, refresh, geocodeAccountById, geocodeAll };
 

@@ -27,6 +27,7 @@
     "garlandOutreach",
     "garlandPipeline",
     "garlandRoofNotes",
+    "garlandGeocoords",   // map geocode cache — syncs pins across devices
   ]);
 
   // ── Helpers ──────────────────────────────────────────────────────
