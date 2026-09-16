@@ -67,6 +67,12 @@
     const client = getClient();
     if (!client) return null;
     try {
+      // getSession() reads from local storage first (no network needed) and refreshes
+      // the token if expired — more reliable on iOS resume than getUser() which always
+      // makes a network request that may fail if the connection isn't ready yet.
+      const { data: sessionData } = await client.auth.getSession();
+      if (sessionData?.session?.user) return sessionData.session.user;
+      // Fallback to network call if no local session
       const { data } = await client.auth.getUser();
       return data?.user || null;
     } catch (_) {
@@ -752,16 +758,19 @@
 
   function startHeartbeat() {
     stopHeartbeat();
-    // Reduced to 5 minutes — realtime broadcasts handle instant updates,
-    // the heartbeat is just a catch-all for missed events.
+    // 30-second heartbeat: catches changes missed by broadcast (offline window,
+    // dropped WebSocket, iOS background) without hammering the API.
     _heartbeatInterval = setInterval(async () => {
       if (!_userSetupDone) return;
       const result = await pullAll();
       if (result === "changed") {
         if (typeof window.gripReloadData === "function") window.gripReloadData();
+        if (typeof window._gripHandleRemoteUpdate === "function") {
+          for (const key of SYNC_KEYS) window._gripHandleRemoteUpdate(key);
+        }
         _gripFullRender();
       }
-    }, 300_000);
+    }, 30_000);
   }
 
   function stopHeartbeat() {
@@ -777,22 +786,57 @@
     }
   });
 
-  // When switching back to this tab/device, pull the latest from Supabase
-  // so changes made on another device (iPad → MacBook, etc.) appear immediately.
-  document.addEventListener("visibilitychange", async () => {
-    if (document.visibilityState !== "visible" || !_userSetupDone) return;
-    // iOS PWA kills the WebSocket when backgrounded — reconnect the live channel first
-    if (_channelStatus !== "SUBSCRIBED") {
-      const u = await getUser();
-      if (u) subscribeToRemoteChanges(u);
-    }
-    const result = await pullAll();
-    if (result === "changed") {
-      if (typeof window.gripReloadData === "function") window.gripReloadData();
-      if (typeof window._gripHandleRemoteUpdate === "function") {
-        for (const key of SYNC_KEYS) window._gripHandleRemoteUpdate(key);
+  // Unified resume handler: runs whenever the app becomes visible again.
+  // iOS PWA kills WebSockets silently — always re-subscribe (don't rely on
+  // _channelStatus which may be stale after background kill) then pull fresh data.
+  // If pullAll fails (network not ready on iOS resume), retry once after 3 s.
+  async function _onResume() {
+    if (!_userSetupDone) return;
+    // Always attempt re-subscribe — iOS may have silently killed the socket
+    // even though _channelStatus still reads "SUBSCRIBED".
+    const u = await getUser();
+    if (u) subscribeToRemoteChanges(u);
+    const applyResult = async (result) => {
+      if (result === "changed") {
+        if (typeof window.gripReloadData === "function") window.gripReloadData();
+        if (typeof window._gripHandleRemoteUpdate === "function") {
+          for (const key of SYNC_KEYS) window._gripHandleRemoteUpdate(key);
+        }
+        _gripFullRender();
       }
-      _gripFullRender();
+    };
+    const result = await pullAll();
+    if (result === false) {
+      // Network may not be ready on iOS resume — retry after 3 s
+      setTimeout(async () => applyResult(await pullAll()), 3000);
+    } else {
+      await applyResult(result);
+    }
+  }
+
+  // visibilitychange: standard cross-browser resume event
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      _lastResumeTime = Date.now();
+      _onResume();
+    }
+  });
+
+  // pageshow: fires on iOS bfcache restore (back-forward navigation, PWA resume)
+  window.addEventListener("pageshow", (e) => {
+    if (e.persisted) {
+      _lastResumeTime = Date.now();
+      _onResume();
+    }
+  });
+
+  // focus: catches cases where visibilitychange doesn't fire (some iOS Safari scenarios)
+  let _lastResumeTime = 0;
+  window.addEventListener("focus", () => {
+    const now = Date.now();
+    if (now - _lastResumeTime > 10_000) {  // debounce: don't double-fire with visibilitychange
+      _lastResumeTime = now;
+      _onResume();
     }
   });
 
