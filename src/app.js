@@ -7120,20 +7120,22 @@ function renderCallList() {
         .map((account) => {
           const key = callCompletionKey(day, account.id);
           const done = state.callLists.completed[key];
-          const phoneLink = account.phone && phoneHref(account.phone)
-            ? `<a class="call-phone-link" href="${phoneHref(account.phone)}" title="Call ${escapeHtml(account.phone)}">${escapeHtml(formatPhoneNumber(account.phone) || account.phone)}</a>`
-            : escapeHtml(account.phone || "");
-          const contactParts = [
-            account.poc ? escapeHtml(account.poc) : null,
-            account.phone ? phoneLink : null,
-            account.email ? escapeHtml(account.email) : null,
-          ].filter(Boolean);
+          const phoneChip = account.phone && phoneHref(account.phone)
+            ? `<a class="call-contact-chip call-contact-chip--phone" href="${phoneHref(account.phone)}">📞 ${escapeHtml(formatPhoneNumber(account.phone) || account.phone)}</a>`
+            : "";
+          const emailChip = account.email
+            ? `<a class="call-contact-chip call-contact-chip--email" href="mailto:${escapeHtml(account.email)}">${escapeHtml(account.email)}</a>`
+            : "";
+          const contactChips = [phoneChip, emailChip].filter(Boolean).join("");
           return `<div class="call-item ${done ? "is-complete" : ""}">
             <input type="checkbox" data-call-account="${account.id}" data-call-day="${day}" ${done ? "checked" : ""} />
-            <button class="call-account-button" data-open-account-dialog="${account.id}" type="button" title="Edit account">
-              <strong>${escapeHtml(account.client)}</strong>
-              <small>${contactParts.join(" • ")}</small>
-            </button>
+            <div class="call-account-info">
+              <button class="call-account-button" data-open-account-dialog="${account.id}" type="button" title="Edit account">
+                <strong>${escapeHtml(account.client)}</strong>
+                ${account.poc ? `<small>${escapeHtml(account.poc)}</small>` : ""}
+              </button>
+              ${contactChips ? `<div class="call-contact-chips">${contactChips}</div>` : ""}
+            </div>
             <button class="call-account-page-btn" data-open-account-page="${escapeHtml(account.id)}" type="button" title="Open account page">↗</button>
             <div class="call-item-calendar">
               ${calendarButtons(callListEvent(account, day), "Add to Calendar")}
@@ -11911,10 +11913,6 @@ function bindEvents() {
     const inlineField = event.target.closest(".editable-field");
     if (inlineField && byId("detailContent")?.contains(inlineField)) {
       beginInlineEdit(inlineField);
-      return;
-    }
-    if (event.target.closest(".call-phone-link")) {
-      event.stopPropagation();
       return;
     }
     const openAccountButton = event.target.closest("[data-open-account-dialog]");

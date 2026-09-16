@@ -1888,14 +1888,72 @@ textarea {
 .call-account-button small {
   color: var(--muted);
 }
-.call-phone-link {
-  color: var(--blue);
-  text-decoration: none;
-  font-weight: 500;
-  pointer-events: all;
+.call-account-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
 }
-.call-phone-link:hover {
-  text-decoration: underline;
+.call-contact-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.call-contact-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  text-decoration: none;
+  border: 1.5px solid transparent;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.call-contact-chip--phone {
+  background: #e8f0fe;
+  border-color: #c5d6fc;
+  color: #1a56db;
+}
+.call-contact-chip--phone:hover {
+  background: #1a56db;
+  border-color: #1a56db;
+  color: #fff;
+}
+.call-contact-chip--email {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #16a34a;
+}
+.call-contact-chip--email:hover {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #fff;
+}
+@media (prefers-color-scheme: dark) {
+  .call-contact-chip--phone {
+    background: #1e3a5f;
+    border-color: #2d5fa8;
+    color: #93c5fd;
+  }
+  .call-contact-chip--phone:hover {
+    background: #2d5fa8;
+    border-color: #2d5fa8;
+    color: #fff;
+  }
+  .call-contact-chip--email {
+    background: #14432a;
+    border-color: #166534;
+    color: #86efac;
+  }
+  .call-contact-chip--email:hover {
+    background: #166534;
+    border-color: #166534;
+    color: #fff;
+  }
 }
 
 .call-account-page-btn {
