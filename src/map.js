@@ -128,20 +128,28 @@
 
   // ── Geocoding ──────────────────────────────────────────────────────
 
-  // Bounding box covering Texas + Louisiana (with margin)
-  // Tight bounding box: SE Texas + Louisiana only — excludes OK, AR, MS, AL
+  // Bounding box covering Texas + Louisiana + immediate neighbors with margin.
+  // Texas spans lat 25.8-36.5, lng -106.6 to -93.5; LA adds up to -88.8.
+  // Previous tight box (28.3-32.0 lat, -97.2 to -88.8 lng) wrongly excluded
+  // Dallas, Austin, San Antonio, Fort Worth, and all of west/north Texas.
   function inTerritoryBounds(lat, lng) {
-    return lat >= 28.3 && lat <= 32.0 && lng >= -97.2 && lng <= -88.8;
+    return lat >= 25.0 && lat <= 37.5 && lng >= -107.5 && lng <= -88.5;
   }
 
-  // Remove any cached coordinates that landed outside TX/LA so they re-geocode
+  // Remove cached entries that are outside bounds (stale from old tight box) or
+  // have null coords from the old bounds-rejection bug so they re-geocode correctly.
   function pruneOutOfBoundsCoords() {
     try {
       const cache = loadGeoCache();
       let changed = false;
       for (const id of Object.keys(cache)) {
-        const { lat, lng } = cache[id];
-        if (lat && lng && !inTerritoryBounds(lat, lng)) {
+        const { lat, lng, geocodeConfidence } = cache[id];
+        const hasCoords = lat && lng;
+        const outsideBounds = hasCoords && !inTerritoryBounds(parseFloat(lat), parseFloat(lng));
+        // Also clear "failed" entries that have an address — they can now be retried
+        // with the expanded bounds. Entries without any geocodeAddress are left alone.
+        const staleFailed = geocodeConfidence === "failed" && cache[id].geocodeAddress;
+        if (outsideBounds || staleFailed) {
           delete cache[id];
           changed = true;
         }
@@ -195,7 +203,8 @@
       if (!match) return null;
       const lat = parseFloat(match.coordinates.y);
       const lng = parseFloat(match.coordinates.x);
-      if (inTerritoryBounds(lat, lng)) return { lat, lng, confidence: "verified" };
+      // Census geocoder is US-only and matches the exact address — trust any result
+      if (!isNaN(lat) && !isNaN(lng)) return { lat, lng, confidence: "verified" };
     } catch (_) {}
     return null;
   }
@@ -245,14 +254,16 @@
   async function geocodeAll(progressCallback) {
     const pending = accounts().filter(a => {
       const q = buildGeoQuery(a);
-      return q && (!a.lat || !a.lng || a.geocodeAddress !== q);
+      // Include: no coords yet, address changed, OR previously failed (retry with fixed bounds)
+      return q && (!a.lat || !a.lng || a.geocodeAddress !== q || a.geocodeConfidence === "failed");
     });
     let done = 0;
     for (const a of pending) {
       if (!_geocoding) break;
       try {
         const q           = buildGeoQuery(a);
-        const approximate = !a.address || a.address.trim().length <= 4;
+        const hasAddress  = (a.street || a.city || (a.address || "").trim().length > 4);
+        const approximate = !hasAddress;
         const nameFallback = [a.client, a.city, a.state].filter(Boolean).join(", ");
         await geocodeAccountById(a.id, q, approximate, nameFallback);
       } catch (e) {
@@ -970,12 +981,23 @@
               if (result) usedQuery = nameQ;
             }
           }
+          if (!result) {
+            // Last attempt: try the Census geocoder directly with the raw query
+            // (geocodeAddress already does this, but census skips short/non-address strings)
+            const acctData = accounts().find(ac => ac.id === id);
+            const clientOnly = acctData?.client;
+            if (clientOnly && clientOnly !== q) {
+              fixStat.textContent = "Trying business name only…";
+              result = await geocodeAddress(clientOnly);
+              if (result) usedQuery = clientOnly;
+            }
+          }
           if (result) {
             saveGeoCoord(id, result.lat, result.lng, "manual", usedQuery);
             refreshMarkers();
             renderSidebar(accounts(), countMapped());
           } else {
-            fixStat.textContent = "Not found — try a more specific address or business name.";
+            fixStat.textContent = "Not found — try adding the city and state (e.g. \"City Hall, Dallas, TX\").";
             fixGo.textContent = "Search";
             fixGo.disabled = false;
           }
