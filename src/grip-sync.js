@@ -158,11 +158,11 @@
       let anyChanged = false;
       for (const row of data) {
         if (row.data_key === SESSION_CLAIM_KEY) continue;
-        // Only overwrite local data if the server version is newer than our last push.
-        // This prevents stale server data from wiping recent local changes.
-        const serverUpdatedAt = row.updated_at ? new Date(row.updated_at).getTime() : 0;
+        // Skip only if WE pushed this key in the last 30 seconds — protects in-flight
+        // local writes from being overwritten before they reach the server.
+        // Avoids comparing local-device time to Supabase server time (clock-skew safe).
         const ourLastPush = localPushTs[row.data_key] || 0;
-        if (ourLastPush > 0 && serverUpdatedAt <= ourLastPush) continue;
+        if (ourLastPush > 0 && (Date.now() - ourLastPush) < 30_000) continue;
         let incoming = row.data_value;
         // Preserve this device's active Gmail token.
         if (row.data_key === "garlandOutreach" && incoming && typeof incoming === "object") {
@@ -462,6 +462,12 @@
         } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
           console.warn("GRIP realtime channel error:", status);
           updateSyncIndicator("error");
+          // Auto-reconnect after 5 seconds so live sync resumes
+          setTimeout(async () => {
+            if (!_userSetupDone) return;
+            const u = await getUser();
+            if (u) subscribeToRemoteChanges(u);
+          }, 5000);
         }
       });
   }
@@ -762,6 +768,11 @@
   // so changes made on another device (iPad → MacBook, etc.) appear immediately.
   document.addEventListener("visibilitychange", async () => {
     if (document.visibilityState !== "visible" || !_userSetupDone) return;
+    // iOS PWA kills the WebSocket when backgrounded — reconnect the live channel first
+    if (_channelStatus !== "SUBSCRIBED") {
+      const u = await getUser();
+      if (u) subscribeToRemoteChanges(u);
+    }
     const result = await pullAll();
     if (result === "changed") {
       if (typeof window.gripReloadData === "function") window.gripReloadData();
