@@ -9551,19 +9551,34 @@ function showContractorDetail(name, editMode = false) {
 }
 
 function contractorProposalRequestSection(contractorName, proposals) {
+  const key = normalize(contractorName);
   return `<section class="detail-section">
     <h4>Proposal Requests</h4>
     <div class="stack-list">
       ${
         proposals.length
           ? proposals
-              .map(
-                (proposal) => `<div class="stack-item">
+              .map((proposal) => {
+                const bidReceived = splitContractors(proposal.bidsReceived).some(n => normalize(n) === key);
+                const awarded     = normalize(proposal.awardedContractor) === key;
+                const stage       = proposal.stage || "";
+                const bidChip = awarded
+                  ? `<span class="prop-req-badge prop-req-badge--awarded">Awarded ✓</span>`
+                  : bidReceived
+                    ? `<span class="prop-req-badge prop-req-badge--received">Bid Received</span>`
+                    : stage.toLowerCase().includes("requested") || stage.toLowerCase().includes("sent")
+                      ? `<span class="prop-req-badge prop-req-badge--pending">Bid Pending</span>`
+                      : "";
+                const stageChip = stage
+                  ? `<span class="pill ${rankClass(stage)}" style="font-size:0.72rem">${escapeHtml(stage)}</span>`
+                  : "";
+                return `<div class="stack-item">
                   <strong>${escapeHtml(proposal.project || proposal.client || "Proposal")}</strong>
                   <p>${escapeHtml([proposal.client, proposal.bidDueDate ? `Due ${compactDate(proposal.bidDueDate)}` : ""].filter(Boolean).join(" • "))}</p>
+                  ${stageChip || bidChip ? `<div class="prop-req-status">${stageChip}${bidChip}</div>` : ""}
                   ${proposalRequestButton(proposal, contractorName)}
-                </div>`
-              )
+                </div>`;
+              })
               .join("")
           : `<p class="empty-state">No proposal opportunities tied to this contractor yet.</p>`
       }
