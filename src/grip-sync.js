@@ -27,7 +27,10 @@
     "garlandOutreach",
     "garlandPipeline",
     "garlandRoofNotes",
-    "garlandGeocoords",   // map geocode cache — syncs pins across devices
+    "garlandGeocoords",          // map geocode cache — syncs pins across devices
+    "garlandCrmNotes",           // account notes (was missing — notes never synced)
+    "garlandPriceBooks",         // price books
+    "garlandPriceBookProducts",  // price book line items
   ]);
 
   // ── Helpers ──────────────────────────────────────────────────────
@@ -362,9 +365,18 @@
     pullAll().then((result) => {
       if (result === "changed") {
         if (typeof window.gripReloadData === "function") window.gripReloadData();
-        if (typeof window.render === "function") window.render();
+        _gripFullRender();
       }
     });
+  }
+
+  // ── Full render (main app + modular views) ───────────────────────
+  // Called only on remote sync events — Today and Pipeline read directly
+  // from localStorage so they need their own render() on remote update.
+  function _gripFullRender() {
+    if (typeof window.render === "function") window.render();
+    if (typeof window.gripToday?.render === "function") window.gripToday.render();
+    if (typeof window.gripPipeline?.render === "function") window.gripPipeline.render();
   }
 
   // ── Real-time subscription ───────────────────────────────────────
@@ -403,7 +415,7 @@
     if (typeof window._gripHandleRemoteUpdate === "function") {
       window._gripHandleRemoteUpdate(key);
     }
-    if (typeof window.render === "function") window.render();
+    _gripFullRender();
     updateSyncIndicator("saved");
   }
 
@@ -544,7 +556,7 @@
       if (typeof window._gripHandleRemoteUpdate === "function") {
         for (const key of SYNC_KEYS) window._gripHandleRemoteUpdate(key);
       }
-      if (typeof window.render === "function") window.render();
+      _gripFullRender();
     }
     updateSyncIndicator("saved");
     startHeartbeat();
@@ -706,7 +718,7 @@
           if (typeof window._gripHandleRemoteUpdate === "function") {
             for (const key of SYNC_KEYS) window._gripHandleRemoteUpdate(key);
           }
-          if (typeof window.render === "function") window.render();
+          _gripFullRender();
         }
         updateSyncIndicator("saved");
       } else {
@@ -747,7 +759,7 @@
       const result = await pullAll();
       if (result === "changed") {
         if (typeof window.gripReloadData === "function") window.gripReloadData();
-        if (typeof window.render === "function") window.render();
+        _gripFullRender();
       }
     }, 300_000);
   }
@@ -780,7 +792,7 @@
       if (typeof window._gripHandleRemoteUpdate === "function") {
         for (const key of SYNC_KEYS) window._gripHandleRemoteUpdate(key);
       }
-      if (typeof window.render === "function") window.render();
+      _gripFullRender();
     }
   });
 

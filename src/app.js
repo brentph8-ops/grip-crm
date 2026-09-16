@@ -7120,11 +7120,19 @@ function renderCallList() {
         .map((account) => {
           const key = callCompletionKey(day, account.id);
           const done = state.callLists.completed[key];
+          const phoneLink = account.phone && phoneHref(account.phone)
+            ? `<a class="call-phone-link" href="${phoneHref(account.phone)}" title="Call ${escapeHtml(account.phone)}">${escapeHtml(formatPhoneNumber(account.phone) || account.phone)}</a>`
+            : escapeHtml(account.phone || "");
+          const contactParts = [
+            account.poc ? escapeHtml(account.poc) : null,
+            account.phone ? phoneLink : null,
+            account.email ? escapeHtml(account.email) : null,
+          ].filter(Boolean);
           return `<div class="call-item ${done ? "is-complete" : ""}">
             <input type="checkbox" data-call-account="${account.id}" data-call-day="${day}" ${done ? "checked" : ""} />
             <button class="call-account-button" data-open-account-dialog="${account.id}" type="button" title="Edit account">
               <strong>${escapeHtml(account.client)}</strong>
-              <small>${escapeHtml([account.poc, account.phone, account.email].filter(Boolean).join(" • "))}</small>
+              <small>${contactParts.join(" • ")}</small>
             </button>
             <button class="call-account-page-btn" data-open-account-page="${escapeHtml(account.id)}" type="button" title="Open account page">↗</button>
             <div class="call-item-calendar">
@@ -11905,6 +11913,10 @@ function bindEvents() {
       beginInlineEdit(inlineField);
       return;
     }
+    if (event.target.closest(".call-phone-link")) {
+      event.stopPropagation();
+      return;
+    }
     const openAccountButton = event.target.closest("[data-open-account-dialog]");
     if (openAccountButton) {
       openAccountDialog(openAccountButton.dataset.openAccountDialog);
@@ -12356,7 +12368,7 @@ window.gripReloadData = function () {
   const freshTS = readStorageJson("garlandTerritorySettings", {});
   Object.assign(territorySettings, freshTS);
 
-  state.notes               = readStorageJson("garlandAccountActivities",      {});
+  state.notes               = readStorageJson("garlandCrmNotes",               {});
   state.activities          = readStorageJson("garlandAccountActivities",      {});
   state.attachments         = readStorageJson("garlandProposalAttachments",    {});
   state.projectChecklists   = readStorageJson("garlandProjectChecklists",      {});
@@ -12367,6 +12379,8 @@ window.gripReloadData = function () {
   state.callLists           = readStorageJson("garlandCallLists",              { rules: [], completed: {} });
   state.tasks               = readStorageJson("garlandTasks",                  []);
   state.punchLists          = readStorageJson("garlandPunchLists",             []);
+  state.priceBooks          = readStorageJson("garlandPriceBooks",             []);
+  state.priceBookProducts   = readStorageJson("garlandPriceBookProducts",      []);
 };
 
 // Start on Today dashboard

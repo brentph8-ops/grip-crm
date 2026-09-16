@@ -1888,6 +1888,15 @@ textarea {
 .call-account-button small {
   color: var(--muted);
 }
+.call-phone-link {
+  color: var(--blue);
+  text-decoration: none;
+  font-weight: 500;
+  pointer-events: all;
+}
+.call-phone-link:hover {
+  text-decoration: underline;
+}
 
 .call-account-page-btn {
   border: 1px solid var(--border);
