@@ -217,13 +217,9 @@
           _origSetItem(OUTBOX_KEY, JSON.stringify(latest));
         }
         if (latest[key]?.changes && queued.changes) {
-          const savedRecords = recordMap(key, parsed);
-          for (const id of Object.keys(queued.changes)) {
-            const edit = latest[key].changes[id];
-            if (!edit) continue;
-            edit.before = savedRecords[id];
-            if (sameValue(edit.before, edit.after)) delete latest[key].changes[id];
-          }
+          // Recompute from the acknowledged local snapshot, including an edit
+          // reverted while its earlier value was still uploading.
+          latest[key].changes = trackRecordChanges(key, raw, localStorage.getItem(key));
           _origSetItem(OUTBOX_KEY, JSON.stringify(latest));
         }
         setLocalPushTimestamp(key);
