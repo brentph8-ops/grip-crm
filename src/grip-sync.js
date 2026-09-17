@@ -130,7 +130,14 @@
     }
     return records;
   }
-  function sameValue(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+  function sameValue(a, b) {
+    if (a === b) return true;
+    if (a === null || b === null || typeof a !== "object" || typeof b !== "object") return false;
+    if (Array.isArray(a) !== Array.isArray(b)) return false;
+    const keys = Object.keys(a);
+    return keys.length === Object.keys(b).length && keys.every(key =>
+      Object.prototype.hasOwnProperty.call(b, key) && sameValue(a[key], b[key]));
+  }
   function trackRecordChanges(key, previous, next, changes = {}) {
     if (!["garlandCallLists", "garlandAccountActivities"].includes(key)) return null;
     const before = recordMap(key, JSON.parse(previous || "{}"));
@@ -184,7 +191,7 @@
         if (remote && queued.changes && Object.keys(queued.changes).length) {
           parsed = mergeRecordChanges(key, remote.data_value, queued.changes);
         }
-        const same = remote && JSON.stringify(remote.data_value) === JSON.stringify(parsed);
+        const same = remote && sameValue(remote.data_value, parsed);
         const known = readMeta(VERSION_KEY)[key];
         if (remote && !same && !Object.keys(queued.changes || {}).length && known !== remote.updated_at) {
           syncProblem = "conflict";

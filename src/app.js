@@ -616,6 +616,12 @@ const productNumberDetails = {
 
 mappedProductNumbers.forEach((item) => Object.assign(item, productNumberDetails[item.number] || {}));
 
+// Expose documented package variants without guessing a similar product name.
+Object.entries(productNumberDetails).forEach(([number, detail]) => {
+  if (!detail.application || !detail.size || detail.size === "Verify") return;
+  mappedProductNumbers.push({match: `${detail.application} (${detail.size}) [${number}]`, number, source: "2026 Coatings", ...detail});
+});
+
 const productChoiceVariants = {
   optimax: ["OptiMax", "OptiMax FR Mineral"],
   stressply: ["StressPly", "StressPly FR Mineral"],
@@ -633,13 +639,9 @@ const productChoiceVariants = {
 };
 
 const standardCoverageSpecLanguage = [
-  "Apply all materials in strict accordance with manufacturer published technical data sheets. Coverage rates shall be as follows unless otherwise required by substrate conditions:",
-  "- Primers: 0.5-1.0 gal./sq.",
-  "- Adhesives: 1.5-2.0 gal./sq.",
-  "- Coating systems: 3.0-4.0 gal./sq. total",
-  "- Mastics: 2-3 gal./sq. or thickness-based application",
-  "- Flood coats (coal tar): 4.0-8.0 gal./sq. depending on condition",
-  "- Garland intentionally varies coverage based on substrate absorption; confirm final rates with current technical data and Garland representative when required.",
+  "Apply materials according to the current manufacturer technical data and approved project specification.",
+  "Select coverage separately for each product, substrate, coat, and application; generic rates do not establish warranty compliance.",
+  "Confirm required wet/dry film thickness, reinforcement, detail work, and package yield before ordering.",
 ].join("\n");
 
 const localStorageLargeFileLimit = 1500000;
@@ -4520,8 +4522,12 @@ function takeoffAdjustedArea() {
 }
 
 function parseGalPerSquare(text) {
-  const matches = [...String(text || "").matchAll(/(\d+(?:\.\d+)?)(?:\s*-\s*(\d+(?:\.\d+)?))?\s*gal\.?\/sq\.?/gi)];
-  return matches.reduce((sum, match) => sum + Number(match[2] || match[1] || 0), 0);
+  const values = [...String(text || "").matchAll(/(\d+(?:\.\d+)?(?:\/\d+)?)(?:\s*-\s*(\d+(?:\.\d+)?))?\s*gal\.?\s*\/\s*(?:100\s*sq\.?\s*ft\.?|sq\.?(?!\s*ft))/gi)];
+  // Multiple applications must be selected explicitly, never added together.
+  if (values.length !== 1) return 0;
+  const value = values[0][2] || values[0][1];
+  const parts = value.split("/").map(Number);
+  return parts.length === 2 ? parts[0] / parts[1] : parts[0];
 }
 
 function estimateGalPerSquare(text) {
@@ -4557,7 +4563,7 @@ function selectedTakeoffPricingYear() {
 }
 
 function availablePricingYears() {
-  return [...new Set([String(today.getFullYear()), ...state.priceBooks.map((book) => String(book.year || "")).filter(Boolean), ...state.priceBookProducts.map((item) => String(item.year || "")).filter(Boolean)])].sort((a, b) => Number(b) - Number(a));
+  return [...new Set([String(today.getFullYear()), ...state.takeoffEstimates.map((item) => String(item.pricingYear || "")).filter(Boolean), ...mappedProductNumbers.map((item) => String(item.source || "").match(/20\d{2}/)?.[0]).filter(Boolean), ...state.priceBooks.map((book) => String(book.year || "")).filter(Boolean), ...state.priceBookProducts.map((item) => String(item.year || "")).filter(Boolean)])].sort((a, b) => Number(b) - Number(a));
 }
 
 function matchingPriceBooks(program = selectedTakeoffPricingType(), year = selectedTakeoffPricingYear()) {
@@ -4590,15 +4596,7 @@ function expandProductChoices(values) {
 
 function bestMappedProduct(value) {
   const product = normalize(value);
-  if (!product || product === "not applicable") return null;
-  const exact = mappedProductNumbers.find((item) => product === normalize(item.match));
-  if (exact) return exact;
-  const contains = mappedProductNumbers.find((item) => product.includes(normalize(item.match)));
-  if (contains) return contains;
-  const candidates = mappedProductNumbers
-    .filter((item) => normalize(item.match).startsWith(product) || firstWordsMatch(product, normalize(item.match)))
-    .sort((a, b) => normalize(a.match).length - normalize(b.match).length);
-  return candidates[0] || null;
+  return mappedProductNumbers.find((item) => product === normalize(item.match) || product === normalize(item.number)) || null;
 }
 
 function firstWordsMatch(value, candidate) {
@@ -4635,38 +4633,20 @@ function escapeRegExp(value) {
 }
 
 function parsePriceBookProducts(text, { year, program, type, sourceName }) {
-  const normalizedText = String(text || "").replace(/\r/g, "\n");
-  const productNumbers = [...new Set(mappedProductNumbers.map((item) => item.number).concat(Object.keys(productNumberDetails)))].filter(Boolean);
-  return productNumbers
-    .map((number) => {
-      const pattern = new RegExp(`${escapeRegExp(number)}\\s+\\$([\\d,]+\\.\\d{2})(\\d{1,3})([\\s\\S]{0,220})`, "i");
-      const match = normalizedText.match(pattern);
-      if (!match) return null;
-      const before = normalizedText.slice(Math.max(0, match.index - 280), match.index);
-      const coop = [...before.matchAll(/\$([\d,]+\.\d{2})/g)].pop()?.[1] || "";
-      const after = match[3] || "";
-      const size = after.match(/(5\s*GL\s*PAIL|4\.5\s*GL\s*PAIL|3\.5\s*GL\s*PAIL|3\s*GL\s*PAIL|2\s*GL\s*PAIL|50\s*GAL\s*DRUM|55\s*GAL\s*DRM|55\s*GAL\s*DRUM|100#\s*KEG|50#\s*KEG|EACH|BOX KIT|CS\/[^\n]+)/i)?.[1] || productNumberDetails[number]?.size || "";
-      const coverageRaw = after
-        .replace(size, "")
-        .replace(/\n+/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
-      const coverage = coverageRaw || productNumberDetails[number]?.coverage || "";
-      return {
-        number,
-        year: String(year),
-        program,
-        type,
-        sourceName,
-        seriesPrice: Number(match[1].replace(/,/g, "")),
-        coopPrice: coop ? Number(coop.replace(/,/g, "")) : undefined,
-        perPallet: match[2] || productNumberDetails[number]?.perPallet || "Verify",
-        coverage,
-        size,
-        uploadedAt: new Date().toISOString(),
-      };
-    })
-    .filter(Boolean);
+  const known = [...new Set(mappedProductNumbers.map((item) => item.number))];
+  const candidates = [];
+  for (const line of String(text || "").split(/\r?\n/)) {
+    // Read only a complete visual row. Ambiguous multi-price rows require review.
+    const numbers = known.filter((number) => new RegExp(`(^|\\s)${escapeRegExp(number)}(?=\\s|$)`, "i").test(line));
+    const prices = [...line.matchAll(/\$\s*([\d,]+\.\d{2})(?!\d)/g)];
+    if (numbers.length !== 1 || prices.length !== 1) continue;
+    const price = Number(prices[0][1].replace(/,/g, ""));
+    if (!(price > 0)) continue;
+    candidates.push({number:numbers[0], year:String(year), program, type, sourceName,
+      ...(program === "Co-op Pricing" ? {coopPrice:price} : {seriesPrice:price}),
+      parserVersion:2, sourceRow:line.trim(), uploadedAt:new Date().toISOString()});
+  }
+  return candidates.filter((item) => candidates.filter((other) => other.number === item.number).length === 1);
 }
 
 async function extractPdfText(file) {
@@ -4678,7 +4658,15 @@ async function extractPdfText(file) {
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
     const page = await pdf.getPage(pageNumber);
     const content = await page.getTextContent();
-    pages.push(content.items.map((item) => item.str).join("\n"));
+    const rows = [];
+    for (const item of content.items) {
+      if (!item.str || !item.transform) continue;
+      const y = item.transform[5];
+      let row = rows.find((entry) => Math.abs(entry.y - y) < 2);
+      if (!row) { row = { y, items: [] }; rows.push(row); }
+      row.items.push({ x: item.transform[4], text: item.str });
+    }
+    pages.push(rows.sort((a, b) => b.y - a.y).map((row) => row.items.sort((a, b) => a.x - b.x).map((item) => item.text).join(" ")).join("\n"));
   }
   return pages.join("\n");
 }
@@ -4716,7 +4704,7 @@ function priceBookProductData(mapped) {
     String(item.year || "") === String(year) &&
     (item.program || "Series Pricing") === program
   );
-  return uploaded ? { ...mapped, ...uploaded, source: `${uploaded.year} uploaded price book` } : mapped;
+  return uploaded ? { ...mapped, ...(uploaded.parserVersion === 2 ? uploaded : {year:uploaded.year}), seriesPrice: uploaded.parserVersion === 2 ? uploaded.seriesPrice : undefined, coopPrice: uploaded.parserVersion === 2 ? uploaded.coopPrice : undefined, source: `${uploaded.year} uploaded price book` } : mapped;
 }
 
 function selectedSystemLayerProductData() {
@@ -4780,7 +4768,7 @@ function productMilNote(value) {
 
 function productCoverageSqft(value) {
   const coverage = mappedProductData(value)?.coverage || "";
-  const match = String(coverage).match(/([\d,]+(?:\.\d+)?)\s*sq\.?\s*ft/i);
+  const match = String(coverage).match(/([\d,]+(?:\.\d+)?)\s*sq\.?\s*ft\.?\s*\/\s*roll/i);
   return match ? Number(match[1].replace(/,/g, "")) : 0;
 }
 
@@ -4788,8 +4776,9 @@ function productUnitPrice(value) {
   const mapped = mappedProductData(value);
   if (!mapped) return 0;
   const selectedYear = selectedTakeoffPricingYear();
-  if (!mapped.year && selectedYear !== String(today.getFullYear()) && !String(mapped.source || "").includes(selectedYear)) return 0;
-  return normalize(selectedTakeoffPricingType()).includes("co op") ? Number(mapped.coopPrice || mapped.seriesPrice || 0) : Number(mapped.seriesPrice || mapped.coopPrice || 0);
+  const sourceYear = String(mapped.year || String(mapped.source || "").match(/\b20\d{2}\b/)?.[0] || "");
+  if (sourceYear !== selectedYear) return 0;
+  return normalize(selectedTakeoffPricingType()).includes("co op") ? Number(mapped.coopPrice || 0) : Number(mapped.seriesPrice || 0);
 }
 
 function takeoffQuantityNumber(qty) {
@@ -4829,38 +4818,55 @@ function takeoffProductOptions() {
 function takeoffRow(material, basis, qty, unit, note = "", priceQty = "") {
   const productNote = productNumberNote(material);
   const unitPrice = productUnitPrice(material);
-  const lineTotal = takeoffLinePrice(material, priceQty || qty);
-  return `<tr data-line-total="${lineTotal.toFixed(2)}">
+  const quantity = priceQty === "" ? (/^(rolls?|units?|pails?|drums?|kegs?|each)$/i.test(unit) ? takeoffQuantityNumber(qty) : 0) : Number(priceQty);
+  const lineTotal = unitPrice > 0 && quantity > 0 ? unitPrice * quantity : 0;
+  const issue = !unitPrice ? "Missing price for selected year/program" : !(quantity > 0) ? "Verify purchase quantity/unit" : "";
+  return `<tr data-line-total="${lineTotal.toFixed(2)}" data-needs-review="${issue ? "yes" : "no"}">
     <td>${escapeHtml(productNumber(material))}</td>
     <td>${escapeHtml(material)}</td>
-    <td>${escapeHtml(productCoverageRate(material, basis))}</td>
+    <td>${escapeHtml(basis || productCoverageRate(material))}</td>
     <td>${escapeHtml(productPalletCount(material))}</td>
     <td>${escapeHtml(qty)}</td>
     <td>${escapeHtml(unit)}</td>
     <td>${takeoffMoney(unitPrice)}</td>
     <td>${takeoffMoney(lineTotal)}</td>
-    <td>${note}${productNote}</td>
+    <td>${issue ? `<strong>${escapeHtml(issue)}.</strong> ` : ""}${note}${productNote}</td>
   </tr>`;
 }
 
 function takeoffGallons(name, gallonsPerSq, area, note) {
   const gallons = (area / 100) * gallonsPerSq;
-  const pails = Math.ceil(gallons / 5);
-  return takeoffRow(name, `${gallonsPerSq} gal./sq.`, `${Math.ceil(gallons)} gal.`, `${pails} five-gal pails`, note, pails);
+  const size = mappedProductData(name)?.size || "";
+  const match = size.match(/(\d+(?:\.\d+)?)\s*(?:gal\.?|gl)\s*(pail|drum|drm)/i);
+  const packageSize = match ? Number(match[1]) : 0;
+  const count = packageSize > 0 ? Math.ceil(gallons / packageSize) : 0;
+  return takeoffRow(name, `${gallonsPerSq} gal./100 sq. ft.`, `${Math.ceil(gallons)} gal.`, count ? `${count} × ${size}` : "Verify package size", note, count);
 }
 
 function takeoffPounds(name, poundsPerSq, area, note) {
   const pounds = (area / 100) * poundsPerSq;
-  const kegs = Math.ceil(pounds / 100);
-  return takeoffRow(name, `${poundsPerSq} lb./sq.`, `${Math.ceil(pounds)} lb.`, `${kegs} 100-lb kegs`, note, kegs);
+  const size = mappedProductData(name)?.size || "";
+  const match = size.match(/(\d+(?:\.\d+)?)\s*(?:lb\.?|#)\s*keg/i);
+  const count = match && Number(match[1]) > 0 ? Math.ceil(pounds / Number(match[1])) : 0;
+  return takeoffRow(name, `${poundsPerSq} lb./100 sq. ft.`, `${Math.ceil(pounds)} lb.`, count ? `${count} × ${size}` : "Verify package size", note, count);
 }
 
 function takeoffRollGood(name, area, note = "") {
   if (!name || name === "Not applicable") return "";
-  const coverage = productCoverageSqft(name) || 100;
-  const rolls = Math.ceil(area / coverage);
-  const basis = productCoverageSqft(name) ? productCoverageRate(name) : "Assumption: 100 sq. ft. per roll";
-  return takeoffRow(name, basis, `${rolls} rolls`, "Rolls", `${note} ${takeoffRef(name)}`);
+  const coverage = productCoverageSqft(name);
+  const rolls = coverage > 0 ? Math.ceil(area / coverage) : 0;
+  return takeoffRow(name, coverage ? `${coverage} sq. ft./roll` : "Missing roll yield", rolls ? `${rolls} rolls` : "Verify", "Rolls", `${note} ${takeoffRef(name)}`, rolls);
+}
+
+function restorationComponents(system) {
+  const name = String(system.product || "").replace(/ - (?:Partially Reinforced|Fully Reinforced|Not Fabric Reinforced)$| over Metal$/i, "");
+  const description = String(system.description || "");
+  if (system.product === "Cool-Sil Gravel-Surfaced Roof Restoration") return [{name:"Cool-Sil Eliminator (5 gal. pail) [21100-G]",rate:8,coat:"Eliminator"},{name:"Cool-Sil",rate:2,coat:"Top coat"}];
+  const base = description.match(/([\d.]+)\s*gal\.\/sq\.\s*base coat/i);
+  const top = description.match(/([\d.]+)\s*gal\.\/sq\.\s*top coat/i);
+  if (base && top) return [{name:name === "White-Knight Plus" ? "White-Knight Plus base coat" : name,rate:Number(base[1]),coat:"Base coat"},{name,rate:Number(top[1]),coat:"Top coat"}];
+  const rate = estimateGalPerSquare(description);
+  return rate ? [{name,rate,coat:"Field application"}] : [];
 }
 
 function takeoffEstimatorRows() {
@@ -4870,11 +4876,12 @@ function takeoffEstimatorRows() {
   const rows = [];
   if (!area) return [takeoffRow("Enter roof area", "Square footage required", "-", "-", "Choose a project or enter square footage to calculate.")];
 
-  const descriptionRate = estimateGalPerSquare(system.description);
-  if (descriptionRate) {
-    rows.push(takeoffGallons(product, descriptionRate, area, `Rate pulled from the Garland restoration/warranty chart note: ${escapeHtml(system.description || "")}`));
-    if (normalize(system.description).includes("fabric")) rows.push(takeoffRow("Grip Polyester reinforcement", "Fabric-reinforced system", `${Math.ceil(area / 100)} roof squares`, "Verify roll count", takeoffRef("Grip Polyester")));
-  }
+  restorationComponents(system).forEach((component) => {
+    rows.push(takeoffGallons(component.name, component.rate, area, `${escapeHtml(component.coat)}. Built-in system rate; confirm against current project specification.`));
+  });
+  if (/fabric|reinforced|laps|seams/i.test(system.description || "")) rows.push(takeoffRow("Reinforcement / seam and flashing details", "Measure detail area and select reinforcement SKU", "Verify", "Verify", "Field coating quantities exclude unmeasured details and reinforcement. Add the required materials separately."));
+
+  if (/with gravel|plus gravel/i.test(system.description || "")) rows.push(takeoffRow("Restoration aggregate", "Confirm aggregate requirement and supplier units", "Verify", "Verify", "Gravel is not included in the coating quantity or price."));
 
   const capSheet = byId("takeoffCapSheetInput")?.value || "";
   const baseSheet = byId("takeoffBaseSheetInput")?.value || "";
@@ -4894,7 +4901,7 @@ function takeoffEstimatorRows() {
       rows.push(takeoffPounds(adhesive, 25, area, "HPR All-Temp Asphalt membrane/interply rate from 2026 coatings price book. Flood coat rates should be handled under surfacing."));
       return;
     }
-    const rate = adhesiveName.includes("green lock") ? 2.5 : 0;
+    const rate = ["green lock plus", "green lock plus membrane adhesive"].includes(adhesiveName) ? 2.5 : 0;
     if (rate) rows.push(takeoffGallons(adhesive, rate, area, "Green-Lock Plus Membrane Adhesive field/interply rate uses high side of 2-2.5 gal./sq.; flashing adhesive is intentionally not used here."));
     else rows.push(takeoffRow(adhesive, "Application-specific", "Verify", "Verify", `${coverageNote(adhesive) || "Coverage not exposed in the current mapped data."} ${takeoffRef(adhesive)}`));
   });
@@ -4908,7 +4915,10 @@ function takeoffEstimatorRows() {
   }
 
   const primer = byId("takeoffPrimerInput")?.value || "";
-  if (primer && primer !== "Not applicable") rows.push(takeoffRow(primer, "Substrate-specific", "Verify", "Verify", `Primer coverage varies by substrate. ${takeoffRef(primer)}`));
+  if (primer && !["not applicable", "not required"].includes(normalize(primer))) {
+    const rate = parseGalPerSquare(mappedProductData(primer)?.coverage);
+    rows.push(rate ? takeoffGallons(primer, rate, area, `Confirm substrate-specific primer rate. ${takeoffRef(primer)}`) : takeoffRow(primer, "Substrate-specific", "Verify", "Verify", `Primer coverage varies by substrate. ${takeoffRef(primer)}`));
+  }
 
   if (normalize(product).includes("r mer")) {
     rows.push(takeoffRow("Metal roof panels", "Shop drawing required", `${Math.ceil(area / 100)} roof squares`, "Panel count by layout", `${system.description || ""} ${takeoffRef(product)}`));
@@ -4937,6 +4947,7 @@ function currentTakeoffEstimateSnapshot(existingId = "") {
     slope: byId("takeoffSlopeInput")?.value || "0",
     waste: byId("takeoffWasteInput")?.value || "10",
     pricingType: selectedTakeoffPricingType(),
+    pricingYear: selectedTakeoffPricingYear(),
     adjustedArea,
     projectType: byId("takeoffProjectTypeInput")?.value || "",
     warrantyType: byId("takeoffWarrantyTypeInput")?.value || "",
@@ -4985,7 +4996,14 @@ function loadTakeoffEstimate(estimateId) {
   byId("takeoffSqftInput").value = estimate.sqft || "";
   byId("takeoffSlopeInput").value = estimate.slope || "0";
   byId("takeoffWasteInput").value = estimate.waste || "10";
-  if (estimate.pricingType) state.filters.takeoffPricingType = estimate.pricingType;
+  if (estimate.pricingType) {
+    state.filters.takeoffPricingType = estimate.pricingType;
+    fillSelect("takeoffPricingTypeInput", pricingPrograms, estimate.pricingType);
+  }
+  if (estimate.pricingYear) {
+    state.filters.takeoffPricingYear = String(estimate.pricingYear);
+    fillSelect("takeoffPricingYearInput", availablePricingYears(), state.filters.takeoffPricingYear);
+  }
   byId("takeoffProjectTypeInput").value = normalizeProjectTypeLabel(estimate.projectType || defaultProjectType);
   renderTakeoffSelectors();
   if (estimate.warrantyType) byId("takeoffWarrantyTypeInput").value = estimate.warrantyType;
@@ -5321,7 +5339,16 @@ function renderWarrantySummaryChart() {
     capSheet: byId("warrantyCapSheetInput").value,
     term: byId("warrantyTermInput").value,
   });
-  const systems = filteredSystems.length ? filteredSystems : material.systems;
+  const systems = filteredSystems;
+  if (!systems.length) {
+    fillSystemSelect("warrantySystemInput", [], "");
+    ["warrantyCapAdhesiveInput", "warrantyBaseSheetInput", "warrantyBaseAdhesiveInput", "warrantySurfacingInput"].forEach((id) => fillSystemSelect(id, [], ""));
+    byId("warrantyPrimerInput").value = "";
+    byId("warrantySummaryCards").innerHTML = "";
+    byId("warrantySummaryRows").innerHTML = `<tr><td colspan="5">No catalog system matches this cap sheet and warranty term. Change the selections and verify eligibility with the current Garland warranty chart.</td></tr>`;
+    byId("warrantySummaryNotes").value = "No matching system. Warranty eligibility has not been established for these selections.";
+    return;
+  }
   fillSystemSelect("warrantySystemInput", systems.map((item) => item.product), byId("warrantySystemInput").value || "");
   const system = takeoffSystem({ systems }, byId("warrantySystemInput").value);
   const logic = systemLogic(system, {
@@ -5397,12 +5424,14 @@ function renderTakeoffEstimator() {
   const adjusted = takeoffAdjustedArea();
   const rows = takeoffEstimatorRows();
   const total = takeoffRowsTotal(rows);
+  const unresolved = rows.filter((row) => row.includes('data-needs-review="yes"')).length;
   byId("takeoffSummary").innerHTML = `
     <span><strong>Measured Area:</strong> ${area ? Math.round(area).toLocaleString() : "0"} sq. ft.</span>
     <span><strong>Adjusted Area:</strong> ${adjusted ? Math.ceil(adjusted).toLocaleString() : "0"} sq. ft.</span>
     <span><strong>Waste:</strong> ${escapeHtml(byId("takeoffWasteInput")?.value || "10")}%</span>
     <span><strong>Pricing:</strong> ${escapeHtml(selectedTakeoffPricingYear())} ${escapeHtml(selectedTakeoffPricingType())}</span>
-    <span><strong>Total Estimate:</strong> ${takeoffMoney(total)}</span>
+    <span><strong>Priced Material Subtotal:</strong> ${takeoffMoney(total)}</span>
+    <span><strong>${unresolved} line(s) missing price or purchase quantity.</strong> Review every material quantity and price. Unpriced items, labor, freight, tax, and project-specific details are excluded.</span>
   `;
   byId("takeoffResults").innerHTML = rows.join("");
   renderPriceBookList();
@@ -5425,7 +5454,7 @@ function renderPriceBookList() {
           (book) => `<div class="price-book-row">
             <div>
               <strong>${escapeHtml(book.name)}</strong>
-              <span>${escapeHtml([book.year, book.program || "Series Pricing", book.type, fileSizeLabel(book.size), `${book.extractedCount || 0} matched products`].filter(Boolean).join(" | "))}</span>
+              <span>${escapeHtml([book.year, book.program || "Series Pricing", book.type, fileSizeLabel(book.size), `${book.extractedCount || 0} matched products`, book.parserVersion === 2 ? "Single-price rows imported; check against original" : "Legacy import: re-upload to recheck prices"].filter(Boolean).join(" | "))}</span>
             </div>
             <div class="manage-actions">
               ${book.dataUrl ? `<a class="mini-button" href="${book.dataUrl}" download="${escapeHtml(book.name)}">Open</a>` : ""}
@@ -5453,6 +5482,7 @@ async function addPriceBookFiles(files) {
       size: file.size,
       dataUrl: "",
       extractedCount: 0,
+      parserVersion: 2,
       uploadedAt: new Date().toISOString(),
     };
     const dataUrl = await new Promise((resolve) => {
@@ -5463,6 +5493,7 @@ async function addPriceBookFiles(files) {
     entry.dataUrl = dataUrl;
     const extracted = await readPriceBookProducts(file, entry);
     entry.extractedCount = extracted.length;
+    if (!extracted.length) alert(`${file.name}: saved as a reference document. No unambiguous product prices were imported. Review the original before using this book for an estimate.`);
     if (extracted.length) {
       const keys = new Set(extracted.map((item) => `${item.year}|${item.program}|${item.number}`));
       state.priceBookProducts = state.priceBookProducts.filter((item) => !keys.has(`${item.year}|${item.program}|${item.number}`)).concat(extracted);
