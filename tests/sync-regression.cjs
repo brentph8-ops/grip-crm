@@ -25,6 +25,15 @@ const calls=completed=>({rules:[],completed});const K='garlandCallLists';
  // A newer edit during upload remains pending and is rebased onto the first ack.
  beforeUpdate=()=>c.s.setItem(K,JSON.stringify(calls({b:'done',c:'done',d:'later'})));
  await c.t.flushPending();assert(c.t.hasPending(K));await c.t.flushPending();assert.equal(db.get(K).data_value.completed.d,'later');assert(!c.t.hasPending(K));
+ // Reverting during an upload must not discard another device's completion.
+ db.set(K,{data_value:calls({...db.get(K).data_value.completed,remote:'done'}),updated_at:String(++clock)});
+ const original=JSON.parse(c.s.getItem(K));
+ c.s.setItem(K,JSON.stringify(calls({...original.completed,temporary:'done'})));
+ beforeUpdate=()=>c.s.setItem(K,JSON.stringify(original));
+ await c.t.flushPending();await c.t.flushPending();
+ assert.equal(db.get(K).data_value.completed.temporary,undefined);
+ assert.equal(db.get(K).data_value.completed.remote,'done');
+ const O='garlandOutreach'; c.s.setItem(O,JSON.stringify({settings:{gmailToken:'device-only',gmailTokenExpiry:123}})); await c.t.flushPending(); assert.equal(JSON.parse(c.s.getItem(O)).settings.gmailToken,'device-only'); assert.equal(db.get(O).data_value.settings.gmailToken,undefined);
  // Conflicting generic records are protected, not force-overwritten.
  const N='garlandCrmNotes';db.set(N,{data_value:{a:'cloud'},updated_at:'initial'});await c.t.pullAll();c.s.setItem(N,JSON.stringify({a:'phone'}));db.set(N,{data_value:{a:'other device'},updated_at:'changed'});await c.t.flushPending();assert(c.t.hasPending(N));assert.equal(db.get(N).data_value.a,'other device');assert.equal(JSON.parse(c.s.getItem(N)).a,'phone');assert.match(c.indicator.innerHTML,/Conflicting/);
  // Activity records on separate clients merge; conflicting edits to one note stop.

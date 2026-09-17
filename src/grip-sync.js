@@ -212,18 +212,14 @@
         // A newer edit made during this upload still needs its own upload.
         if (latest[key]?.revision === queued.revision && localStorage.getItem(key) === raw) {
           // Include independent records uploaded by another device in our copy.
-          _origSetItem(key, JSON.stringify(parsed));
+          if (queued.changes) _origSetItem(key, JSON.stringify(parsed));
           delete latest[key];
           _origSetItem(OUTBOX_KEY, JSON.stringify(latest));
         }
         if (latest[key]?.changes && queued.changes) {
-          const savedRecords = recordMap(key, parsed);
-          for (const id of Object.keys(queued.changes)) {
-            const edit = latest[key].changes[id];
-            if (!edit) continue;
-            edit.before = savedRecords[id];
-            if (sameValue(edit.before, edit.after)) delete latest[key].changes[id];
-          }
+          // Recompute from the acknowledged local snapshot, including an edit
+          // reverted while its earlier value was still uploading.
+          latest[key].changes = trackRecordChanges(key, raw, localStorage.getItem(key));
           _origSetItem(OUTBOX_KEY, JSON.stringify(latest));
         }
         setLocalPushTimestamp(key);
