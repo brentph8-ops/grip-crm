@@ -6919,7 +6919,7 @@ function addAccountActivity(accountId, note, showDetailAfter = true, extra = {})
   if (!cleaned) return;
   state.activities[accountId] = [
     {
-      id: `activity-${Date.now()}`,
+      id: `activity-${crypto.randomUUID()}`,
       note: cleaned,
       createdAt: extra.createdAt || new Date().toISOString(),
       accountId,
@@ -7371,13 +7371,32 @@ function openCallActivityDialog(accountId, day = "", completeCall = false) {
       ${field("Last Activity", latest ? `${compactDate(latest.createdAt)} - ${latest.note || latest.source || ""}` : "No activity logged yet")}
     </div>
   `;
+  const draftKey = callActivityDraftKey(account.id);
+  byId("callActivityForm").elements.activity.value = localStorage.getItem(draftKey) || "";
   openDialog("callActivityDialog");
+}
+
+function callActivityDraftKey(accountId) {
+  return `gripCallDraft:${localStorage.getItem("gripCurrentUserId") || "local"}:${accountId}`;
+}
+
+function saveCallActivityDraft() {
+  const form = byId("callActivityForm");
+  const accountId = form.elements.accountId.value;
+  if (!accountId) return;
+  try {
+    localStorage.setItem(callActivityDraftKey(accountId), form.elements.activity.value);
+  } catch (_) {
+    // Keep the typed note visible if this device has run out of storage.
+    alert("This device could not save your draft. Keep this note open and copy it before leaving.");
+  }
 }
 
 function saveCallActivity(form) {
   const accountId = form.get("accountId");
   addAccountActivity(accountId, form.get("activity"), false);
   if (form.get("completeCall") === "yes") completeCallListItem(accountId, form.get("day"), true, false);
+  localStorage.removeItem(callActivityDraftKey(accountId));
   byId("callActivityDialog").close();
   renderCallList();
 }
@@ -7387,6 +7406,7 @@ function addCallOutcomeToActivity(outcome) {
   if (!textarea || !outcome) return;
   const current = String(textarea.value || "").trim();
   textarea.value = current ? `${current}\n${outcome}` : outcome;
+  saveCallActivityDraft();
   textarea.focus();
 }
 
@@ -11460,7 +11480,11 @@ function bindEvents() {
     byId("supportContactDialog").close();
   });
   byId("cancelCallActivityButton").addEventListener("click", () => byId("callActivityDialog").close());
-  byId("clearCallActivityButton").addEventListener("click", () => byId("callActivityForm").reset());
+  byId("callActivityForm").elements.activity.addEventListener("input", saveCallActivityDraft);
+  byId("clearCallActivityButton").addEventListener("click", () => {
+    byId("callActivityForm").elements.activity.value = "";
+    saveCallActivityDraft();
+  });
   byId("callActivityDialog").addEventListener("click", (event) => {
     const outcome = event.target.closest("[data-call-outcome]");
     if (!outcome) return;
