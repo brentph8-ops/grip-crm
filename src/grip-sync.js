@@ -212,7 +212,7 @@
         // A newer edit made during this upload still needs its own upload.
         if (latest[key]?.revision === queued.revision && localStorage.getItem(key) === raw) {
           // Include independent records uploaded by another device in our copy.
-          _origSetItem(key, JSON.stringify(parsed));
+          if (queued.changes) _origSetItem(key, JSON.stringify(parsed));
           delete latest[key];
           _origSetItem(OUTBOX_KEY, JSON.stringify(latest));
         }
