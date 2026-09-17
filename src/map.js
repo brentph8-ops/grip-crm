@@ -88,10 +88,10 @@
     try { return JSON.parse(localStorage.getItem(GEO_KEY) || "{}"); } catch { return {}; }
   }
 
-  function saveGeoCoord(id, lat, lng, confidence, address) {
+  function saveGeoCoord(id, lat, lng, confidence, address, sourceQuery = address) {
     try {
       const cache = loadGeoCache();
-      cache[id] = { lat, lng, geocodeConfidence: confidence, geocodeAddress: address };
+      cache[id] = { lat, lng, geocodeConfidence: confidence, geocodeAddress: address, geocodeSourceQuery: sourceQuery };
       localStorage.setItem(GEO_KEY, JSON.stringify(cache));
     } catch (e) {
       console.warn("GRIP geo cache write failed:", e);
@@ -108,9 +108,9 @@
       const g = geo[a.id];
       if (!g) return a;
       // Failed geocode: carry geocodeAddress so pending filter knows it was tried
-      if (!g.lat || !g.lng) return { ...a, geocodeAddress: g.geocodeAddress, geocodeConfidence: g.geocodeConfidence };
+      if (!g.lat || !g.lng) return { ...a, geocodeAddress: g.geocodeAddress, geocodeConfidence: g.geocodeConfidence, geocodeSourceQuery: g.geocodeSourceQuery };
       // geo cache wins for coordinates; everything else stays from CRM
-      return { ...a, lat: g.lat, lng: g.lng, geocodeConfidence: g.geocodeConfidence, geocodeAddress: g.geocodeAddress };
+      return { ...a, lat: g.lat, lng: g.lng, geocodeConfidence: g.geocodeConfidence, geocodeAddress: g.geocodeAddress, geocodeSourceQuery: g.geocodeSourceQuery };
     });
   }
 
@@ -136,37 +136,28 @@
     return lat >= 25.0 && lat <= 37.5 && lng >= -107.5 && lng <= -88.5;
   }
 
-  // Remove cached entries that are outside bounds (stale from old tight box) or
-  // have null coords from the old bounds-rejection bug so they re-geocode correctly.
-  function pruneOutOfBoundsCoords() {
-    try {
-      const cache = loadGeoCache();
-      let changed = false;
-      for (const id of Object.keys(cache)) {
-        const { lat, lng, geocodeConfidence } = cache[id];
-        const hasCoords = lat && lng;
-        const outsideBounds = hasCoords && !inTerritoryBounds(parseFloat(lat), parseFloat(lng));
-        // Also clear "failed" entries that have an address — they can now be retried
-        // with the expanded bounds. Entries without any geocodeAddress are left alone.
-        const staleFailed = geocodeConfidence === "failed" && cache[id].geocodeAddress;
-        if (outsideBounds || staleFailed) {
-          delete cache[id];
-          changed = true;
-        }
-      }
-      if (changed) localStorage.setItem(GEO_KEY, JSON.stringify(cache));
-    } catch (_) {}
+  let lookupQueue = Promise.resolve();
+  let lastLookup = 0;
+  function throttledLookup(url, options) {
+    const task = lookupQueue.then(async () => {
+      const delay = Math.max(0, 1100 - (Date.now() - lastLookup));
+      if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+      lastLookup = Date.now();
+      return fetch(url, { ...options, signal: AbortSignal.timeout(12000) });
+    });
+    lookupQueue = task.catch(() => {});
+    return task;
   }
 
   async function geocodeViaNominatim(address, _retry = 2) {
     try {
       const params = new URLSearchParams({
-        format: "json", limit: "5",
+        format: "json", limit: "5", addressdetails: "1",
         q:      address.trim(),
         countrycodes: "us",
         email:  "bphillips@garlandco.com",
       });
-      const res = await fetch(`${GEOCODE_URL}?${params}`, {
+      const res = await throttledLookup(`${GEOCODE_URL}?${params}`, {
         signal:  AbortSignal.timeout(12000),
         headers: { "Accept-Language": "en" },
       });
@@ -180,7 +171,9 @@
         for (const r of results) {
           const lat = parseFloat(r.lat);
           const lng = parseFloat(r.lon);
-          if (inTerritoryBounds(lat, lng)) return { lat, lng, confidence: "verified" };
+          if (inTerritoryBounds(lat, lng)) return {
+            lat, lng, confidence: r.address?.house_number ? "verified" : "unverified"
+          };
         }
       }
     } catch (_) {}
@@ -203,18 +196,24 @@
       if (!match) return null;
       const lat = parseFloat(match.coordinates.y);
       const lng = parseFloat(match.coordinates.x);
-      // Census geocoder is US-only and matches the exact address — trust any result
-      if (!isNaN(lat) && !isNaN(lng)) return { lat, lng, confidence: "verified" };
+      // Census interpolates along street ranges; keep these pins approximate.
+      if (inTerritoryBounds(lat, lng)) return { lat, lng, confidence: "unverified" };
     } catch (_) {}
     return null;
   }
 
   async function geocodeAddress(address) {
     if (!address || address.trim().length < 5) return null;
+    const coordinates = address.trim().match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+    if (coordinates) {
+      const lat = Number(coordinates[1]), lng = Number(coordinates[2]);
+      return Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+        ? { lat, lng, confidence: "manual" } : null;
+    }
     // Try Nominatim first (broader — no bounded box), then Census Bureau as fallback
     const nominatim = await geocodeViaNominatim(address);
     if (nominatim) return nominatim;
-    return geocodeViaCensus(address);
+    return /^\d+\s+\S/.test(address.trim()) ? geocodeViaCensus(address) : null;
   }
 
   function buildGeoQuery(account) {
@@ -223,13 +222,22 @@
     const city   = (account.city   || "").trim();
     const state  = (account.state  || "").trim();
     const zip    = (account.zip    || "").trim();
-    if (street || city) {
+    if (street) {
       return [street, city, [state, zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
     }
     // Fall back to legacy single address field
     const addr = (account.address || "").trim();
     if (addr.length > 4) return addr;
+    if (account.client && (city || account.county)) {
+      return [account.client, city || `${account.county} County`, state || "TX"].join(", ");
+    }
     return null;
+  }
+
+  function needsGeocode(a) {
+    const query = buildGeoQuery(a);
+    return query && (!a.lat || !a.lng || a.geocodeConfidence === "failed" ||
+      (a.geocodeSourceQuery || a.geocodeAddress) !== query);
   }
 
   async function geocodeAccountById(id, query, approximate = false, nameFallback = null) {
@@ -242,27 +250,24 @@
       if (result) usedQuery = nameFallback;
     }
     if (!result) {
-      saveGeoCoord(id, null, null, "failed", query);
+      const existing = accounts().find(a => a.id === id);
+      if (!existing?.lat || !existing?.lng) saveGeoCoord(id, null, null, "failed", query);
       return false;
     }
-    const confidence = approximate ? "unverified" : result.confidence;
-    saveGeoCoord(id, result.lat, result.lng, confidence, usedQuery);
+    const confidence = approximate || usedQuery !== query ? "unverified" : result.confidence;
+    saveGeoCoord(id, result.lat, result.lng, confidence, usedQuery, query);
     if (_map && _markersGroup) refreshMarkers();
     return true;
   }
 
   async function geocodeAll(progressCallback) {
-    const pending = accounts().filter(a => {
-      const q = buildGeoQuery(a);
-      // Include: no coords yet, address changed, OR previously failed (retry with fixed bounds)
-      return q && (!a.lat || !a.lng || a.geocodeAddress !== q || a.geocodeConfidence === "failed");
-    });
+    const pending = accounts().filter(needsGeocode);
     let done = 0;
     for (const a of pending) {
       if (!_geocoding) break;
       try {
         const q           = buildGeoQuery(a);
-        const hasAddress  = (a.street || a.city || (a.address || "").trim().length > 4);
+        const hasAddress  = (a.street || (a.address || "").trim().length > 4);
         const approximate = !hasAddress;
         const nameFallback = [a.client, a.city, a.state].filter(Boolean).join(", ");
         await geocodeAccountById(a.id, q, approximate, nameFallback);
@@ -343,7 +348,7 @@
       <div class="gmp-fix-wrap" data-fix-id="${esc(account.id)}">
         <button class="gmp-fix-btn" type="button">✏️ Fix Location</button>
         <div class="gmp-fix-form" style="display:none">
-          <input class="gmp-fix-input" type="text" value="${esc(buildGeoQuery(account) || account.address || account.client || "")}" placeholder="Enter address or place name…">
+          <input class="gmp-fix-input" type="text" value="${esc(buildGeoQuery(account) || account.address || account.client || "")}" placeholder="Address, place + city, or latitude, longitude">
           <button class="gmp-fix-go" type="button">Search</button>
           <p class="gmp-fix-status"></p>
         </div>
@@ -586,7 +591,7 @@
           fixGo.disabled = true;
           const result = await geocodeAddress(q);
           if (result) {
-            saveGeoCoord(a.id, result.lat, result.lng, "manual", q);
+            saveGeoCoord(a.id, result.lat, result.lng, result.confidence, q, buildGeoQuery(a) || "");
             refreshMarkers();
             marker.closePopup();
           } else {
@@ -607,12 +612,8 @@
   function renderLegendTab(accts, mapped) {
     const total   = accts.length;
     const unmapped = accts.filter(a => !a.lat || !a.lng).length;
-    // pending = accounts whose geocodeAddress doesn't yet match the current query
-    // (failed geocodes save the query as geocodeAddress, so they drop out of pending)
-    const pending = accts.filter(a => {
-      const q = buildGeoQuery(a);
-      return q && (a.geocodeAddress || "") !== q;
-    }).length;
+    // Use the same retry rules for the count and the lookup operation.
+    const pending = accts.filter(needsGeocode).length;
 
     const entityCounts = {};
     const rankingCounts = {};
@@ -669,7 +670,7 @@
       ${!_geocoding ? `
         <div class="map-geocode-wrap">
           <button class="map-geocode-btn map-remap-btn" id="mapRemapBtn" type="button">
-            🔄 Remap All
+            🔄 Retry Missing / Changed
           </button>
         </div>` : ""}
       ${_geocoding ? `<div class="map-geocode-wrap"><p id="mapGeocodeProgress" class="map-geocode-progress">Geocoding…</p></div>` : ""}
@@ -700,11 +701,9 @@
       </div>
 
       ${(function() {
-        const noAddr = accts.filter(a => !buildGeoQuery(a));
-        const failed = accts.filter(a => buildGeoQuery(a) && (!a.lat || !a.lng) && a.geocodeConfidence === "failed");
-        if (!noAddr.length && !failed.length) return "";
+        const failed = accts.filter(a => !a.lat || !a.lng);
+        if (!failed.length) return "";
         const rows = [
-          ...noAddr.map(a => `<div class="map-unmapped-row"><span class="map-unmapped-name">${esc(a.client)}</span><span class="map-unmapped-reason">No address on file</span></div>`),
           ...failed.map(a => `<div class="map-unmapped-row map-unmapped-row--failed" data-unmapped-id="${esc(a.id)}">
             <div class="map-unmapped-row-top">
               <span class="map-unmapped-name">${esc(a.client)}</span>
@@ -712,7 +711,9 @@
               <button class="map-unmapped-fix-btn" type="button" title="Fix geocode for this account">Fix</button>
             </div>
             <div class="map-unmapped-fix-form" hidden>
-              <input class="map-unmapped-fix-input" type="text" value="${esc(a.geocodeAddress || buildGeoQuery(a) || a.client || "")}" placeholder="Enter address or place name…">
+              <input class="map-unmapped-fix-input" type="text" value="${esc(a.geocodeAddress || buildGeoQuery(a) || a.client || "")}" placeholder="Address, place + city, or latitude, longitude">
+              <a target="_blank" rel="noopener noreferrer" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([a.client, a.city, a.county, a.state || "TX"].filter(Boolean).join(", "))}">Find in Google Maps</a>
+              <p>Try a street address, or copy latitude, longitude from Google Maps.</p>
               <button class="map-unmapped-fix-go" type="button">Search</button>
               <p class="map-unmapped-fix-status"></p>
             </div>
@@ -929,8 +930,7 @@
       });
       sidebar.querySelector("#mapRemapBtn")?.addEventListener("click", async () => {
         if (_geocoding) return;
-        if (!confirm("Clear all cached map locations and re-geocode every account from scratch?")) return;
-        try { localStorage.removeItem(GEO_KEY); } catch (_) {}
+        if (!confirm("Retry missing or outdated locations? Existing pins will be kept if a lookup fails.")) return;
         _geocoding = true;
         renderSidebar(accts, mapped);
         try {
@@ -981,19 +981,8 @@
               if (result) usedQuery = nameQ;
             }
           }
-          if (!result) {
-            // Last attempt: try the Census geocoder directly with the raw query
-            // (geocodeAddress already does this, but census skips short/non-address strings)
-            const acctData = accounts().find(ac => ac.id === id);
-            const clientOnly = acctData?.client;
-            if (clientOnly && clientOnly !== q) {
-              fixStat.textContent = "Trying business name only…";
-              result = await geocodeAddress(clientOnly);
-              if (result) usedQuery = clientOnly;
-            }
-          }
           if (result) {
-            saveGeoCoord(id, result.lat, result.lng, "manual", usedQuery);
+            saveGeoCoord(id, result.lat, result.lng, result.confidence, usedQuery, buildGeoQuery(accounts().find(a => a.id === id) || {}) || "");
             refreshMarkers();
             renderSidebar(accounts(), countMapped());
           } else {
@@ -1253,7 +1242,7 @@
   // ── Public API ─────────────────────────────────────────────────────
 
   function render() {
-    pruneOutOfBoundsCoords();
+    // Saved locations and failures survive reloads; retry is user initiated.
     const view = document.getElementById("territoryView") || document.getElementById("liveMapView");
     if (!view) return;
 
