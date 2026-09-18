@@ -8496,3 +8496,26 @@ button#gripSyncStatus:hover { opacity: 0.75; }
 }
 .rank-graveyard { background: #f3f4f6; color: #374151; }
 
+
+/* Field calling: comfortable touch targets and visible saved history. */
+.call-saved-note { margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .85rem; }
+.call-saved-note small { display: block; opacity: .75; }
+.call-log-button { min-height: 44px; }
+#callActivitySaveStatus { padding: 10px; border-radius: 8px; background: #eaf5ed; color: #164329; }
+#callActivitySaveStatus[data-failed="yes"] { background: #fff0eb; color: #8b2418; }
+#callActivityDialog .call-outcome-buttons button { min-height: 44px; flex: 1 1 130px; }
+@media (max-width: 640px) {
+  #callActivityDialog { width: calc(100% - 16px); max-width: none; max-height: calc(100dvh - 16px); padding: 14px; box-sizing: border-box; }
+  #callActivityDialog .modal-actions { position: sticky; bottom: -14px; background: var(--panel, white); padding: 12px 0 calc(12px + env(safe-area-inset-bottom)); display: flex; flex-wrap: wrap; gap: 8px; }
+  #callActivityDialog .modal-actions button { min-height: 46px; flex: 1 1 auto; }
+  #callActivityDialog textarea { font-size: 16px; min-height: 110px; }
+  #dailyCallList .call-item > input[type="checkbox"] { min-width: 28px; min-height: 28px; margin: 8px; }
+  #dailyCallList .call-item-calendar { display: none; }
+  #dailyCallList .call-contact-chip { min-height: 44px; display: inline-flex; align-items: center; }
+}
+
+#callActivityDialog .call-contact-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; }
+#callActivityDialog .call-contact-summary a { min-height: 44px; display: inline-flex; align-items: center; }
+#callActivityDialog .call-context summary { min-height: 44px; cursor: pointer; padding: 12px 0; box-sizing: border-box; }
+#callActivityDialog .call-outcome-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#callActivityDialog .call-outcome-buttons button { white-space: normal; }

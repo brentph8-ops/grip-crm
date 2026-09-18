@@ -7120,8 +7120,8 @@ function renderCallList() {
   const accounts = accountsForCallDay(day).filter(a => !gydIds.has(a.id));
   const dateLabel = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   byId("callListTitle").textContent = `${day} Calls`;
-  byId("callListCount").textContent = `${accounts.length} accounts`;
-  byId("callListTodayPanel").querySelector(".panel-header span").textContent = dateLabel;
+  byId("callListCount").textContent = `${accounts.filter((account) => state.callLists.completed[callCompletionKey(day, account.id)]).length} of ${accounts.length} complete`;
+  byId("callListTodayPanel").querySelector(".panel-header span").textContent = `${dateLabel} · ${byId("callListCount").textContent}`;
   byId("callListSetupPanel").querySelector(".panel-header span").textContent = "Assign by Day";
   byId("callListView").querySelectorAll("[data-call-list-mode]").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.callListMode === state.callListMode);
@@ -7159,13 +7159,15 @@ function renderCallList() {
             : "";
           const contactChips = [phoneChip, emailChip].filter(Boolean).join("");
           return `<div class="call-item ${done ? "is-complete" : ""}">
-            <input type="checkbox" data-call-account="${account.id}" data-call-day="${day}" ${done ? "checked" : ""} />
+            <input type="checkbox" aria-label="Log call for ${escapeHtml(account.client)}" data-call-account="${account.id}" data-call-day="${day}" ${done ? "checked" : ""} />
             <div class="call-account-info">
               <button class="call-account-button" data-open-account-dialog="${account.id}" type="button" title="Edit account">
                 <strong>${escapeHtml(account.client)}</strong>
                 ${account.poc ? `<small>${escapeHtml(account.poc)}</small>` : ""}
               </button>
               ${contactChips ? `<div class="call-contact-chips">${contactChips}</div>` : ""}
+              ${latestAccountActivity(account) ? `<p class="call-saved-note"><strong>Latest saved:</strong> ${escapeHtml(latestAccountActivity(account).note || "")} <small>${escapeHtml(compactDate(latestAccountActivity(account).createdAt))}</small></p>` : ""}
+              <button class="mini-button call-log-button" data-open-call-account="${escapeHtml(account.id)}" data-call-log-day="${escapeHtml(day)}" type="button">Log call / note</button>
             </div>
             <button class="call-account-page-btn" data-open-account-page="${escapeHtml(account.id)}" type="button" title="Open account page">↗</button>
             <div class="call-item-calendar">
@@ -7358,14 +7360,13 @@ function addCallListRule(form) {
 
 function completeCallListItem(accountId, day, checked, addDefaultActivity = true, refresh = true) {
   const key = callCompletionKey(day, accountId);
-  if (checked) {
-    state.callLists.completed[key] = new Date().toISOString();
-    if (addDefaultActivity) addAccountActivity(accountId, `Completed ${day} call list call.`, false);
-  } else {
-    delete state.callLists.completed[key];
-    saveCallLists();
-  }
-  saveCallLists();
+  const latest = readStorageJson("garlandCallLists", state.callLists);
+  const next = { ...latest, completed: { ...(latest.completed || {}) } };
+  if (checked) next.completed[key] = next.completed[key] || new Date().toISOString();
+  else delete next.completed[key];
+  localStorage.setItem("garlandCallLists", JSON.stringify(next));
+  state.callLists = next;
+  if (checked && addDefaultActivity) addAccountActivity(accountId, `Completed ${day} call list call.`, false);
   if (refresh) renderCallList();
 }
 
@@ -7373,17 +7374,24 @@ function handleCallListCheckbox(callCheckbox) {
   if (!callCheckbox) return;
   if (callCheckbox.checked) {
     callCheckbox.closest(".call-item")?.classList.add("is-complete");
-    completeCallListItem(callCheckbox.dataset.callAccount, callCheckbox.dataset.callDay, true, false, false);
+    // Completion is committed with the outcome, not before the call is logged.
     openCallActivityDialog(callCheckbox.dataset.callAccount, callCheckbox.dataset.callDay, true);
   } else {
     callCheckbox.closest(".call-item")?.classList.remove("is-complete");
-    completeCallListItem(callCheckbox.dataset.callAccount, callCheckbox.dataset.callDay, false);
+    try {
+      completeCallListItem(callCheckbox.dataset.callAccount, callCheckbox.dataset.callDay, false);
+    } catch (_) {
+      renderCallList();
+      alert("Could not save the checkbox change. The previous completion is still saved; please try again.");
+    }
   }
 }
 
 function openCallActivityDialog(accountId, day = "", completeCall = false) {
   const account = cleanAccounts().find((item) => item.id === accountId);
   if (!account) return;
+  if (byId("callActivityDialog").open && !finishCallActivity(false)) return;
+  clearTimeout(callActivitySaveTimer);
   const latest = latestAccountActivity(account);
   byId("callActivityForm").reset();
   byId("callActivityAccountId").value = account.id;
@@ -7391,7 +7399,10 @@ function openCallActivityDialog(accountId, day = "", completeCall = false) {
   byId("callActivityComplete").value = completeCall ? "yes" : "";
   byId("callActivityTitle").textContent = account.client || "Client Call";
   byId("callActivityDetails").innerHTML = `
-    <div class="field-grid">
+    <p class="call-contact-summary">${escapeHtml(account.poc || account.client || "")}
+      ${account.phone ? `<a class="mini-button" href="tel:${escapeHtml(String(account.phone).replace(/[^0-9+]/g, ""))}">Call ${escapeHtml(account.phone)}</a>` : ""}
+    </p>
+    <details class="call-context"><summary>Contact details &amp; previous activity</summary><div class="field-grid">
       ${field("Contact", account.poc)}
       ${field("Title", account.title)}
       ${account.phone ? `<div class="field"><span>Phone</span><strong><a href="tel:${escapeHtml(String(account.phone).replace(/[^0-9+]/g, ""))}">${escapeHtml(account.phone)}</a></strong></div>` : ""}
@@ -7400,10 +7411,15 @@ function openCallActivityDialog(accountId, day = "", completeCall = false) {
       ${field("County", account.county)}
       ${field("Address", buildFullAddress(account))}
       ${field("Last Activity", latest ? `${compactDate(latest.createdAt)} - ${latest.note || latest.source || ""}` : "No activity logged yet")}
-    </div>
+    </div></details>
   `;
   const draftKey = callActivityDraftKey(account.id);
   byId("callActivityForm").elements.activity.value = localStorage.getItem(draftKey) || "";
+  const draftSession = readStorageJson(`${draftKey}:session`, null);
+  byId("callActivityForm").dataset.activityId = draftSession?.id || `activity-${crypto.randomUUID()}`;
+  byId("callActivityForm").dataset.createdAt = draftSession?.createdAt || new Date().toISOString();
+  setCallSaveStatus(byId("callActivityForm").elements.activity.value ? "Recovered your note. Choose Save or an outcome to log it." : "Tap an outcome to save this call immediately. Notes also autosave.");
+  if (byId("saveNextCallActivityButton")) byId("saveNextCallActivityButton").hidden = !day;
   openDialog("callActivityDialog");
 }
 
@@ -7411,34 +7427,100 @@ function callActivityDraftKey(accountId) {
   return `gripCallDraft:${localStorage.getItem("gripCurrentUserId") || "local"}:${accountId}`;
 }
 
+let callActivitySaveTimer;
+
+function setCallSaveStatus(message, failed = false) {
+  const status = byId("callActivitySaveStatus");
+  if (!status) return;
+  status.textContent = message;
+  status.dataset.failed = failed ? "yes" : "no";
+}
+
 function saveCallActivityDraft() {
   const form = byId("callActivityForm");
   const accountId = form.elements.accountId.value;
-  if (!accountId) return;
+  if (!accountId) return true;
   try {
-    localStorage.setItem(callActivityDraftKey(accountId), form.elements.activity.value);
+    const key = callActivityDraftKey(accountId);
+    // Keep a stable ID across reloads and retries, so autosave cannot duplicate calls.
+    localStorage.setItem(`${key}:session`, JSON.stringify({id:form.dataset.activityId, createdAt:form.dataset.createdAt}));
+    localStorage.setItem(key, form.elements.activity.value);
+    return true;
   } catch (_) {
-    // Keep the typed note visible if this device has run out of storage.
-    alert("This device could not save your draft. Keep this note open and copy it before leaving.");
+    setCallSaveStatus("Could not save on this device. Keep this note open and copy it before leaving.", true);
+    return false;
   }
 }
 
-function saveCallActivity(form) {
-  const accountId = form.get("accountId");
-  addAccountActivity(accountId, form.get("activity"), false);
-  if (form.get("completeCall") === "yes") completeCallListItem(accountId, form.get("day"), true, false);
-  localStorage.removeItem(callActivityDraftKey(accountId));
+function persistCallActivity() {
+  clearTimeout(callActivitySaveTimer);
+  const form = byId("callActivityForm");
+  const accountId = form.elements.accountId.value;
+  const note = String(form.elements.activity.value || "").trim();
+  if (!accountId || !form.dataset.activityId) return false;
+  if (!saveCallActivityDraft()) return false;
+  if (!note) {
+    setCallSaveStatus("Choose an outcome or enter a note. Previously saved call history is unchanged.");
+    return true;
+  }
+  try {
+    // Read the latest durable records; stale screen state must never erase another call.
+    const activities = readStorageJson("garlandAccountActivities", {});
+    const entries = Array.isArray(activities[accountId]) ? activities[accountId] : [];
+    const existing = entries.find((item) => item.id === form.dataset.activityId);
+    const entry = { ...existing, id:form.dataset.activityId, accountId, note,
+      createdAt:existing?.createdAt || form.dataset.createdAt, source:"Call List", files:existing?.files || [] };
+    const next = { ...activities, [accountId]:[entry, ...entries.filter((item) => item.id !== entry.id)] };
+    if (!existing || existing.note !== note) localStorage.setItem("garlandAccountActivities", JSON.stringify(next));
+    state.activities = next;
+    if (form.elements.completeCall.value === "yes") completeCallListItem(accountId, form.elements.day.value, true, false, false);
+    setCallSaveStatus("Saved on this device. You can move to the next account.");
+    renderCallList();
+    return true;
+  } catch (_) {
+    setCallSaveStatus("Save did not finish. Your note is still here. Retry Save before moving on.", true);
+    return false;
+  }
+}
+
+function queueCallActivitySave() {
+  clearTimeout(callActivitySaveTimer);
+  if (!saveCallActivityDraft()) return;
+  setCallSaveStatus("Saving note…");
+  callActivitySaveTimer = setTimeout(persistCallActivity, 350);
+}
+
+function finishCallActivity(nextAccount = false) {
+  const form = byId("callActivityForm");
+  const accountId = form.elements.accountId.value;
+  const day = form.elements.day.value;
+  if (!persistCallActivity()) return false;
+  const key = callActivityDraftKey(accountId);
+  localStorage.removeItem(key);
+  localStorage.removeItem(`${key}:session`);
   byId("callActivityDialog").close();
   renderCallList();
+  if (nextAccount && day) {
+    const hidden = graveyardAccountIds();
+    const accounts = accountsForCallDay(day).filter((item) => !hidden.has(item.id));
+    const index = accounts.findIndex((item) => item.id === accountId);
+    const ordered = [...accounts.slice(index + 1), ...accounts.slice(0, index)];
+    const next = ordered.find((item) => item.id !== accountId && !state.callLists.completed[callCompletionKey(day, item.id)]);
+    if (next) openCallActivityDialog(next.id, day, true);
+  }
+  return true;
+}
+
+function saveCallActivity() {
+  return finishCallActivity(false);
 }
 
 function addCallOutcomeToActivity(outcome) {
   const textarea = byId("callActivityForm")?.elements.activity;
   if (!textarea || !outcome) return;
   const current = String(textarea.value || "").trim();
-  textarea.value = current ? `${current}\n${outcome}` : outcome;
-  saveCallActivityDraft();
-  textarea.focus();
+  if (!current.split("\n").includes(outcome)) textarea.value = current ? `${current}\n${outcome}` : outcome;
+  persistCallActivity();
 }
 
 function quickRecordTitle(type, record) {
@@ -11510,11 +11592,27 @@ function bindEvents() {
     addSupportContact(form.get("contractor"), form);
     byId("supportContactDialog").close();
   });
-  byId("cancelCallActivityButton").addEventListener("click", () => byId("callActivityDialog").close());
-  byId("callActivityForm").elements.activity.addEventListener("input", saveCallActivityDraft);
+  byId("cancelCallActivityButton").addEventListener("click", () => finishCallActivity(false));
+  byId("callActivityDialog").addEventListener("cancel", (event) => { event.preventDefault(); finishCallActivity(false); });
+  byId("saveNextCallActivityButton")?.addEventListener("click", () => {
+    if (byId("callActivityForm").reportValidity()) finishCallActivity(true);
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden" && byId("callActivityDialog").open) persistCallActivity();
+  });
+  window.addEventListener("pagehide", () => { if (byId("callActivityDialog").open) persistCallActivity(); });
+  const cloudStatus = byId("gripSyncStatus");
+  if (cloudStatus) {
+    const reflectCloud = () => { const label = byId("callActivityCloudStatus"); if (label) label.textContent = `Sync: ${cloudStatus.textContent || "checking…"}`; };
+    new MutationObserver(reflectCloud).observe(cloudStatus, {childList:true, characterData:true, subtree:true});
+    reflectCloud();
+  }
+  byId("callActivityForm").elements.activity.addEventListener("input", queueCallActivitySave);
   byId("clearCallActivityButton").addEventListener("click", () => {
     byId("callActivityForm").elements.activity.value = "";
+    clearTimeout(callActivitySaveTimer);
     saveCallActivityDraft();
+    setCallSaveStatus("Note cleared. Previously saved call history is unchanged.");
   });
   byId("callActivityDialog").addEventListener("click", (event) => {
     const outcome = event.target.closest("[data-call-outcome]");
@@ -11997,7 +12095,7 @@ function bindEvents() {
     }
     const openCallAccount = event.target.closest("[data-open-call-account]");
     if (openCallAccount) {
-      openCallActivityDialog(openCallAccount.dataset.openCallAccount);
+      openCallActivityDialog(openCallAccount.dataset.openCallAccount, openCallAccount.dataset.callLogDay || "", Boolean(openCallAccount.dataset.callLogDay));
       return;
     }
     const openAccountPage = event.target.closest("[data-open-account-page]");
