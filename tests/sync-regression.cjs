@@ -13,7 +13,7 @@ function boot(seed={}){
  const values=new Map(Object.entries(seed));
  class Storage { getItem(k){return values.get(k)??null} setItem(k,v){values.set(k,String(v))} removeItem(k){values.delete(k)} }
  const storage=new Proxy(new Storage(),{set(target,k,v){values.set(k,String(v));return true},ownKeys(){return [...values.keys()]},getOwnPropertyDescriptor(target,k){if(values.has(k))return {configurable:true,enumerable:true,value:values.get(k)}},get(target,k){return k in target?Reflect.get(target,k):values.get(k)}});
-const indicator={};const w={GRIP_SUPABASE_URL:'https://example.supabase.co',GRIP_SUPABASE_ANON:'x'.repeat(30),_gripSupabaseClient:client,addEventListener(){}};const c={window:w,localStorage:storage,document:{readyState:'loading',addEventListener(){},getElementById:()=>indicator},console:{warn(){}},crypto:{randomUUID},Date,URLSearchParams,setTimeout:()=>1,clearTimeout(){},setInterval:()=>1,clearInterval(){}};vm.runInNewContext(source,c);return {s:storage,t:w.testSync,indicator};}
+const indicator={};const w={GRIP_SUPABASE_URL:'https://example.supabase.co',GRIP_SUPABASE_ANON:'x'.repeat(30),_gripSupabaseClient:client,addEventListener(){}};const c={window:w,localStorage:storage,document:{readyState:'loading',addEventListener(){},getElementById:()=>indicator},console:{warn(){}},crypto:{randomUUID},Date,URLSearchParams,setTimeout:()=>1,clearTimeout(){},setInterval:()=>1,clearInterval(){}};vm.runInNewContext(source,c);return {s:storage,t:w.testSync,api:w.gripSync,indicator};}
 const calls=completed=>({rules:[],completed});const K='garlandCallLists';
 (async()=>{
  let a=boot({gripCurrentUserId:'u',[K]:JSON.stringify(calls({}))});
@@ -82,5 +82,19 @@ const calls=completed=>({rules:[],completed});const K='garlandCallLists';
  beforeUpdate=()=>repeat.s.setItem(K,submitted);
  await repeat.t.flushPending();await repeat.t.flushPending();
  assert.equal(db.get(K).data_value.completed.otherPhone,'done','repeat save erased other device call');
+ // Per-call labels require server confirmation of both the note and completion.
+ const statusPhone=boot({gripCurrentUserId:'u'});
+ const statusActivity={id:'status-note',note:'Left voicemail'};
+ statusPhone.s.setItem(A,JSON.stringify({statusAccount:[statusActivity]}));
+ statusPhone.s.setItem(K,JSON.stringify(calls({statusCall:'done'})));
+ assert.match(statusPhone.api.callSaveStatus('statusAccount','status-note','statusCall'),/pending/);
+ await statusPhone.t.flushPending();
+ assert.equal(statusPhone.api.callSaveStatus('statusAccount','status-note','statusCall'),'Saved to cloud');
+ statusPhone.s.setItem(A,JSON.stringify({statusAccount:[{...statusActivity,note:'Edited'}]}));
+ assert.match(statusPhone.api.callSaveStatus('statusAccount','status-note','statusCall'),/pending/);
+ fail=true;await statusPhone.t.flushPending();fail=false;
+ assert.match(statusPhone.api.callSaveStatus('statusAccount','status-note','statusCall'),/retry/);
+ await statusPhone.t.flushPending();
+ assert.equal(statusPhone.api.callSaveStatus('statusAccount','status-note','statusCall'),'Saved to cloud');
  console.log('PASS: durable offline retry, reload recovery, checked/unchecked calls, concurrent clients, in-flight edits, stale pulls, cloud conflicts, and activity merges.');
 })().catch(e=>{console.error(e);process.exitCode=1});

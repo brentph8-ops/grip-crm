@@ -4815,15 +4815,23 @@ function takeoffProductOptions() {
     .sort((a, b) => compareText(a.category, b.category) || compareText(a.match, b.match));
 }
 
+function takeoffConfidenceLabel(material) {
+  const product = mappedProductData(material);
+  const source = product?.source || "No matching price source";
+  const coverage = product?.coverage ? `Catalog coverage: ${product.coverage}` : "Coverage rate missing or application-specific";
+  return `${escapeHtml(source)} · selected ${escapeHtml(selectedTakeoffPricingYear())} ${escapeHtml(selectedTakeoffPricingType())}<br>${escapeHtml(coverage)}<br>Coverage reference: ${takeoffRef(material)}<br>Not independently verified against the current project specification.`;
+}
+
 function takeoffRow(material, basis, qty, unit, note = "", priceQty = "") {
   const productNote = productNumberNote(material);
+  const confidence = takeoffConfidenceLabel(material);
   const unitPrice = productUnitPrice(material);
   const quantity = priceQty === "" ? (/^(rolls?|units?|pails?|drums?|kegs?|each)$/i.test(unit) ? takeoffQuantityNumber(qty) : 0) : Number(priceQty);
   const lineTotal = unitPrice > 0 && quantity > 0 ? unitPrice * quantity : 0;
   const issue = !unitPrice ? "Missing price for selected year/program" : !(quantity > 0) ? "Verify purchase quantity/unit" : "";
   return `<tr data-line-total="${lineTotal.toFixed(2)}" data-needs-review="${issue ? "yes" : "no"}">
     <td>${escapeHtml(productNumber(material))}</td>
-    <td>${escapeHtml(material)}</td>
+    <td>${escapeHtml(material)}<small class="estimate-confidence">${confidence}</small></td>
     <td>${escapeHtml(basis || productCoverageRate(material))}</td>
     <td>${escapeHtml(productPalletCount(material))}</td>
     <td>${escapeHtml(qty)}</td>
@@ -5426,6 +5434,7 @@ function renderTakeoffEstimator() {
   const total = takeoffRowsTotal(rows);
   const unresolved = rows.filter((row) => row.includes('data-needs-review="yes"')).length;
   byId("takeoffSummary").innerHTML = `
+    <span class="estimate-confidence"><strong>${unresolved ? "Needs pricing / quantity review" : "Material lines priced; specification review required"}</strong><br>Price-book year: ${escapeHtml(selectedTakeoffPricingYear())}. ${Number(selectedTakeoffPricingYear()) < new Date().getFullYear() ? "Older pricing year selected." : "Confirm effective date with supplier."}<br>Matching uploaded books: ${escapeHtml(matchingPriceBooks().map(book => book.name).join(", ") || "None; catalog pricing where available")}<br>Coverage rates and warranty eligibility require current manufacturer and project review.</span>
     <span><strong>Measured Area:</strong> ${area ? Math.round(area).toLocaleString() : "0"} sq. ft.</span>
     <span><strong>Adjusted Area:</strong> ${adjusted ? Math.ceil(adjusted).toLocaleString() : "0"} sq. ft.</span>
     <span><strong>Waste:</strong> ${escapeHtml(byId("takeoffWasteInput")?.value || "10")}%</span>
@@ -7167,6 +7176,7 @@ function renderCallList() {
               </button>
               ${contactChips ? `<div class="call-contact-chips">${contactChips}</div>` : ""}
               ${latestAccountActivity(account) ? `<p class="call-saved-note"><strong>Latest saved:</strong> ${escapeHtml(latestAccountActivity(account).note || "")} <small>${escapeHtml(compactDate(latestAccountActivity(account).createdAt))}</small></p>` : ""}
+              ${latestAccountActivity(account) ? `<p class="call-save-label" data-call-save-account="${escapeHtml(account.id)}" data-call-save-id="${escapeHtml(latestAccountActivity(account).id)}" data-call-save-completion="${escapeHtml(latestAccountActivity(account).completionKey || "")}">${escapeHtml(callSaveLabel(account.id, latestAccountActivity(account).id, latestAccountActivity(account).completionKey || ""))}</p>` : ""}
               <button class="mini-button call-log-button" data-open-call-account="${escapeHtml(account.id)}" data-call-log-day="${escapeHtml(day)}" type="button">Log call / note</button>
             </div>
             <button class="call-account-page-btn" data-open-account-page="${escapeHtml(account.id)}" type="button" title="Open account page">↗</button>
@@ -7420,7 +7430,15 @@ function openCallActivityDialog(accountId, day = "", completeCall = false) {
   byId("callActivityForm").dataset.createdAt = draftSession?.createdAt || new Date().toISOString();
   setCallSaveStatus(byId("callActivityForm").elements.activity.value ? "Recovered your note. Choose Save or an outcome to log it." : "Tap an outcome to save this call immediately. Notes also autosave.");
   if (byId("saveNextCallActivityButton")) byId("saveNextCallActivityButton").hidden = !day;
+  const progress = day ? accountsForCallDay(day).filter(item => !graveyardAccountIds().has(item.id)) : [];
+  if (progress.length) byId("callActivityDetails").insertAdjacentHTML("afterbegin", `<p id="callActivityProgress" class="call-progress">Account ${progress.findIndex(item => item.id === account.id) + 1} of ${progress.length} · ${progress.filter(item => state.callLists.completed[callCompletionKey(day, item.id)]).length} completed</p>`);
+  if (byId("callFollowupPanel")) {
+    byId("callFollowupPanel").hidden = !/left voicemail/i.test(byId("callActivityForm").elements.activity.value);
+    byId("callFollowupDate").value = callFollowupDate();
+    byId("callFollowupStatus").textContent = "Suggested: 3 business days. Change the date or skip this step.";
+  }
   openDialog("callActivityDialog");
+  refreshCallSaveLabels();
 }
 
 function callActivityDraftKey(accountId) {
@@ -7469,13 +7487,14 @@ function persistCallActivity() {
     const entries = Array.isArray(activities[accountId]) ? activities[accountId] : [];
     const existing = entries.find((item) => item.id === form.dataset.activityId);
     const entry = { ...existing, id:form.dataset.activityId, accountId, note,
-      createdAt:existing?.createdAt || form.dataset.createdAt, source:"Call List", files:existing?.files || [] };
+      createdAt:existing?.createdAt || form.dataset.createdAt, source:"Call List", completionKey:form.elements.completeCall.value === "yes" ? callCompletionKey(form.elements.day.value, accountId) : "", files:existing?.files || [] };
     const next = { ...activities, [accountId]:[entry, ...entries.filter((item) => item.id !== entry.id)] };
     if (!existing || existing.note !== note) localStorage.setItem("garlandAccountActivities", JSON.stringify(next));
     state.activities = next;
     if (form.elements.completeCall.value === "yes") completeCallListItem(accountId, form.elements.day.value, true, false, false);
     setCallSaveStatus("Saved on this device. You can move to the next account.");
     renderCallList();
+    refreshCallSaveLabels();
     return true;
   } catch (_) {
     setCallSaveStatus("Save did not finish. Your note is still here. Retry Save before moving on.", true);
@@ -7521,6 +7540,60 @@ function addCallOutcomeToActivity(outcome) {
   const current = String(textarea.value || "").trim();
   if (!current.split("\n").includes(outcome)) textarea.value = current ? `${current}\n${outcome}` : outcome;
   persistCallActivity();
+  if (/left voicemail/i.test(outcome) && byId("callFollowupPanel")) byId("callFollowupPanel").hidden = false;
+}
+
+function callFollowupDate(start = new Date()) {
+  const date = new Date(start);
+  let days = 0;
+  while (days < 3) { date.setDate(date.getDate() + 1); if (date.getDay() !== 0 && date.getDay() !== 6) days++; }
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function addCallFollowup() {
+  const form = byId("callActivityForm");
+  const date = byId("callFollowupDate").value;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { byId("callFollowupStatus").textContent = "Choose a follow-up date first."; return false; }
+  if (!persistCallActivity()) return false;
+  if (!String(form.elements.activity.value).trim()) return false;
+  const account = cleanAccounts().find(item => item.id === form.elements.accountId.value);
+  if (!account) return false;
+  try {
+    const tasks = readStorageJson("garlandTasks", []);
+    const id = `call-followup-${form.dataset.activityId}`;
+    const existing = tasks.find(item => item.task_id === id);
+    const task = normalizedTask({ ...existing, task_id:id, title:`Follow up with ${account.client}`, account_id:account.id,
+      account_name:account.client, due_date:date, description:form.elements.activity.value,
+      next_action:"Call following voicemail", updated_at:new Date().toISOString() });
+    const next = [task, ...tasks.filter(item => item.task_id !== id)];
+    localStorage.setItem("garlandTasks", JSON.stringify(next));
+    state.tasks = next;
+    byId("callFollowupStatus").textContent = `Follow-up saved on this device for ${date}. Check the main sync status for cloud upload. Find it in Tasks; it appears in Today when due.`;
+    return true;
+  } catch (_) { byId("callFollowupStatus").textContent = "Could not save the follow-up. Retry before leaving."; return false; }
+}
+
+function callSaveLabel(accountId, activityId, completionKey = "") {
+  return window.gripSync?.callSaveStatus?.(accountId, activityId, completionKey) || "Saved on phone · cloud not confirmed";
+}
+
+function refreshCallSaveLabels() {
+  document.querySelectorAll("[data-call-save-account]").forEach(label => {
+    label.textContent = callSaveLabel(label.dataset.callSaveAccount, label.dataset.callSaveId, label.dataset.callSaveCompletion);
+  });
+  const form = byId("callActivityForm");
+  const progress = byId("callActivityProgress");
+  if (progress && form?.elements.day.value) {
+    const day = form.elements.day.value;
+    const accounts = accountsForCallDay(day).filter(item => !graveyardAccountIds().has(item.id));
+    progress.textContent = `Account ${accounts.findIndex(item => item.id === form.elements.accountId.value) + 1} of ${accounts.length} · ${accounts.filter(item => state.callLists.completed[callCompletionKey(day, item.id)]).length} completed`;
+  }
+  const label = byId("callActivityCloudStatus");
+  if (!label || !form?.dataset.activityId) return;
+  const status = callSaveLabel(form.elements.accountId.value, form.dataset.activityId,
+    form.elements.completeCall.value === "yes" ? callCompletionKey(form.elements.day.value, form.elements.accountId.value) : "");
+  label.textContent = status;
+  if (byId("retryCallUploadButton")) byId("retryCallUploadButton").hidden = status === "Saved to cloud" || status === "Not saved";
 }
 
 function quickRecordTitle(type, record) {
@@ -11601,9 +11674,16 @@ function bindEvents() {
     if (document.visibilityState === "hidden" && byId("callActivityDialog").open) persistCallActivity();
   });
   window.addEventListener("pagehide", () => { if (byId("callActivityDialog").open) persistCallActivity(); });
+  byId("addCallFollowupButton")?.addEventListener("click", addCallFollowup);
+  byId("retryCallUploadButton")?.addEventListener("click", async () => {
+    if (!persistCallActivity()) return;
+    const button = byId("retryCallUploadButton");
+    button.disabled = true;
+    try { await window.gripSync?.forceSync(); } finally { button.disabled = false; refreshCallSaveLabels(); }
+  });
   const cloudStatus = byId("gripSyncStatus");
   if (cloudStatus) {
-    const reflectCloud = () => { const label = byId("callActivityCloudStatus"); if (label) label.textContent = `Sync: ${cloudStatus.textContent || "checking…"}`; };
+    const reflectCloud = refreshCallSaveLabels;
     new MutationObserver(reflectCloud).observe(cloudStatus, {childList:true, characterData:true, subtree:true});
     reflectCloud();
   }

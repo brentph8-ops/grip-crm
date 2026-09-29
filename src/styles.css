@@ -8519,3 +8519,17 @@ button#gripSyncStatus:hover { opacity: 0.75; }
 #callActivityDialog .call-context summary { min-height: 44px; cursor: pointer; padding: 12px 0; box-sizing: border-box; }
 #callActivityDialog .call-outcome-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 #callActivityDialog .call-outcome-buttons button { white-space: normal; }
+
+/* Mobile call workflow and estimate source labels */
+.call-progress, .call-save-label { font-size: .85rem; color: var(--muted, #9cacc0); }
+.call-followup-panel { padding: 12px; border: 1px solid #526079; border-radius: 10px; margin: 12px 0; }
+.call-followup-panel[hidden] { display: none; }
+.call-followup-panel input { display: block; min-height: 44px; font-size: 16px; margin: 8px 0; }
+.estimate-confidence { display: block; line-height: 1.5; margin-top: 8px; font-size: .8rem; }
+@media (max-width: 600px) {
+  #callActivityDialog { width: calc(100% - 16px); max-height: 94dvh; }
+  #callActivityDialog .modal-actions { position: sticky; bottom: 0; background: var(--panel, #162030); padding: 12px 0; z-index: 2; }
+  #callActivityDialog button, .call-contact-chip--phone { min-height: 44px; }
+  #callActivityDialog .modal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  #saveNextCallActivityButton { grid-column: 1 / -1; }
+}

@@ -106,6 +106,7 @@
   const _origSetItem = localStorage.setItem.bind(localStorage);
   const inFlight = new Map();
   let syncProblem = false;
+  const confirmedRecords = new Map();
   function readMeta(key) {
     try { return JSON.parse(localStorage.getItem(key) || "{}"); } catch { return {}; }
   }
@@ -216,6 +217,7 @@
           }
           version = data[0].updated_at;
         }
+        confirmedRecords.set(key, parsed);
         rememberVersion(key, version);
         const latest = readMeta(OUTBOX_KEY);
         // A newer edit made during this upload still needs its own upload.
@@ -355,6 +357,7 @@
             }
           } catch (_) {}
         }
+        confirmedRecords.set(row.data_key, incoming);
         rememberVersion(row.data_key, row.updated_at);
         const serialized = JSON.stringify(incoming);
         if (localStorage.getItem(row.data_key) !== serialized) {
@@ -711,6 +714,7 @@
         alert("This device has unsent changes for another GRIP account. Sign back into that account to save them before switching accounts.");
         return;
       }
+      confirmedRecords.clear();
       for (const key of SYNC_KEYS) localStorage.removeItem(key);
       localStorage.removeItem("gripUserFirstName");
       localStorage.removeItem(OUTBOX_KEY);
@@ -847,7 +851,22 @@
 
   // ── Public API ───────────────────────────────────────────────────
 
+  function callSaveStatus(accountId, activityId, completionKey = "") {
+    const key = "garlandAccountActivities";
+    const local = readMeta(key)[accountId]?.find(item => item.id === activityId);
+    if (!local) return "Not saved";
+    const remote = confirmedRecords.get(key)?.[accountId]?.find(item => item.id === activityId);
+    const completion = completionKey ? readMeta("garlandCallLists").completed?.[completionKey] : null;
+    const remoteCompletion = completionKey ? confirmedRecords.get("garlandCallLists")?.completed?.[completionKey] : null;
+    if (sameValue(local, remote) && (!completionKey || (completion && sameValue(completion, remoteCompletion)))) return "Saved to cloud";
+    if (syncProblem === "conflict") return "Saved on phone · sync conflict";
+    if (syncProblem === "error") return "Saved on phone · retry upload";
+    if (hasPending(key) || (completionKey && hasPending("garlandCallLists"))) return "Saved on phone · upload pending";
+    return "Saved on phone · cloud not confirmed";
+  }
+
   window.gripSync = {
+    callSaveStatus,
     isConfigured,
     getClient,
     getUser,

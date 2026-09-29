@@ -2558,7 +2558,13 @@
           <textarea class="note-box" name="activity" placeholder="Type your call notes here" required></textarea>
         </label>
         <p id="callActivitySaveStatus" role="status" aria-live="polite"></p>
-        <p id="callActivityCloudStatus" class="muted"></p>
+        <p id="callActivityCloudStatus" class="muted" role="status" aria-live="polite"></p>
+        <button class="secondary-button" id="retryCallUploadButton" type="button">Retry cloud save</button>
+        <section id="callFollowupPanel" hidden class="call-followup-panel">
+          <label>Voicemail follow-up date <input type="date" id="callFollowupDate" /></label>
+          <button class="secondary-button" id="addCallFollowupButton" type="button">Add follow-up task</button>
+          <p id="callFollowupStatus" role="status" aria-live="polite">Suggested: 3 business days. Change the date or skip this step.</p>
+        </section>
         <div class="modal-actions">
           <button class="secondary-button" id="clearCallActivityButton" type="button">Clear note</button>
           <button class="primary-button" type="submit">Save & close</button>
