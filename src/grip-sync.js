@@ -266,7 +266,15 @@
 
   // Save the retry marker before the data. If storage is full, throw rather
   // than allowing the app to claim that an unsaved edit succeeded.
-  localStorage.setItem = function (key, value) {
+  // Storage instances have a named-property setter. Assigning setItem directly
+  // can store the function as text instead of installing a hook (notably Safari).
+  // Wrap the prototype and leave sessionStorage and other instances untouched.
+  const storagePrototype = Object.getPrototypeOf(localStorage);
+  const nativeSetItem = storagePrototype.setItem;
+  storagePrototype.setItem = function (key, value) {
+    if (this !== localStorage) return nativeSetItem.call(this, key, value);
+    key = String(key);
+    value = String(value);
     if (SYNC_KEYS.has(key) && isConfigured()) {
       const previousQueue = localStorage.getItem(OUTBOX_KEY) || "{}";
       const queued = readMeta(OUTBOX_KEY);
@@ -306,17 +314,26 @@
     const client = getClient();
     const user = await getUser();
     if (!client || !user) return false;
+    // Capture the exact local state before starting the request. A response may
+    // arrive after another pull or an upload has already installed newer data.
+    const versionsAtStart = readMeta(VERSION_KEY);
+    const valuesAtStart = new Map([...SYNC_KEYS].map(key => [key, localStorage.getItem(key)]));
+    const ownerAtStart = localStorage.getItem("gripCurrentUserId");
     try {
       const { data, error } = await client
         .from("grip_data")
         .select("data_key, data_value, updated_at")
         .eq("user_id", user.id);
       if (error) { syncProblem = "error"; updateSyncIndicator("error"); return false; }
+      if (localStorage.getItem("gripCurrentUserId") !== ownerAtStart) return "unchanged";
       if (!data?.length) return "empty";
+      const currentVersions = readMeta(VERSION_KEY);
       const localPushTs = getLocalPushTimestamps();
       let anyChanged = false;
       for (const row of data) {
         if (!SYNC_KEYS.has(row.data_key) || hasPending(row.data_key)) continue;
+        if (currentVersions[row.data_key] !== versionsAtStart[row.data_key] ||
+            localStorage.getItem(row.data_key) !== valuesAtStart.get(row.data_key)) continue;
         // Skip only if WE pushed this key in the last 30 seconds — protects in-flight
         // local writes from being overwritten before they reach the server.
         // Avoids comparing local-device time to Supabase server time (clock-skew safe).
