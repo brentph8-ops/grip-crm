@@ -188,7 +188,9 @@
           .select("data_value,updated_at").eq("user_id", user.id).eq("data_key", key).maybeSingle();
         if (readError) throw readError;
         let parsed = sanitizeForSync(key, JSON.parse(raw));
-        if (remote && queued.changes && Object.keys(queued.changes).length) {
+        // Even an empty record delta must use the server copy. A repeated
+        // save during upload can leave no new edits while raw is still stale.
+        if (remote && queued.changes) {
           parsed = mergeRecordChanges(key, remote.data_value, queued.changes);
         }
         const same = remote && sameValue(remote.data_value, parsed);

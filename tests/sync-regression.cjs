@@ -73,5 +73,14 @@ const calls=completed=>({rules:[],completed});const K='garlandCallLists';
  };
  await race.t.pullAll();
  assert.equal(JSON.parse(race.s.getItem(K)).completed.fresh,'done','delayed response erased newer cloud completion');
+ // Repeated save during upload must retain another device's independent call.
+ const repeat=boot({gripCurrentUserId:'u'});await repeat.t.pullAll();
+ const initial=JSON.parse(repeat.s.getItem(K));
+ db.set(K,{data_value:calls({...initial.completed,otherPhone:'done'}),updated_at:String(++clock)});
+ const submitted=JSON.stringify(calls({...initial.completed,myCall:'done'}));
+ repeat.s.setItem(K,submitted);
+ beforeUpdate=()=>repeat.s.setItem(K,submitted);
+ await repeat.t.flushPending();await repeat.t.flushPending();
+ assert.equal(db.get(K).data_value.completed.otherPhone,'done','repeat save erased other device call');
  console.log('PASS: durable offline retry, reload recovery, checked/unchecked calls, concurrent clients, in-flight edits, stale pulls, cloud conflicts, and activity merges.');
 })().catch(e=>{console.error(e);process.exitCode=1});
