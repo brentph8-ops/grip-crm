@@ -106,6 +106,19 @@
   const _origSetItem = localStorage.setItem.bind(localStorage);
   const inFlight = new Map();
   let syncProblem = false;
+  // Before authentication/hydration, app scripts may seed or normalize data.
+  // Those automatic writes must not become user edits or replace stored work.
+  let initialDataReady = !isConfigured();
+  if (!initialDataReady) showAuthOverlay(true);
+
+  function releaseInitialData() {
+    // Discard only transient in-memory startup defaults, never stored/outbox data.
+    window.gripReloadData?.();
+    initialDataReady = true;
+    const error = document.getElementById("gripAuthError");
+    if (error) error.hidden = true;
+    showAuthOverlay(false);
+  }
   const confirmedRecords = new Map();
   function readMeta(key) {
     try { return JSON.parse(localStorage.getItem(key) || "{}"); } catch { return {}; }
@@ -280,6 +293,7 @@
     key = String(key);
     value = String(value);
     if (SYNC_KEYS.has(key) && isConfigured()) {
+      if (!initialDataReady) return;
       const previousQueue = localStorage.getItem(OUTBOX_KEY) || "{}";
       const queued = readMeta(OUTBOX_KEY);
       const changes = trackRecordChanges(key, localStorage.getItem(key), value, queued[key]?.changes);
@@ -409,7 +423,7 @@
       ready:   { text: "● Cloud connected",     cls: "sync-ready"   },
       error:   { text: "⚠ Cloud save failed — retry",  cls: "sync-error"   },
       pending: { text: "Saved on device — upload pending", cls: "sync-syncing" },
-      conflict: { text: "⚠ Conflicting changes — device copy kept", cls: "sync-error" },
+      conflict: { text: "⚠ Upload paused: conflicting changes saved on this device", cls: "sync-error" },
       storage: { text: "⚠ Device storage full — edit not saved", cls: "sync-error" },
       local:   { text: "Device only — sign in to sync", cls: "sync-local"   },
     };
@@ -682,6 +696,7 @@
   // Does not await — local state clears synchronously, Supabase call is fire-and-forget.
   function _doSignOut() {
     _userSetupDone = false;
+    initialDataReady = !isConfigured();
     stopHeartbeat();
     unsubscribeFromRemoteChanges();
     updateSyncIndicator("local");
@@ -726,7 +741,9 @@
     const fullName = user?.user_metadata?.full_name || user?.user_metadata?.name || "";
     const firstName = fullName.split(" ")[0] || "";
     if (firstName) localStorage.setItem("gripUserFirstName", firstName);
-    showAuthOverlay(false);
+    showAuthOverlay(true);
+    const loadingMessage = document.getElementById("gripAuthError");
+    if (loadingMessage) { loadingMessage.textContent = "Loading your saved GRIP data…"; loadingMessage.hidden = false; }
     updateSyncIndicator("syncing");
     subscribeToRemoteChanges(user);
 
@@ -737,6 +754,7 @@
       pullAll(),
       new Promise((resolve) => setTimeout(() => resolve(false), 12000)),
     ]);
+    if (pullResult) releaseInitialData();
     if (pullResult === "empty") {
       // First time — offer to push local data up
       if (Object.keys(localStorage).some((k) => SYNC_KEYS.has(k))) {
@@ -752,6 +770,8 @@
       }
       _gripFullRender();
     }
+    if (pullResult === "empty") _gripFullRender();
+    if (!pullResult && loadingMessage) loadingMessage.textContent = "Cloud data could not load. Your stored changes are safe. Continue locally to work offline, or try again when connected.";
     updateSyncIndicator(pullResult ? "saved" : "error");
     startHeartbeat();
 
@@ -827,6 +847,7 @@
         const treatAsNew = event === "SIGNED_IN" || isOAuthCallback;
         await setupAuthorizedUser(user, treatAsNew);
       } else if (event === "SIGNED_OUT") {
+        initialDataReady = !isConfigured();
         _userSetupDone = false;
         unsubscribeFromRemoteChanges();
         updateSyncIndicator("local");
@@ -915,6 +936,8 @@
     },
 
     continueLocal() {
+      releaseInitialData();
+      _gripFullRender();
       showAuthOverlay(false);
       updateSyncIndicator("local");
     },
@@ -926,6 +949,7 @@
       await flushPending();
       const syncResult = await pullAll();
       if (syncResult) {
+        if (!initialDataReady) releaseInitialData();
         if (syncResult === "changed") {
           if (typeof window.gripReloadData === "function") window.gripReloadData();
           if (typeof window._gripHandleRemoteUpdate === "function") {
@@ -971,6 +995,7 @@
       if (!_userSetupDone) return;
       await flushPending();
       const result = await pullAll();
+      if (result && !initialDataReady) releaseInitialData();
       if (result === "changed") {
         if (typeof window.gripReloadData === "function") window.gripReloadData();
         if (typeof window._gripHandleRemoteUpdate === "function") {
@@ -1005,6 +1030,7 @@
     const u = await getUser();
     if (u) subscribeToRemoteChanges(u);
     const applyResult = async (result) => {
+      if (result && !initialDataReady) releaseInitialData();
       if (result === "changed") {
         if (typeof window.gripReloadData === "function") window.gripReloadData();
         if (typeof window._gripHandleRemoteUpdate === "function") {
