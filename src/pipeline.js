@@ -44,7 +44,7 @@
 
   // ── Data I/O ──────────────────────────────────────────────────────
 
-  const STAGE_MIGRATE = { "Prospect": "Client", "Qualifying": "Meeting", "Proposal Sent": "Bucket", "Won": "Project Completed", "Lost": "Project Completed" };
+  const STAGE_MIGRATE = { "Prospect": "Client", "Qualifying": "Meeting", "Proposal Sent": "Bucket", "Won": "Project Completed", "Lost": "Graveyard" };
 
   function load() {
     try {

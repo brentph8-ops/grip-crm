@@ -27,5 +27,12 @@ const saved=JSON.parse(cache.get('garlandGeocoords')).fallback;
 assert.equal(saved.geocodeSourceQuery,'Unknown Road'); assert.equal(saved.geocodeConfidence,'unverified');
 const html=t.renderLegendTab([{id:'missing',client:'No Address'},{id:'pending',client:'Pending',street:'123 Main'}],0);
 assert.ok(html.includes('Not on Map (2)')); assert.ok(html.includes('data-unmapped-id="missing"')); assert.ok(html.includes('latitude, longitude'));
+// Execute the real startup script against saved pins, including west Texas.
+const page=fs.readFileSync(require('node:path').join(__dirname,'../index.html'),'utf8');
+const bootScript=page.slice(page.lastIndexOf('<script>')+8,page.lastIndexOf('</script>'));
+cache.set('garlandGeocoords',JSON.stringify({west:{lat:31.76,lng:-106.48},manual:{lat:30,lng:-95}}));
+const beforeBoot=cache.get('garlandGeocoords');
+vm.runInNewContext(bootScript,{localStorage:context.localStorage,navigator:{},window:{}});
+assert.equal(cache.get('garlandGeocoords'),beforeBoot);
 console.log('Passed 12 mapping regression checks (mocked services; no live CRM data changed).');
 })().catch(e=>{console.error(e);process.exitCode=1;});

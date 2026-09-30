@@ -155,15 +155,17 @@
 
   function buildPopup(account) {
     const acts = (() => { try { return JSON.parse(localStorage.getItem("garlandAccountActivities") || "{}"); } catch (_) { return {}; } })();
-    const log = acts[account.id] || [];
-    const last = log.length ? log[log.length - 1] : null;
-    const lastStr = last ? (last.date || last.at || "").slice(0, 10) : "Never";
+    const log = Array.isArray(acts[account.id]) ? acts[account.id] : [];
+    const last = log.map(entry => entry.createdAt || entry.date || entry.at)
+      .filter(value => value && Number.isFinite(Date.parse(value)))
+      .sort((a, b) => Date.parse(b) - Date.parse(a))[0];
+    const lastStr = last ? new Date(last.length === 10 ? `${last}T12:00:00` : last).toLocaleDateString("en-US") : "No contact logged";
     return `
       <div class="territory-popup">
         <strong>${esc(account.client)}</strong>
         <div class="territory-popup-meta">${esc(account.entity || "")} · ${esc(account.county || "")}</div>
         ${account.poc ? `<div class="territory-popup-poc">${esc(account.poc)}</div>` : ""}
-        <div class="territory-popup-last">Last contact: ${lastStr}</div>
+        <div class="territory-popup-last">Last contact: ${esc(lastStr)}</div>
         <button class="territory-popup-btn" onclick="if(window.setView)window.setView('accounts')">Open Account</button>
       </div>`;
   }

@@ -11,7 +11,10 @@
     return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
-  function todayIso() { return new Date().toISOString().slice(0, 10); }
+  function todayIso() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
 
   function fmtShort(iso) {
     if (!iso) return "";
@@ -87,15 +90,18 @@
 
   function tasksDue() {
     const today = todayIso();
-    return tasks().filter(t => !t.done && t.dueDate && t.dueDate <= today);
+    return tasks().filter(t => !t.done && !["Completed", "Cancelled"].includes(t.status) && (t.due_date || t.dueDate) && (t.due_date || t.dueDate) <= today)
+      .sort((a, b) => (a.due_date || a.dueDate).localeCompare(b.due_date || b.dueDate));
   }
 
   function coldAccounts() {
     const acts = activities();
     return accounts()
       .map(a => {
-        const log = acts[a.id] || [];
-        const lastDate = log.length ? log[log.length - 1]?.date || log[log.length - 1]?.at : null;
+        const log = Array.isArray(acts[a.id]) ? acts[a.id] : [];
+        const lastDate = log.map(entry => entry.createdAt || entry.date || entry.at)
+          .filter(value => value && Number.isFinite(Date.parse(value)))
+          .sort((a, b) => Date.parse(b) - Date.parse(a))[0] || null;
         return { ...a, daysSince: daysSince(lastDate), lastDate };
       })
       .filter(a => a.daysSince >= 30)
@@ -114,9 +120,9 @@
 
   function pipelineStats() {
     const deals = pipeline();
-    const open = deals.filter(d => !["Won", "Lost"].includes(d.stage));
-    const won = deals.filter(d => d.stage === "Won");
-    const total = deals.filter(d => ["Won", "Lost"].includes(d.stage));
+    const open = deals.filter(d => !["Won", "Lost", "Project Completed", "Graveyard"].includes(d.stage));
+    const won = deals.filter(d => ["Won", "Project Completed"].includes(d.stage));
+    const total = deals.filter(d => ["Won", "Lost", "Project Completed", "Graveyard"].includes(d.stage));
     return {
       openCount: open.length,
       openValue: open.reduce((s, d) => s + (parseFloat(d.amount) || 0), 0),
@@ -127,7 +133,7 @@
   function overdueDeals() {
     const today = todayIso();
     return pipeline().filter(d =>
-      !["Won", "Lost"].includes(d.stage) && d.closeDate && d.closeDate < today
+      !["Won", "Lost", "Project Completed", "Graveyard"].includes(d.stage) && d.closeDate && d.closeDate < today
     ).sort((a, b) => a.closeDate.localeCompare(b.closeDate));
   }
 
@@ -191,7 +197,7 @@
       <div class="td-row">
         <div class="td-row-main">
           <span class="td-row-name">${esc(t.title || t.task || "Task")}</span>
-          <span class="td-row-meta">${t.dueDate ? "Due " + fmtShort(t.dueDate) : ""}</span>
+          <span class="td-row-meta">${(t.due_date || t.dueDate) ? "Due " + fmtShort(t.due_date || t.dueDate) : ""}</span>
         </div>
         <span class="td-badge td-badge--blue">Task</span>
       </div>`).join("");
@@ -205,7 +211,7 @@
           <span class="td-row-name">${esc(a.client)}</span>
           <span class="td-row-meta">${esc(a.county || "")}${a.entity ? " · " + esc(a.entity) : ""}</span>
         </div>
-        <span class="td-badge td-badge--muted">${a.daysSince}d ago</span>
+        <span class="td-badge td-badge--muted">${a.lastDate ? `${a.daysSince}d ago` : "No contact logged"}</span>
       </div>`).join("");
   }
 

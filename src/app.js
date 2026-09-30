@@ -616,6 +616,12 @@ const productNumberDetails = {
 
 mappedProductNumbers.forEach((item) => Object.assign(item, productNumberDetails[item.number] || {}));
 
+// Expose documented package variants without guessing a similar product name.
+Object.entries(productNumberDetails).forEach(([number, detail]) => {
+  if (!detail.application || !detail.size || detail.size === "Verify") return;
+  mappedProductNumbers.push({match: `${detail.application} (${detail.size}) [${number}]`, number, source: "2026 Coatings", ...detail});
+});
+
 const productChoiceVariants = {
   optimax: ["OptiMax", "OptiMax FR Mineral"],
   stressply: ["StressPly", "StressPly FR Mineral"],
@@ -633,13 +639,9 @@ const productChoiceVariants = {
 };
 
 const standardCoverageSpecLanguage = [
-  "Apply all materials in strict accordance with manufacturer published technical data sheets. Coverage rates shall be as follows unless otherwise required by substrate conditions:",
-  "- Primers: 0.5-1.0 gal./sq.",
-  "- Adhesives: 1.5-2.0 gal./sq.",
-  "- Coating systems: 3.0-4.0 gal./sq. total",
-  "- Mastics: 2-3 gal./sq. or thickness-based application",
-  "- Flood coats (coal tar): 4.0-8.0 gal./sq. depending on condition",
-  "- Garland intentionally varies coverage based on substrate absorption; confirm final rates with current technical data and Garland representative when required.",
+  "Apply materials according to the current manufacturer technical data and approved project specification.",
+  "Select coverage separately for each product, substrate, coat, and application; generic rates do not establish warranty compliance.",
+  "Confirm required wet/dry film thickness, reinforcement, detail work, and package yield before ordering.",
 ].join("\n");
 
 const localStorageLargeFileLimit = 1500000;
@@ -2174,7 +2176,7 @@ function normalizedTask(task) {
     account_name: task.account_name || "",
     related_project_id: task.related_project_id || "",
     related_project_name: task.related_project_name || "",
-    due_date: task.due_date || toLocalDateKey(new Date()),
+    due_date: task.due_date || task.dueDate || "",
     due_time: task.due_time || "",
     priority: task.priority || "Normal",
     task_type: task.task_type || "Follow-Up",
@@ -2327,7 +2329,7 @@ function normalizedPunchList(list) {
     list_type: list.list_type || "Roofing Project",
     status: list.status || "Running Punch List",
     assigned_contractor: list.assigned_contractor || "",
-    due_date: list.due_date || toDateInput(addDays(new Date(), 7)),
+    due_date: list.due_date || "",
     reviewer: list.reviewer || taskDefaultAssignedUser(),
     sent_at: list.sent_at || "",
     closed_at: list.closed_at || "",
@@ -4520,8 +4522,12 @@ function takeoffAdjustedArea() {
 }
 
 function parseGalPerSquare(text) {
-  const matches = [...String(text || "").matchAll(/(\d+(?:\.\d+)?)(?:\s*-\s*(\d+(?:\.\d+)?))?\s*gal\.?\/sq\.?/gi)];
-  return matches.reduce((sum, match) => sum + Number(match[2] || match[1] || 0), 0);
+  const values = [...String(text || "").matchAll(/(\d+(?:\.\d+)?(?:\/\d+)?)(?:\s*-\s*(\d+(?:\.\d+)?))?\s*gal\.?\s*\/\s*(?:100\s*sq\.?\s*ft\.?|sq\.?(?!\s*ft))/gi)];
+  // Multiple applications must be selected explicitly, never added together.
+  if (values.length !== 1) return 0;
+  const value = values[0][2] || values[0][1];
+  const parts = value.split("/").map(Number);
+  return parts.length === 2 ? parts[0] / parts[1] : parts[0];
 }
 
 function estimateGalPerSquare(text) {
@@ -4557,7 +4563,7 @@ function selectedTakeoffPricingYear() {
 }
 
 function availablePricingYears() {
-  return [...new Set([String(today.getFullYear()), ...state.priceBooks.map((book) => String(book.year || "")).filter(Boolean), ...state.priceBookProducts.map((item) => String(item.year || "")).filter(Boolean)])].sort((a, b) => Number(b) - Number(a));
+  return [...new Set([String(today.getFullYear()), ...state.takeoffEstimates.map((item) => String(item.pricingYear || "")).filter(Boolean), ...mappedProductNumbers.map((item) => String(item.source || "").match(/20\d{2}/)?.[0]).filter(Boolean), ...state.priceBooks.map((book) => String(book.year || "")).filter(Boolean), ...state.priceBookProducts.map((item) => String(item.year || "")).filter(Boolean)])].sort((a, b) => Number(b) - Number(a));
 }
 
 function matchingPriceBooks(program = selectedTakeoffPricingType(), year = selectedTakeoffPricingYear()) {
@@ -4590,15 +4596,7 @@ function expandProductChoices(values) {
 
 function bestMappedProduct(value) {
   const product = normalize(value);
-  if (!product || product === "not applicable") return null;
-  const exact = mappedProductNumbers.find((item) => product === normalize(item.match));
-  if (exact) return exact;
-  const contains = mappedProductNumbers.find((item) => product.includes(normalize(item.match)));
-  if (contains) return contains;
-  const candidates = mappedProductNumbers
-    .filter((item) => normalize(item.match).startsWith(product) || firstWordsMatch(product, normalize(item.match)))
-    .sort((a, b) => normalize(a.match).length - normalize(b.match).length);
-  return candidates[0] || null;
+  return mappedProductNumbers.find((item) => product === normalize(item.match) || product === normalize(item.number)) || null;
 }
 
 function firstWordsMatch(value, candidate) {
@@ -4635,38 +4633,20 @@ function escapeRegExp(value) {
 }
 
 function parsePriceBookProducts(text, { year, program, type, sourceName }) {
-  const normalizedText = String(text || "").replace(/\r/g, "\n");
-  const productNumbers = [...new Set(mappedProductNumbers.map((item) => item.number).concat(Object.keys(productNumberDetails)))].filter(Boolean);
-  return productNumbers
-    .map((number) => {
-      const pattern = new RegExp(`${escapeRegExp(number)}\\s+\\$([\\d,]+\\.\\d{2})(\\d{1,3})([\\s\\S]{0,220})`, "i");
-      const match = normalizedText.match(pattern);
-      if (!match) return null;
-      const before = normalizedText.slice(Math.max(0, match.index - 280), match.index);
-      const coop = [...before.matchAll(/\$([\d,]+\.\d{2})/g)].pop()?.[1] || "";
-      const after = match[3] || "";
-      const size = after.match(/(5\s*GL\s*PAIL|4\.5\s*GL\s*PAIL|3\.5\s*GL\s*PAIL|3\s*GL\s*PAIL|2\s*GL\s*PAIL|50\s*GAL\s*DRUM|55\s*GAL\s*DRM|55\s*GAL\s*DRUM|100#\s*KEG|50#\s*KEG|EACH|BOX KIT|CS\/[^\n]+)/i)?.[1] || productNumberDetails[number]?.size || "";
-      const coverageRaw = after
-        .replace(size, "")
-        .replace(/\n+/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
-      const coverage = coverageRaw || productNumberDetails[number]?.coverage || "";
-      return {
-        number,
-        year: String(year),
-        program,
-        type,
-        sourceName,
-        seriesPrice: Number(match[1].replace(/,/g, "")),
-        coopPrice: coop ? Number(coop.replace(/,/g, "")) : undefined,
-        perPallet: match[2] || productNumberDetails[number]?.perPallet || "Verify",
-        coverage,
-        size,
-        uploadedAt: new Date().toISOString(),
-      };
-    })
-    .filter(Boolean);
+  const known = [...new Set(mappedProductNumbers.map((item) => item.number))];
+  const candidates = [];
+  for (const line of String(text || "").split(/\r?\n/)) {
+    // Read only a complete visual row. Ambiguous multi-price rows require review.
+    const numbers = known.filter((number) => new RegExp(`(^|\\s)${escapeRegExp(number)}(?=\\s|$)`, "i").test(line));
+    const prices = [...line.matchAll(/\$\s*([\d,]+\.\d{2})(?!\d)/g)];
+    if (numbers.length !== 1 || prices.length !== 1) continue;
+    const price = Number(prices[0][1].replace(/,/g, ""));
+    if (!(price > 0)) continue;
+    candidates.push({number:numbers[0], year:String(year), program, type, sourceName,
+      ...(program === "Co-op Pricing" ? {coopPrice:price} : {seriesPrice:price}),
+      parserVersion:2, sourceRow:line.trim(), uploadedAt:new Date().toISOString()});
+  }
+  return candidates.filter((item) => candidates.filter((other) => other.number === item.number).length === 1);
 }
 
 async function extractPdfText(file) {
@@ -4678,7 +4658,15 @@ async function extractPdfText(file) {
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
     const page = await pdf.getPage(pageNumber);
     const content = await page.getTextContent();
-    pages.push(content.items.map((item) => item.str).join("\n"));
+    const rows = [];
+    for (const item of content.items) {
+      if (!item.str || !item.transform) continue;
+      const y = item.transform[5];
+      let row = rows.find((entry) => Math.abs(entry.y - y) < 2);
+      if (!row) { row = { y, items: [] }; rows.push(row); }
+      row.items.push({ x: item.transform[4], text: item.str });
+    }
+    pages.push(rows.sort((a, b) => b.y - a.y).map((row) => row.items.sort((a, b) => a.x - b.x).map((item) => item.text).join(" ")).join("\n"));
   }
   return pages.join("\n");
 }
@@ -4716,7 +4704,7 @@ function priceBookProductData(mapped) {
     String(item.year || "") === String(year) &&
     (item.program || "Series Pricing") === program
   );
-  return uploaded ? { ...mapped, ...uploaded, source: `${uploaded.year} uploaded price book` } : mapped;
+  return uploaded ? { ...mapped, ...(uploaded.parserVersion === 2 ? uploaded : {year:uploaded.year}), seriesPrice: uploaded.parserVersion === 2 ? uploaded.seriesPrice : undefined, coopPrice: uploaded.parserVersion === 2 ? uploaded.coopPrice : undefined, source: `${uploaded.year} uploaded price book` } : mapped;
 }
 
 function selectedSystemLayerProductData() {
@@ -4780,7 +4768,7 @@ function productMilNote(value) {
 
 function productCoverageSqft(value) {
   const coverage = mappedProductData(value)?.coverage || "";
-  const match = String(coverage).match(/([\d,]+(?:\.\d+)?)\s*sq\.?\s*ft/i);
+  const match = String(coverage).match(/([\d,]+(?:\.\d+)?)\s*sq\.?\s*ft\.?\s*\/\s*roll/i);
   return match ? Number(match[1].replace(/,/g, "")) : 0;
 }
 
@@ -4788,8 +4776,9 @@ function productUnitPrice(value) {
   const mapped = mappedProductData(value);
   if (!mapped) return 0;
   const selectedYear = selectedTakeoffPricingYear();
-  if (!mapped.year && selectedYear !== String(today.getFullYear()) && !String(mapped.source || "").includes(selectedYear)) return 0;
-  return normalize(selectedTakeoffPricingType()).includes("co op") ? Number(mapped.coopPrice || mapped.seriesPrice || 0) : Number(mapped.seriesPrice || mapped.coopPrice || 0);
+  const sourceYear = String(mapped.year || String(mapped.source || "").match(/\b20\d{2}\b/)?.[0] || "");
+  if (sourceYear !== selectedYear) return 0;
+  return normalize(selectedTakeoffPricingType()).includes("co op") ? Number(mapped.coopPrice || 0) : Number(mapped.seriesPrice || 0);
 }
 
 function takeoffQuantityNumber(qty) {
@@ -4826,41 +4815,66 @@ function takeoffProductOptions() {
     .sort((a, b) => compareText(a.category, b.category) || compareText(a.match, b.match));
 }
 
+function takeoffConfidenceLabel(material) {
+  const product = mappedProductData(material);
+  const source = product?.source || "No matching price source";
+  const coverage = product?.coverage ? `Catalog coverage: ${product.coverage}` : "Coverage rate missing or application-specific";
+  return `${escapeHtml(source)} · selected ${escapeHtml(selectedTakeoffPricingYear())} ${escapeHtml(selectedTakeoffPricingType())}<br>${escapeHtml(coverage)}<br>Coverage reference: ${takeoffRef(material)}<br>Not independently verified against the current project specification.`;
+}
+
 function takeoffRow(material, basis, qty, unit, note = "", priceQty = "") {
   const productNote = productNumberNote(material);
+  const confidence = takeoffConfidenceLabel(material);
   const unitPrice = productUnitPrice(material);
-  const lineTotal = takeoffLinePrice(material, priceQty || qty);
-  return `<tr data-line-total="${lineTotal.toFixed(2)}">
+  const quantity = priceQty === "" ? (/^(rolls?|units?|pails?|drums?|kegs?|each)$/i.test(unit) ? takeoffQuantityNumber(qty) : 0) : Number(priceQty);
+  const lineTotal = unitPrice > 0 && quantity > 0 ? unitPrice * quantity : 0;
+  const issue = !unitPrice ? "Missing price for selected year/program" : !(quantity > 0) ? "Verify purchase quantity/unit" : "";
+  return `<tr data-line-total="${lineTotal.toFixed(2)}" data-needs-review="${issue ? "yes" : "no"}">
     <td>${escapeHtml(productNumber(material))}</td>
-    <td>${escapeHtml(material)}</td>
-    <td>${escapeHtml(productCoverageRate(material, basis))}</td>
+    <td>${escapeHtml(material)}<small class="estimate-confidence">${confidence}</small></td>
+    <td>${escapeHtml(basis || productCoverageRate(material))}</td>
     <td>${escapeHtml(productPalletCount(material))}</td>
     <td>${escapeHtml(qty)}</td>
     <td>${escapeHtml(unit)}</td>
     <td>${takeoffMoney(unitPrice)}</td>
     <td>${takeoffMoney(lineTotal)}</td>
-    <td>${note}${productNote}</td>
+    <td>${issue ? `<strong>${escapeHtml(issue)}.</strong> ` : ""}${note}${productNote}</td>
   </tr>`;
 }
 
 function takeoffGallons(name, gallonsPerSq, area, note) {
   const gallons = (area / 100) * gallonsPerSq;
-  const pails = Math.ceil(gallons / 5);
-  return takeoffRow(name, `${gallonsPerSq} gal./sq.`, `${Math.ceil(gallons)} gal.`, `${pails} five-gal pails`, note, pails);
+  const size = mappedProductData(name)?.size || "";
+  const match = size.match(/(\d+(?:\.\d+)?)\s*(?:gal\.?|gl)\s*(pail|drum|drm)/i);
+  const packageSize = match ? Number(match[1]) : 0;
+  const count = packageSize > 0 ? Math.ceil(gallons / packageSize) : 0;
+  return takeoffRow(name, `${gallonsPerSq} gal./100 sq. ft.`, `${Math.ceil(gallons)} gal.`, count ? `${count} × ${size}` : "Verify package size", note, count);
 }
 
 function takeoffPounds(name, poundsPerSq, area, note) {
   const pounds = (area / 100) * poundsPerSq;
-  const kegs = Math.ceil(pounds / 100);
-  return takeoffRow(name, `${poundsPerSq} lb./sq.`, `${Math.ceil(pounds)} lb.`, `${kegs} 100-lb kegs`, note, kegs);
+  const size = mappedProductData(name)?.size || "";
+  const match = size.match(/(\d+(?:\.\d+)?)\s*(?:lb\.?|#)\s*keg/i);
+  const count = match && Number(match[1]) > 0 ? Math.ceil(pounds / Number(match[1])) : 0;
+  return takeoffRow(name, `${poundsPerSq} lb./100 sq. ft.`, `${Math.ceil(pounds)} lb.`, count ? `${count} × ${size}` : "Verify package size", note, count);
 }
 
 function takeoffRollGood(name, area, note = "") {
   if (!name || name === "Not applicable") return "";
-  const coverage = productCoverageSqft(name) || 100;
-  const rolls = Math.ceil(area / coverage);
-  const basis = productCoverageSqft(name) ? productCoverageRate(name) : "Assumption: 100 sq. ft. per roll";
-  return takeoffRow(name, basis, `${rolls} rolls`, "Rolls", `${note} ${takeoffRef(name)}`);
+  const coverage = productCoverageSqft(name);
+  const rolls = coverage > 0 ? Math.ceil(area / coverage) : 0;
+  return takeoffRow(name, coverage ? `${coverage} sq. ft./roll` : "Missing roll yield", rolls ? `${rolls} rolls` : "Verify", "Rolls", `${note} ${takeoffRef(name)}`, rolls);
+}
+
+function restorationComponents(system) {
+  const name = String(system.product || "").replace(/ - (?:Partially Reinforced|Fully Reinforced|Not Fabric Reinforced)$| over Metal$/i, "");
+  const description = String(system.description || "");
+  if (system.product === "Cool-Sil Gravel-Surfaced Roof Restoration") return [{name:"Cool-Sil Eliminator (5 gal. pail) [21100-G]",rate:8,coat:"Eliminator"},{name:"Cool-Sil",rate:2,coat:"Top coat"}];
+  const base = description.match(/([\d.]+)\s*gal\.\/sq\.\s*base coat/i);
+  const top = description.match(/([\d.]+)\s*gal\.\/sq\.\s*top coat/i);
+  if (base && top) return [{name:name === "White-Knight Plus" ? "White-Knight Plus base coat" : name,rate:Number(base[1]),coat:"Base coat"},{name,rate:Number(top[1]),coat:"Top coat"}];
+  const rate = estimateGalPerSquare(description);
+  return rate ? [{name,rate,coat:"Field application"}] : [];
 }
 
 function takeoffEstimatorRows() {
@@ -4870,11 +4884,12 @@ function takeoffEstimatorRows() {
   const rows = [];
   if (!area) return [takeoffRow("Enter roof area", "Square footage required", "-", "-", "Choose a project or enter square footage to calculate.")];
 
-  const descriptionRate = estimateGalPerSquare(system.description);
-  if (descriptionRate) {
-    rows.push(takeoffGallons(product, descriptionRate, area, `Rate pulled from the Garland restoration/warranty chart note: ${escapeHtml(system.description || "")}`));
-    if (normalize(system.description).includes("fabric")) rows.push(takeoffRow("Grip Polyester reinforcement", "Fabric-reinforced system", `${Math.ceil(area / 100)} roof squares`, "Verify roll count", takeoffRef("Grip Polyester")));
-  }
+  restorationComponents(system).forEach((component) => {
+    rows.push(takeoffGallons(component.name, component.rate, area, `${escapeHtml(component.coat)}. Built-in system rate; confirm against current project specification.`));
+  });
+  if (/fabric|reinforced|laps|seams/i.test(system.description || "")) rows.push(takeoffRow("Reinforcement / seam and flashing details", "Measure detail area and select reinforcement SKU", "Verify", "Verify", "Field coating quantities exclude unmeasured details and reinforcement. Add the required materials separately."));
+
+  if (/with gravel|plus gravel/i.test(system.description || "")) rows.push(takeoffRow("Restoration aggregate", "Confirm aggregate requirement and supplier units", "Verify", "Verify", "Gravel is not included in the coating quantity or price."));
 
   const capSheet = byId("takeoffCapSheetInput")?.value || "";
   const baseSheet = byId("takeoffBaseSheetInput")?.value || "";
@@ -4894,7 +4909,7 @@ function takeoffEstimatorRows() {
       rows.push(takeoffPounds(adhesive, 25, area, "HPR All-Temp Asphalt membrane/interply rate from 2026 coatings price book. Flood coat rates should be handled under surfacing."));
       return;
     }
-    const rate = adhesiveName.includes("green lock") ? 2.5 : 0;
+    const rate = ["green lock plus", "green lock plus membrane adhesive"].includes(adhesiveName) ? 2.5 : 0;
     if (rate) rows.push(takeoffGallons(adhesive, rate, area, "Green-Lock Plus Membrane Adhesive field/interply rate uses high side of 2-2.5 gal./sq.; flashing adhesive is intentionally not used here."));
     else rows.push(takeoffRow(adhesive, "Application-specific", "Verify", "Verify", `${coverageNote(adhesive) || "Coverage not exposed in the current mapped data."} ${takeoffRef(adhesive)}`));
   });
@@ -4908,7 +4923,10 @@ function takeoffEstimatorRows() {
   }
 
   const primer = byId("takeoffPrimerInput")?.value || "";
-  if (primer && primer !== "Not applicable") rows.push(takeoffRow(primer, "Substrate-specific", "Verify", "Verify", `Primer coverage varies by substrate. ${takeoffRef(primer)}`));
+  if (primer && !["not applicable", "not required"].includes(normalize(primer))) {
+    const rate = parseGalPerSquare(mappedProductData(primer)?.coverage);
+    rows.push(rate ? takeoffGallons(primer, rate, area, `Confirm substrate-specific primer rate. ${takeoffRef(primer)}`) : takeoffRow(primer, "Substrate-specific", "Verify", "Verify", `Primer coverage varies by substrate. ${takeoffRef(primer)}`));
+  }
 
   if (normalize(product).includes("r mer")) {
     rows.push(takeoffRow("Metal roof panels", "Shop drawing required", `${Math.ceil(area / 100)} roof squares`, "Panel count by layout", `${system.description || ""} ${takeoffRef(product)}`));
@@ -4937,6 +4955,7 @@ function currentTakeoffEstimateSnapshot(existingId = "") {
     slope: byId("takeoffSlopeInput")?.value || "0",
     waste: byId("takeoffWasteInput")?.value || "10",
     pricingType: selectedTakeoffPricingType(),
+    pricingYear: selectedTakeoffPricingYear(),
     adjustedArea,
     projectType: byId("takeoffProjectTypeInput")?.value || "",
     warrantyType: byId("takeoffWarrantyTypeInput")?.value || "",
@@ -4985,7 +5004,14 @@ function loadTakeoffEstimate(estimateId) {
   byId("takeoffSqftInput").value = estimate.sqft || "";
   byId("takeoffSlopeInput").value = estimate.slope || "0";
   byId("takeoffWasteInput").value = estimate.waste || "10";
-  if (estimate.pricingType) state.filters.takeoffPricingType = estimate.pricingType;
+  if (estimate.pricingType) {
+    state.filters.takeoffPricingType = estimate.pricingType;
+    fillSelect("takeoffPricingTypeInput", pricingPrograms, estimate.pricingType);
+  }
+  if (estimate.pricingYear) {
+    state.filters.takeoffPricingYear = String(estimate.pricingYear);
+    fillSelect("takeoffPricingYearInput", availablePricingYears(), state.filters.takeoffPricingYear);
+  }
   byId("takeoffProjectTypeInput").value = normalizeProjectTypeLabel(estimate.projectType || defaultProjectType);
   renderTakeoffSelectors();
   if (estimate.warrantyType) byId("takeoffWarrantyTypeInput").value = estimate.warrantyType;
@@ -5321,7 +5347,16 @@ function renderWarrantySummaryChart() {
     capSheet: byId("warrantyCapSheetInput").value,
     term: byId("warrantyTermInput").value,
   });
-  const systems = filteredSystems.length ? filteredSystems : material.systems;
+  const systems = filteredSystems;
+  if (!systems.length) {
+    fillSystemSelect("warrantySystemInput", [], "");
+    ["warrantyCapAdhesiveInput", "warrantyBaseSheetInput", "warrantyBaseAdhesiveInput", "warrantySurfacingInput"].forEach((id) => fillSystemSelect(id, [], ""));
+    byId("warrantyPrimerInput").value = "";
+    byId("warrantySummaryCards").innerHTML = "";
+    byId("warrantySummaryRows").innerHTML = `<tr><td colspan="5">No catalog system matches this cap sheet and warranty term. Change the selections and verify eligibility with the current Garland warranty chart.</td></tr>`;
+    byId("warrantySummaryNotes").value = "No matching system. Warranty eligibility has not been established for these selections.";
+    return;
+  }
   fillSystemSelect("warrantySystemInput", systems.map((item) => item.product), byId("warrantySystemInput").value || "");
   const system = takeoffSystem({ systems }, byId("warrantySystemInput").value);
   const logic = systemLogic(system, {
@@ -5397,12 +5432,15 @@ function renderTakeoffEstimator() {
   const adjusted = takeoffAdjustedArea();
   const rows = takeoffEstimatorRows();
   const total = takeoffRowsTotal(rows);
+  const unresolved = rows.filter((row) => row.includes('data-needs-review="yes"')).length;
   byId("takeoffSummary").innerHTML = `
+    <span class="estimate-confidence"><strong>${unresolved ? "Needs pricing / quantity review" : "Material lines priced; specification review required"}</strong><br>Price-book year: ${escapeHtml(selectedTakeoffPricingYear())}. ${Number(selectedTakeoffPricingYear()) < new Date().getFullYear() ? "Older pricing year selected." : "Confirm effective date with supplier."}<br>Matching uploaded books: ${escapeHtml(matchingPriceBooks().map(book => book.name).join(", ") || "None; catalog pricing where available")}<br>Coverage rates and warranty eligibility require current manufacturer and project review.</span>
     <span><strong>Measured Area:</strong> ${area ? Math.round(area).toLocaleString() : "0"} sq. ft.</span>
     <span><strong>Adjusted Area:</strong> ${adjusted ? Math.ceil(adjusted).toLocaleString() : "0"} sq. ft.</span>
     <span><strong>Waste:</strong> ${escapeHtml(byId("takeoffWasteInput")?.value || "10")}%</span>
     <span><strong>Pricing:</strong> ${escapeHtml(selectedTakeoffPricingYear())} ${escapeHtml(selectedTakeoffPricingType())}</span>
-    <span><strong>Total Estimate:</strong> ${takeoffMoney(total)}</span>
+    <span><strong>Priced Material Subtotal:</strong> ${takeoffMoney(total)}</span>
+    <span><strong>${unresolved} line(s) missing price or purchase quantity.</strong> Review every material quantity and price. Unpriced items, labor, freight, tax, and project-specific details are excluded.</span>
   `;
   byId("takeoffResults").innerHTML = rows.join("");
   renderPriceBookList();
@@ -5425,7 +5463,7 @@ function renderPriceBookList() {
           (book) => `<div class="price-book-row">
             <div>
               <strong>${escapeHtml(book.name)}</strong>
-              <span>${escapeHtml([book.year, book.program || "Series Pricing", book.type, fileSizeLabel(book.size), `${book.extractedCount || 0} matched products`].filter(Boolean).join(" | "))}</span>
+              <span>${escapeHtml([book.year, book.program || "Series Pricing", book.type, fileSizeLabel(book.size), `${book.extractedCount || 0} matched products`, book.parserVersion === 2 ? "Single-price rows imported; check against original" : "Legacy import: re-upload to recheck prices"].filter(Boolean).join(" | "))}</span>
             </div>
             <div class="manage-actions">
               ${book.dataUrl ? `<a class="mini-button" href="${book.dataUrl}" download="${escapeHtml(book.name)}">Open</a>` : ""}
@@ -5453,6 +5491,7 @@ async function addPriceBookFiles(files) {
       size: file.size,
       dataUrl: "",
       extractedCount: 0,
+      parserVersion: 2,
       uploadedAt: new Date().toISOString(),
     };
     const dataUrl = await new Promise((resolve) => {
@@ -5463,6 +5502,7 @@ async function addPriceBookFiles(files) {
     entry.dataUrl = dataUrl;
     const extracted = await readPriceBookProducts(file, entry);
     entry.extractedCount = extracted.length;
+    if (!extracted.length) alert(`${file.name}: saved as a reference document. No unambiguous product prices were imported. Review the original before using this book for an estimate.`);
     if (extracted.length) {
       const keys = new Set(extracted.map((item) => `${item.year}|${item.program}|${item.number}`));
       state.priceBookProducts = state.priceBookProducts.filter((item) => !keys.has(`${item.year}|${item.program}|${item.number}`)).concat(extracted);
@@ -7089,8 +7129,8 @@ function renderCallList() {
   const accounts = accountsForCallDay(day).filter(a => !gydIds.has(a.id));
   const dateLabel = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   byId("callListTitle").textContent = `${day} Calls`;
-  byId("callListCount").textContent = `${accounts.length} accounts`;
-  byId("callListTodayPanel").querySelector(".panel-header span").textContent = dateLabel;
+  byId("callListCount").textContent = `${accounts.filter((account) => state.callLists.completed[callCompletionKey(day, account.id)]).length} of ${accounts.length} complete`;
+  byId("callListTodayPanel").querySelector(".panel-header span").textContent = `${dateLabel} · ${byId("callListCount").textContent}`;
   byId("callListSetupPanel").querySelector(".panel-header span").textContent = "Assign by Day";
   byId("callListView").querySelectorAll("[data-call-list-mode]").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.callListMode === state.callListMode);
@@ -7128,13 +7168,16 @@ function renderCallList() {
             : "";
           const contactChips = [phoneChip, emailChip].filter(Boolean).join("");
           return `<div class="call-item ${done ? "is-complete" : ""}">
-            <input type="checkbox" data-call-account="${account.id}" data-call-day="${day}" ${done ? "checked" : ""} />
+            <input type="checkbox" aria-label="Log call for ${escapeHtml(account.client)}" data-call-account="${account.id}" data-call-day="${day}" ${done ? "checked" : ""} />
             <div class="call-account-info">
               <button class="call-account-button" data-open-account-dialog="${account.id}" type="button" title="Edit account">
                 <strong>${escapeHtml(account.client)}</strong>
                 ${account.poc ? `<small>${escapeHtml(account.poc)}</small>` : ""}
               </button>
               ${contactChips ? `<div class="call-contact-chips">${contactChips}</div>` : ""}
+              ${latestAccountActivity(account) ? `<p class="call-saved-note"><strong>Latest saved:</strong> ${escapeHtml(latestAccountActivity(account).note || "")} <small>${escapeHtml(compactDate(latestAccountActivity(account).createdAt))}</small></p>` : ""}
+              ${latestAccountActivity(account) ? `<p class="call-save-label" data-call-save-account="${escapeHtml(account.id)}" data-call-save-id="${escapeHtml(latestAccountActivity(account).id)}" data-call-save-completion="${escapeHtml(latestAccountActivity(account).completionKey || "")}">${escapeHtml(callSaveLabel(account.id, latestAccountActivity(account).id, latestAccountActivity(account).completionKey || ""))}</p>` : ""}
+              <button class="mini-button call-log-button" data-open-call-account="${escapeHtml(account.id)}" data-call-log-day="${escapeHtml(day)}" type="button">Log call / note</button>
             </div>
             <button class="call-account-page-btn" data-open-account-page="${escapeHtml(account.id)}" type="button" title="Open account page">↗</button>
             <div class="call-item-calendar">
@@ -7327,14 +7370,13 @@ function addCallListRule(form) {
 
 function completeCallListItem(accountId, day, checked, addDefaultActivity = true, refresh = true) {
   const key = callCompletionKey(day, accountId);
-  if (checked) {
-    state.callLists.completed[key] = new Date().toISOString();
-    if (addDefaultActivity) addAccountActivity(accountId, `Completed ${day} call list call.`, false);
-  } else {
-    delete state.callLists.completed[key];
-    saveCallLists();
-  }
-  saveCallLists();
+  const latest = readStorageJson("garlandCallLists", state.callLists);
+  const next = { ...latest, completed: { ...(latest.completed || {}) } };
+  if (checked) next.completed[key] = next.completed[key] || new Date().toISOString();
+  else delete next.completed[key];
+  localStorage.setItem("garlandCallLists", JSON.stringify(next));
+  state.callLists = next;
+  if (checked && addDefaultActivity) addAccountActivity(accountId, `Completed ${day} call list call.`, false);
   if (refresh) renderCallList();
 }
 
@@ -7342,17 +7384,24 @@ function handleCallListCheckbox(callCheckbox) {
   if (!callCheckbox) return;
   if (callCheckbox.checked) {
     callCheckbox.closest(".call-item")?.classList.add("is-complete");
-    completeCallListItem(callCheckbox.dataset.callAccount, callCheckbox.dataset.callDay, true, false, false);
+    // Completion is committed with the outcome, not before the call is logged.
     openCallActivityDialog(callCheckbox.dataset.callAccount, callCheckbox.dataset.callDay, true);
   } else {
     callCheckbox.closest(".call-item")?.classList.remove("is-complete");
-    completeCallListItem(callCheckbox.dataset.callAccount, callCheckbox.dataset.callDay, false);
+    try {
+      completeCallListItem(callCheckbox.dataset.callAccount, callCheckbox.dataset.callDay, false);
+    } catch (_) {
+      renderCallList();
+      alert("Could not save the checkbox change. The previous completion is still saved; please try again.");
+    }
   }
 }
 
 function openCallActivityDialog(accountId, day = "", completeCall = false) {
   const account = cleanAccounts().find((item) => item.id === accountId);
   if (!account) return;
+  if (byId("callActivityDialog").open && !finishCallActivity(false)) return;
+  clearTimeout(callActivitySaveTimer);
   const latest = latestAccountActivity(account);
   byId("callActivityForm").reset();
   byId("callActivityAccountId").value = account.id;
@@ -7360,7 +7409,10 @@ function openCallActivityDialog(accountId, day = "", completeCall = false) {
   byId("callActivityComplete").value = completeCall ? "yes" : "";
   byId("callActivityTitle").textContent = account.client || "Client Call";
   byId("callActivityDetails").innerHTML = `
-    <div class="field-grid">
+    <p class="call-contact-summary">${escapeHtml(account.poc || account.client || "")}
+      ${account.phone ? `<a class="mini-button" href="tel:${escapeHtml(String(account.phone).replace(/[^0-9+]/g, ""))}">Call ${escapeHtml(account.phone)}</a>` : ""}
+    </p>
+    <details class="call-context"><summary>Contact details &amp; previous activity</summary><div class="field-grid">
       ${field("Contact", account.poc)}
       ${field("Title", account.title)}
       ${account.phone ? `<div class="field"><span>Phone</span><strong><a href="tel:${escapeHtml(String(account.phone).replace(/[^0-9+]/g, ""))}">${escapeHtml(account.phone)}</a></strong></div>` : ""}
@@ -7369,45 +7421,179 @@ function openCallActivityDialog(accountId, day = "", completeCall = false) {
       ${field("County", account.county)}
       ${field("Address", buildFullAddress(account))}
       ${field("Last Activity", latest ? `${compactDate(latest.createdAt)} - ${latest.note || latest.source || ""}` : "No activity logged yet")}
-    </div>
+    </div></details>
   `;
   const draftKey = callActivityDraftKey(account.id);
   byId("callActivityForm").elements.activity.value = localStorage.getItem(draftKey) || "";
+  const draftSession = readStorageJson(`${draftKey}:session`, null);
+  byId("callActivityForm").dataset.activityId = draftSession?.id || `activity-${crypto.randomUUID()}`;
+  byId("callActivityForm").dataset.createdAt = draftSession?.createdAt || new Date().toISOString();
+  setCallSaveStatus(byId("callActivityForm").elements.activity.value ? "Recovered your note. Choose Save or an outcome to log it." : "Tap an outcome to save this call immediately. Notes also autosave.");
+  if (byId("saveNextCallActivityButton")) byId("saveNextCallActivityButton").hidden = !day;
+  const progress = day ? accountsForCallDay(day).filter(item => !graveyardAccountIds().has(item.id)) : [];
+  if (progress.length) byId("callActivityDetails").insertAdjacentHTML("afterbegin", `<p id="callActivityProgress" class="call-progress">Account ${progress.findIndex(item => item.id === account.id) + 1} of ${progress.length} · ${progress.filter(item => state.callLists.completed[callCompletionKey(day, item.id)]).length} completed</p>`);
+  if (byId("callFollowupPanel")) {
+    byId("callFollowupPanel").hidden = !/left voicemail/i.test(byId("callActivityForm").elements.activity.value);
+    byId("callFollowupDate").value = callFollowupDate();
+    byId("callFollowupStatus").textContent = "Suggested: 3 business days. Change the date or skip this step.";
+  }
   openDialog("callActivityDialog");
+  refreshCallSaveLabels();
 }
 
 function callActivityDraftKey(accountId) {
   return `gripCallDraft:${localStorage.getItem("gripCurrentUserId") || "local"}:${accountId}`;
 }
 
+let callActivitySaveTimer;
+
+function setCallSaveStatus(message, failed = false) {
+  const status = byId("callActivitySaveStatus");
+  if (!status) return;
+  status.textContent = message;
+  status.dataset.failed = failed ? "yes" : "no";
+}
+
 function saveCallActivityDraft() {
   const form = byId("callActivityForm");
   const accountId = form.elements.accountId.value;
-  if (!accountId) return;
+  if (!accountId) return true;
   try {
-    localStorage.setItem(callActivityDraftKey(accountId), form.elements.activity.value);
+    const key = callActivityDraftKey(accountId);
+    // Keep a stable ID across reloads and retries, so autosave cannot duplicate calls.
+    localStorage.setItem(`${key}:session`, JSON.stringify({id:form.dataset.activityId, createdAt:form.dataset.createdAt}));
+    localStorage.setItem(key, form.elements.activity.value);
+    return true;
   } catch (_) {
-    // Keep the typed note visible if this device has run out of storage.
-    alert("This device could not save your draft. Keep this note open and copy it before leaving.");
+    setCallSaveStatus("Could not save on this device. Keep this note open and copy it before leaving.", true);
+    return false;
   }
 }
 
-function saveCallActivity(form) {
-  const accountId = form.get("accountId");
-  addAccountActivity(accountId, form.get("activity"), false);
-  if (form.get("completeCall") === "yes") completeCallListItem(accountId, form.get("day"), true, false);
-  localStorage.removeItem(callActivityDraftKey(accountId));
+function persistCallActivity() {
+  clearTimeout(callActivitySaveTimer);
+  const form = byId("callActivityForm");
+  const accountId = form.elements.accountId.value;
+  const note = String(form.elements.activity.value || "").trim();
+  if (!accountId || !form.dataset.activityId) return false;
+  if (!saveCallActivityDraft()) return false;
+  if (!note) {
+    setCallSaveStatus("Choose an outcome or enter a note. Previously saved call history is unchanged.");
+    return true;
+  }
+  try {
+    // Read the latest durable records; stale screen state must never erase another call.
+    const activities = readStorageJson("garlandAccountActivities", {});
+    const entries = Array.isArray(activities[accountId]) ? activities[accountId] : [];
+    const existing = entries.find((item) => item.id === form.dataset.activityId);
+    const entry = { ...existing, id:form.dataset.activityId, accountId, note,
+      createdAt:existing?.createdAt || form.dataset.createdAt, source:"Call List", completionKey:form.elements.completeCall.value === "yes" ? callCompletionKey(form.elements.day.value, accountId) : "", files:existing?.files || [] };
+    const next = { ...activities, [accountId]:[entry, ...entries.filter((item) => item.id !== entry.id)] };
+    if (!existing || existing.note !== note) localStorage.setItem("garlandAccountActivities", JSON.stringify(next));
+    state.activities = next;
+    if (form.elements.completeCall.value === "yes") completeCallListItem(accountId, form.elements.day.value, true, false, false);
+    setCallSaveStatus("Saved on this device. You can move to the next account.");
+    renderCallList();
+    refreshCallSaveLabels();
+    return true;
+  } catch (_) {
+    setCallSaveStatus("Save did not finish. Your note is still here. Retry Save before moving on.", true);
+    return false;
+  }
+}
+
+function queueCallActivitySave() {
+  clearTimeout(callActivitySaveTimer);
+  if (!saveCallActivityDraft()) return;
+  setCallSaveStatus("Saving note…");
+  callActivitySaveTimer = setTimeout(persistCallActivity, 350);
+}
+
+function finishCallActivity(nextAccount = false) {
+  const form = byId("callActivityForm");
+  const accountId = form.elements.accountId.value;
+  const day = form.elements.day.value;
+  if (!persistCallActivity()) return false;
+  const key = callActivityDraftKey(accountId);
+  localStorage.removeItem(key);
+  localStorage.removeItem(`${key}:session`);
   byId("callActivityDialog").close();
   renderCallList();
+  if (nextAccount && day) {
+    const hidden = graveyardAccountIds();
+    const accounts = accountsForCallDay(day).filter((item) => !hidden.has(item.id));
+    const index = accounts.findIndex((item) => item.id === accountId);
+    const ordered = [...accounts.slice(index + 1), ...accounts.slice(0, index)];
+    const next = ordered.find((item) => item.id !== accountId && !state.callLists.completed[callCompletionKey(day, item.id)]);
+    if (next) openCallActivityDialog(next.id, day, true);
+  }
+  return true;
+}
+
+function saveCallActivity() {
+  return finishCallActivity(false);
 }
 
 function addCallOutcomeToActivity(outcome) {
   const textarea = byId("callActivityForm")?.elements.activity;
   if (!textarea || !outcome) return;
   const current = String(textarea.value || "").trim();
-  textarea.value = current ? `${current}\n${outcome}` : outcome;
-  saveCallActivityDraft();
-  textarea.focus();
+  if (!current.split("\n").includes(outcome)) textarea.value = current ? `${current}\n${outcome}` : outcome;
+  persistCallActivity();
+  if (/left voicemail/i.test(outcome) && byId("callFollowupPanel")) byId("callFollowupPanel").hidden = false;
+}
+
+function callFollowupDate(start = new Date()) {
+  const date = new Date(start);
+  let days = 0;
+  while (days < 3) { date.setDate(date.getDate() + 1); if (date.getDay() !== 0 && date.getDay() !== 6) days++; }
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function addCallFollowup() {
+  const form = byId("callActivityForm");
+  const date = byId("callFollowupDate").value;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { byId("callFollowupStatus").textContent = "Choose a follow-up date first."; return false; }
+  if (!persistCallActivity()) return false;
+  if (!String(form.elements.activity.value).trim()) return false;
+  const account = cleanAccounts().find(item => item.id === form.elements.accountId.value);
+  if (!account) return false;
+  try {
+    const tasks = readStorageJson("garlandTasks", []);
+    const id = `call-followup-${form.dataset.activityId}`;
+    const existing = tasks.find(item => item.task_id === id);
+    const task = normalizedTask({ ...existing, task_id:id, title:`Follow up with ${account.client}`, account_id:account.id,
+      account_name:account.client, due_date:date, description:form.elements.activity.value,
+      next_action:"Call following voicemail", updated_at:new Date().toISOString() });
+    const next = [task, ...tasks.filter(item => item.task_id !== id)];
+    localStorage.setItem("garlandTasks", JSON.stringify(next));
+    state.tasks = next;
+    byId("callFollowupStatus").textContent = `Follow-up saved on this device for ${date}. Check the main sync status for cloud upload. Find it in Tasks; it appears in Today when due.`;
+    return true;
+  } catch (_) { byId("callFollowupStatus").textContent = "Could not save the follow-up. Retry before leaving."; return false; }
+}
+
+function callSaveLabel(accountId, activityId, completionKey = "") {
+  return window.gripSync?.callSaveStatus?.(accountId, activityId, completionKey) || "Saved on phone · cloud not confirmed";
+}
+
+function refreshCallSaveLabels() {
+  document.querySelectorAll("[data-call-save-account]").forEach(label => {
+    label.textContent = callSaveLabel(label.dataset.callSaveAccount, label.dataset.callSaveId, label.dataset.callSaveCompletion);
+  });
+  const form = byId("callActivityForm");
+  const progress = byId("callActivityProgress");
+  if (progress && form?.elements.day.value) {
+    const day = form.elements.day.value;
+    const accounts = accountsForCallDay(day).filter(item => !graveyardAccountIds().has(item.id));
+    progress.textContent = `Account ${accounts.findIndex(item => item.id === form.elements.accountId.value) + 1} of ${accounts.length} · ${accounts.filter(item => state.callLists.completed[callCompletionKey(day, item.id)]).length} completed`;
+  }
+  const label = byId("callActivityCloudStatus");
+  if (!label || !form?.dataset.activityId) return;
+  const status = callSaveLabel(form.elements.accountId.value, form.dataset.activityId,
+    form.elements.completeCall.value === "yes" ? callCompletionKey(form.elements.day.value, form.elements.accountId.value) : "");
+  label.textContent = status;
+  if (byId("retryCallUploadButton")) byId("retryCallUploadButton").hidden = status === "Saved to cloud" || status === "Not saved";
 }
 
 function quickRecordTitle(type, record) {
@@ -11479,11 +11665,34 @@ function bindEvents() {
     addSupportContact(form.get("contractor"), form);
     byId("supportContactDialog").close();
   });
-  byId("cancelCallActivityButton").addEventListener("click", () => byId("callActivityDialog").close());
-  byId("callActivityForm").elements.activity.addEventListener("input", saveCallActivityDraft);
+  byId("cancelCallActivityButton").addEventListener("click", () => finishCallActivity(false));
+  byId("callActivityDialog").addEventListener("cancel", (event) => { event.preventDefault(); finishCallActivity(false); });
+  byId("saveNextCallActivityButton")?.addEventListener("click", () => {
+    if (byId("callActivityForm").reportValidity()) finishCallActivity(true);
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden" && byId("callActivityDialog").open) persistCallActivity();
+  });
+  window.addEventListener("pagehide", () => { if (byId("callActivityDialog").open) persistCallActivity(); });
+  byId("addCallFollowupButton")?.addEventListener("click", addCallFollowup);
+  byId("retryCallUploadButton")?.addEventListener("click", async () => {
+    if (!persistCallActivity()) return;
+    const button = byId("retryCallUploadButton");
+    button.disabled = true;
+    try { await window.gripSync?.forceSync(); } finally { button.disabled = false; refreshCallSaveLabels(); }
+  });
+  const cloudStatus = byId("gripSyncStatus");
+  if (cloudStatus) {
+    const reflectCloud = refreshCallSaveLabels;
+    new MutationObserver(reflectCloud).observe(cloudStatus, {childList:true, characterData:true, subtree:true});
+    reflectCloud();
+  }
+  byId("callActivityForm").elements.activity.addEventListener("input", queueCallActivitySave);
   byId("clearCallActivityButton").addEventListener("click", () => {
     byId("callActivityForm").elements.activity.value = "";
+    clearTimeout(callActivitySaveTimer);
     saveCallActivityDraft();
+    setCallSaveStatus("Note cleared. Previously saved call history is unchanged.");
   });
   byId("callActivityDialog").addEventListener("click", (event) => {
     const outcome = event.target.closest("[data-call-outcome]");
@@ -11966,7 +12175,7 @@ function bindEvents() {
     }
     const openCallAccount = event.target.closest("[data-open-call-account]");
     if (openCallAccount) {
-      openCallActivityDialog(openCallAccount.dataset.openCallAccount);
+      openCallActivityDialog(openCallAccount.dataset.openCallAccount, openCallAccount.dataset.callLogDay || "", Boolean(openCallAccount.dataset.callLogDay));
       return;
     }
     const openAccountPage = event.target.closest("[data-open-account-page]");
