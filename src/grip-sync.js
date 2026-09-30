@@ -575,19 +575,17 @@
     ]);
     if (pullResult) releaseInitialData();
     if (pullResult === "empty") {
-      // First time — offer to push local data up
-      if (Object.keys(localStorage).some((k) => SYNC_KEYS.has(k))) {
-        const upload = confirm(
-          "You have existing GRIP data on this device.\n\nUpload it to your cloud account now?\n\n(Click Cancel to start fresh — your local data stays safe.)"
-        );
-        if (upload) await pushAllLocalData();
-      }
+      // Supabase is empty — push all local data up
+      updateSyncIndicator("syncing");
+      await pushAllLocalData();
     } else if (pullResult) {
       if (typeof window.gripReloadData === "function") window.gripReloadData();
       if (typeof window._gripHandleRemoteUpdate === "function") {
         for (const key of SYNC_KEYS) window._gripHandleRemoteUpdate(key);
       }
       _gripFullRender();
+      // Background-push any local keys not yet in Supabase (e.g. data added while logged out)
+      setTimeout(() => pushAllLocalData(), 2000);
     }
     if (pullResult === "empty") _gripFullRender();
     if (!pullResult && loadingMessage) loadingMessage.textContent = "Cloud data could not load. Your stored changes are safe. Continue locally to work offline, or try again when connected.";
@@ -814,6 +812,15 @@
       _gripFullRender();
       showAuthOverlay(false);
       updateSyncIndicator("local");
+    },
+
+    async forceUpload() {
+      const user = await getUser();
+      if (!user) { updateSyncIndicator("error"); return; }
+      syncProblem = false;
+      updateSyncIndicator("syncing");
+      await pushAllLocalData();
+      updateSyncIndicator("saved");
     },
 
     async forceSync() {
