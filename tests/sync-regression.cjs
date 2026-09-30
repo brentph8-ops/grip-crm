@@ -1,5 +1,5 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),{randomUUID}=require('node:crypto');
-const source=fs.readFileSync(require('node:path').join(__dirname, '../src/grip-sync.js'),'utf8').replace('  // Run on DOM ready','  window.testSync={flushPending,pullAll,trackRecordChanges,mergeRecordChanges,hasPending};\n  // Run on DOM ready');
+const source=fs.readFileSync(require('node:path').join(__dirname, '../src/grip-sync.js'),'utf8').replace('  // Run on DOM ready','  window.testSync={flushPending,pullAll,trackRecordChanges,mergeRecordChanges,hasPending,releaseInitialData};\n  // Run on DOM ready');
 let clock=0, fail=false, beforeUpdate=null, afterRead=null; const db=new Map();
 const client={auth:{getSession:async()=>({data:{session:{user:{id:'u'}}}})},from:()=>{
  let key,version,mode='read',value;
@@ -7,13 +7,13 @@ const client={auth:{getSession:async()=>({data:{session:{user:{id:'u'}}}})},from
  async function execute(){if(fail)return {error:{message:'network unavailable'}};if(mode==='read'){const data=key?structuredClone(db.get(key)||null):[...db].map(([data_key,row])=>({data_key,...structuredClone(row)}));if(!key&&afterRead){const f=afterRead;afterRead=null;await f();}return {data};}if(beforeUpdate){const f=beforeUpdate;beforeUpdate=null;await f();}const existing=db.get(key);if(mode==='update'&&existing?.updated_at!==version)return {data:[]};if(mode==='insert'&&existing)return {error:{message:'duplicate'}};const updated_at=String(++clock);db.set(key,{data_value:structuredClone(value),updated_at});return {data:[{updated_at}]};}
  return q;
 }};
-function boot(seed={}){
+function boot(seed={}, ready=true){
  // Browser Storage uses named setters: assigning storage.setItem stores text,
  // rather than replacing the prototype method. A plain object misses this bug.
  const values=new Map(Object.entries(seed));
  class Storage { getItem(k){return values.get(k)??null} setItem(k,v){values.set(k,String(v))} removeItem(k){values.delete(k)} }
  const storage=new Proxy(new Storage(),{set(target,k,v){values.set(k,String(v));return true},ownKeys(){return [...values.keys()]},getOwnPropertyDescriptor(target,k){if(values.has(k))return {configurable:true,enumerable:true,value:values.get(k)}},get(target,k){return k in target?Reflect.get(target,k):values.get(k)}});
-const indicator={};const w={GRIP_SUPABASE_URL:'https://example.supabase.co',GRIP_SUPABASE_ANON:'x'.repeat(30),_gripSupabaseClient:client,addEventListener(){}};const c={window:w,localStorage:storage,document:{readyState:'loading',addEventListener(){},getElementById:()=>indicator},console:{warn(){}},crypto:{randomUUID},Date,URLSearchParams,setTimeout:()=>1,clearTimeout(){},setInterval:()=>1,clearInterval(){}};vm.runInNewContext(source,c);return {s:storage,t:w.testSync,api:w.gripSync,indicator};}
+const indicator={};const w={GRIP_SUPABASE_URL:'https://example.supabase.co',GRIP_SUPABASE_ANON:'x'.repeat(30),_gripSupabaseClient:client,addEventListener(){}};const c={window:w,localStorage:storage,document:{readyState:'loading',addEventListener(){},getElementById:()=>indicator},console:{warn(){}},crypto:{randomUUID},Date,URLSearchParams,setTimeout:()=>1,clearTimeout(){},setInterval:()=>1,clearInterval(){}};vm.runInNewContext(source,c);if(ready)w.testSync.releaseInitialData();return {s:storage,t:w.testSync,api:w.gripSync,indicator};}
 const calls=completed=>({rules:[],completed});const K='garlandCallLists';
 (async()=>{
  let a=boot({gripCurrentUserId:'u',[K]:JSON.stringify(calls({}))});
@@ -41,7 +41,7 @@ const calls=completed=>({rules:[],completed});const K='garlandCallLists';
  assert.equal(db.get(K).data_value.completed.remote,'done');
  const O='garlandOutreach'; c.s.setItem(O,JSON.stringify({settings:{gmailToken:'device-only',gmailTokenExpiry:123}})); await c.t.flushPending(); assert.equal(JSON.parse(c.s.getItem(O)).settings.gmailToken,'device-only'); assert.equal(db.get(O).data_value.settings.gmailToken,undefined);
  // Conflicting generic records are protected, not force-overwritten.
- const N='garlandCrmNotes';db.set(N,{data_value:{a:'cloud'},updated_at:'initial'});await c.t.pullAll();c.s.setItem(N,JSON.stringify({a:'phone'}));db.set(N,{data_value:{a:'other device'},updated_at:'changed'});await c.t.flushPending();assert(c.t.hasPending(N));assert.equal(db.get(N).data_value.a,'other device');assert.equal(JSON.parse(c.s.getItem(N)).a,'phone');assert.match(c.indicator.innerHTML,/Conflicting/);
+ const N='garlandCrmNotes';db.set(N,{data_value:{a:'cloud'},updated_at:'initial'});await c.t.pullAll();c.s.setItem(N,JSON.stringify({a:'phone'}));db.set(N,{data_value:{a:'other device'},updated_at:'changed'});await c.t.flushPending();assert(c.t.hasPending(N));assert.equal(db.get(N).data_value.a,'other device');assert.equal(JSON.parse(c.s.getItem(N)).a,'phone');assert.match(c.indicator.innerHTML,/conflicting/);
  // Activity records on separate clients merge; conflicting edits to one note stop.
  const A='garlandAccountActivities',old={a:[{id:'1',note:'old'}]},next={a:[{id:'1',note:'old'},{id:'2',note:'new'}]},remote={...old,b:[{id:'3',note:'remote'}]};
  const edits=c.t.trackRecordChanges(A,JSON.stringify(old),JSON.stringify(next));const merged=c.t.mergeRecordChanges(A,remote,edits);assert.equal(merged.a.length,2);assert.equal(merged.b.length,1);
@@ -96,5 +96,27 @@ const calls=completed=>({rules:[],completed});const K='garlandCallLists';
  assert.match(statusPhone.api.callSaveStatus('statusAccount','status-note','statusCall'),/retry/);
  await statusPhone.t.flushPending();
  assert.equal(statusPhone.api.callSaveStatus('statusAccount','status-note','statusCall'),'Saved to cloud');
+ // Real startup seeding on a clean device must never queue or replace cloud CRM.
+ const cold=boot({},false), crm='garlandCrmData';
+ const desktop={accounts:[{id:'desktop',client:'Desktop account'}]};
+ db.set(crm,{data_value:desktop,updated_at:String(++clock)});
+ const app=fs.readFileSync(require('node:path').join(__dirname,'../src/app.js'),'utf8');
+ const begin=app.indexOf('(function seedAccounts()');
+ const seed=app.slice(begin,app.indexOf('})();',begin)+5);
+ vm.runInNewContext(seed,{localStorage:cold.s,savedCrm:{accounts:[]},Date,Set});
+ assert.equal(cold.s.getItem(crm),null);assert(!cold.t.hasPending(crm));
+ cold.s.setItem('gripCurrentUserId','u');await cold.t.flushPending();await cold.t.pullAll();
+ assert.equal(JSON.parse(cold.s.getItem(crm)).accounts[0].id,'desktop');
+ cold.t.releaseInitialData();cold.s.setItem(crm,JSON.stringify({accounts:[{id:'desktop',client:'Edited'}]}));
+ assert(cold.t.hasPending(crm));await cold.t.flushPending();assert.equal(db.get(crm).data_value.accounts[0].client,'Edited');
+ // Legacy pending work is never discarded or replaced by initialization writes.
+ const legacy=boot({gripCurrentUserId:'u'});legacy.s.setItem(crm,JSON.stringify({accounts:[{id:'unsent'}]}));
+ const reload=boot(Object.fromEntries(Object.entries(legacy.s).filter(([k,v])=>typeof v==='string')),false);
+ const savedQueue=reload.s.getItem('grip_pending_saves_v1');
+ reload.s.setItem(crm,JSON.stringify({accounts:[{id:'automatic-default'}]}));
+ assert.equal(reload.s.getItem('grip_pending_saves_v1'),savedQueue);
+ await reload.t.pullAll();assert.equal(JSON.parse(reload.s.getItem(crm)).accounts[0].id,'unsent');
+ assert.equal(db.get(crm).data_value.accounts[0].client,'Edited');
+ console.log('PASS: clean-device hydration before seeds; stored offline edits and pending queues preserved.');
  console.log('PASS: durable offline retry, reload recovery, checked/unchecked calls, concurrent clients, in-flight edits, stale pulls, cloud conflicts, and activity merges.');
 })().catch(e=>{console.error(e);process.exitCode=1});
