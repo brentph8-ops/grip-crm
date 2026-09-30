@@ -8563,7 +8563,7 @@ button#gripSyncStatus:hover { opacity: 0.75; }
 #callActivityDialog .call-outcome-buttons button { white-space: normal; }
 
 /* ── Talon floating AI assistant ─────────────────────────────────── */
-#talon-root { position: fixed; bottom: 20px; right: 16px; z-index: 10000; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+#talon-root { position: fixed; top: 62px; right: 16px; z-index: 10000; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
 .talon-btn { width: 56px; height: 56px; border-radius: 50%; border: none; cursor: pointer; background: none; padding: 0; position: relative; filter: drop-shadow(0 4px 12px rgba(15,47,94,.55)); transition: transform .15s; }
 .talon-btn:hover { transform: scale(1.08); }
 .talon-btn:active { transform: scale(0.95); }

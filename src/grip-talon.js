@@ -324,6 +324,10 @@ Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'lon
     const root = document.createElement('div');
     root.id = 'talon-root';
     root.innerHTML = `
+      <button id="talon-btn" class="talon-btn" aria-label="Open Talon AI assistant">
+        ${eagleSvg(40)}
+        ${!hasKey ? '<span class="talon-pulse"></span>' : ''}
+      </button>
       <div id="talon-panel" class="talon-panel" hidden>
         <div class="talon-header">
           <div class="talon-header-left">
@@ -376,11 +380,6 @@ Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'lon
           <button id="talon-key-clear" class="talon-key-clear">Remove key</button>
         </div>
       </div>
-
-      <button id="talon-btn" class="talon-btn" aria-label="Open Talon AI assistant">
-        ${eagleSvg(40)}
-        ${!hasKey ? '<span class="talon-pulse"></span>' : ''}
-      </button>
     `;
     document.body.appendChild(root);
 
