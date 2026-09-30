@@ -284,34 +284,60 @@ Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'lon
     if (dots)  dots.hidden    = !on;
   }
 
-  // ── Avatar SVG (Talon the eagle) ─────────────────────────────────
+  // ── Avatar SVG (Talon — bald eagle head) ─────────────────────────
+  let _eid = 0;
   function eagleSvg(size) {
+    const u = ++_eid;
     return `<svg width="${size}" height="${size}" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="talon-bg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="#0f2f5e"/>
-          <stop offset="100%" stop-color="#16213e"/>
-        </linearGradient>
+        <clipPath id="ec${u}"><circle cx="24" cy="24" r="22"/></clipPath>
       </defs>
-      <circle cx="24" cy="24" r="23" fill="url(#talon-bg)"/>
-      <!-- Wings -->
-      <path d="M5 26 Q10 16 18 21 L24 24 L30 21 Q38 16 43 26 Q38 30 30 27 L24 30 L18 27 Q10 30 5 26Z" fill="#c9a227"/>
-      <!-- Head/body -->
-      <ellipse cx="24" cy="20" rx="9" ry="11" fill="#f5f0e6"/>
-      <!-- Crown feathers -->
-      <path d="M15 16 Q18 9 24 12 Q30 9 33 16 Q28 13 24 14 Q20 13 15 16Z" fill="#8b5e0a"/>
-      <!-- Brow shadow -->
-      <path d="M15 18 Q20 16 24 17 Q28 16 33 18" stroke="#8b5e0a" stroke-width="1.5" fill="none"/>
-      <!-- Eyes -->
-      <ellipse cx="19.5" cy="20.5" rx="3.2" ry="3" fill="#f5a623"/>
-      <ellipse cx="28.5" cy="20.5" rx="3.2" ry="3" fill="#f5a623"/>
-      <circle cx="20" cy="21" r="1.7" fill="#111"/>
-      <circle cx="29" cy="21" r="1.7" fill="#111"/>
-      <circle cx="20.6" cy="20.3" r="0.6" fill="white"/>
-      <circle cx="29.6" cy="20.3" r="0.6" fill="white"/>
-      <!-- Beak -->
-      <path d="M21.5 25 Q24 24 26.5 25 Q25 27 24 29 Q23 27 21.5 25Z" fill="#f5a623"/>
-      <line x1="21.5" y1="26.3" x2="26.5" y2="26.3" stroke="#c47d00" stroke-width="0.8"/>
+      <!-- Dark navy bg -->
+      <circle cx="24" cy="24" r="23" fill="#16213e"/>
+      <g clip-path="url(#ec${u})">
+        <!-- Brown feathered body/neck fanning down -->
+        <path d="M6 50 C10 28 18 20 26 18 C34 16 42 20 50 28 L50 50Z" fill="#7a5010"/>
+        <!-- Darker under-feather layer -->
+        <path d="M4 50 C8 33 16 25 22 23 C20 28 18 35 16 44Z" fill="#5a3808"/>
+        <!-- Feather V-marks (like in reference image) -->
+        <path d="M12 34 L17 26 L22 34" stroke="#4a2a04" stroke-width="1.3" fill="none" stroke-linejoin="round"/>
+        <path d="M19 42 L24 32 L29 42" stroke="#4a2a04" stroke-width="1.2" fill="none" stroke-linejoin="round"/>
+        <path d="M26 50 L31 40 L36 50" stroke="#4a2a04" stroke-width="1.1" fill="none" stroke-linejoin="round"/>
+        <path d="M6 44 L11 36 L16 44" stroke="#4a2a04" stroke-width="1" fill="none" stroke-linejoin="round"/>
+        <!-- Feather highlight lines -->
+        <path d="M10 38 Q16 29 24 24" stroke="#9a6c20" stroke-width="0.9" fill="none" opacity="0.7"/>
+        <path d="M16 44 Q21 34 28 28" stroke="#9a6c20" stroke-width="0.8" fill="none" opacity="0.6"/>
+        <!-- WHITE HEAD -->
+        <path d="M13 4 C21 2 36 6 39 16 C41 24 37 35 30 37 C23 39 15 34 11 26 C7 18 7 8 13 4Z" fill="#eae4d2"/>
+        <!-- Brown crown / top of head -->
+        <path d="M13 4 C21 2 36 6 39 16 C35 8 26 4 18 6 C13 7 11 11 11 15 C10 10 11 6 13 4Z" fill="#7a5010"/>
+        <!-- Subtle brown streaks on white head -->
+        <path d="M20 11 C23 9 27 9 30 11" stroke="#b08030" stroke-width="0.9" fill="none" opacity="0.4"/>
+        <path d="M16 16 C19 13 24 12 28 14" stroke="#b08030" stroke-width="0.8" fill="none" opacity="0.35"/>
+        <!-- BROW RIDGE — angry dark V above eye -->
+        <path d="M10 20 C14 13 21 12 27 15 C21 15 14 17 10 20Z" fill="#5a3808"/>
+        <path d="M10 20 C15 12 22 11 28 15" stroke="#3a2004" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+        <!-- EYE: fierce amber -->
+        <circle cx="26" cy="23" r="5.2" fill="#c87808"/>
+        <circle cx="26" cy="23" r="3.1" fill="#0c0802"/>
+        <circle cx="27.8" cy="21.4" r="1.3" fill="rgba(255,255,255,0.88)"/>
+        <circle cx="26" cy="23" r="5" fill="none" stroke="#e8a018" stroke-width="0.7"/>
+        <!-- BEAK: hooked, facing left -->
+        <!-- Upper mandible -->
+        <path d="M12 19 C8 18 4 19 2 21 C3.5 21 7 21.5 11 22 L12 21Z" fill="#e09010"/>
+        <!-- Hooked tip -->
+        <path d="M2 21 C0 21.5 -0.5 23.5 1 25 C2.5 25.5 5 24.5 5.5 23 C4 23.5 2.5 22.5 2 21Z" fill="#c07008"/>
+        <!-- Lower mandible -->
+        <path d="M12 21.5 L8 23 L5.5 24" stroke="#d08010" stroke-width="1.9" fill="none" stroke-linecap="round"/>
+        <!-- Beak highlight ridge -->
+        <path d="M12 19 C8 18.2 4.5 19.2 2.5 20.5" stroke="#f0b828" stroke-width="0.8" fill="none"/>
+        <!-- Nostril -->
+        <ellipse cx="8" cy="19.5" rx="1.8" ry="0.9" fill="#8a5508" opacity="0.75"/>
+        <!-- Mouth line -->
+        <path d="M12 20.5 C9.5 21 7 22.5 5.5 23.5" stroke="#9a6508" stroke-width="0.7" fill="none"/>
+      </g>
+      <!-- Gold border ring -->
+      <circle cx="24" cy="24" r="22" fill="none" stroke="rgba(210,165,40,0.3)" stroke-width="1.2"/>
     </svg>`;
   }
 
