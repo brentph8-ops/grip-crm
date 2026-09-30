@@ -11191,6 +11191,39 @@ function bindEvents() {
     if (btn) { btn.textContent = "Opening Google sign-in…"; btn.disabled = true; }
     window.gripSync?.signInWithGoogle();
   });
+
+  // Email/password sign-in
+  const _doEmailSignIn = () => {
+    const email = byId("gripEmailInput")?.value || "";
+    const password = byId("gripPasswordInput")?.value || "";
+    if (!email || !password) {
+      const err = byId("gripAuthError");
+      if (err) { err.textContent = "Enter your email and password."; err.className = "auth-error"; err.hidden = false; }
+      return;
+    }
+    window.gripSync?.signInWithPassword(email, password);
+  };
+  byId("gripEmailSignInButton")?.addEventListener("click", _doEmailSignIn);
+  byId("gripPasswordInput")?.addEventListener("keydown", e => { if (e.key === "Enter") _doEmailSignIn(); });
+  byId("gripSendResetButton")?.addEventListener("click", () => {
+    const email = byId("gripEmailInput")?.value || "";
+    if (!email) {
+      const err = byId("gripAuthError");
+      if (err) { err.textContent = "Enter your email address first."; err.className = "auth-error"; err.hidden = false; }
+      return;
+    }
+    window.gripSync?.sendPasswordReset(email);
+  });
+  byId("gripSetPasswordButton")?.addEventListener("click", () => {
+    const pw = byId("gripNewPasswordInput")?.value || "";
+    if (pw.length < 8) {
+      const err = byId("gripAuthError");
+      if (err) { err.textContent = "Password must be at least 8 characters."; err.className = "auth-error"; err.hidden = false; }
+      return;
+    }
+    window.gripSync?.updatePassword(pw);
+  });
+
   byId("gripContinueLocalButton")?.addEventListener("click", () => window.gripSync?.continueLocal());
   byId("gripClearSessionButton")?.addEventListener("click", () => window.gripSync?.clearSessionAndRetry());
   byId("gripSyncStatus")?.addEventListener("click", () => window.gripSync?.forceSync());

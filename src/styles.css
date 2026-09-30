@@ -103,6 +103,53 @@ textarea {
   box-sizing: border-box;
 }
 
+.auth-success {
+  font-size: 0.8rem;
+  color: #166534;
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: 6px;
+  padding: 8px 12px;
+  line-height: 1.4;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0;
+  color: #94a3b8;
+  font-size: 0.75rem;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #e2e8f0;
+}
+
+.auth-email-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.auth-link-btn {
+  background: none;
+  border: none;
+  color: #4f46e5;
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 2px 0;
+  text-align: left;
+  text-decoration: underline;
+}
+.auth-link-btn:hover { color: #3730a3; }
+
 /* ── Sync status indicator ────────────────────────────────────── */
 
 .grip-sync-status {

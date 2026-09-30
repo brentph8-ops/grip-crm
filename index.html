@@ -31,6 +31,18 @@
         <button class="primary-button auth-google-btn" id="gripGoogleSignInButton" type="button">
           Sign in with Garland Google Account
         </button>
+        <div class="auth-divider"><span>or sign in with email</span></div>
+        <div class="auth-email-form" id="gripEmailForm">
+          <input type="email" id="gripEmailInput" class="form-input" placeholder="Email address" autocomplete="email" />
+          <input type="password" id="gripPasswordInput" class="form-input" placeholder="Password" autocomplete="current-password" />
+          <button class="primary-button" id="gripEmailSignInButton" type="button">Sign in</button>
+          <button class="auth-link-btn" id="gripSendResetButton" type="button">Forgot password or need to set one? →</button>
+        </div>
+        <div class="auth-email-form" id="gripNewPasswordForm" hidden>
+          <p class="auth-tagline" style="margin:0 0 0.5rem">Choose a new password</p>
+          <input type="password" id="gripNewPasswordInput" class="form-input" placeholder="New password (min 8 chars)" autocomplete="new-password" />
+          <button class="primary-button" id="gripSetPasswordButton" type="button">Set password &amp; sign in</button>
+        </div>
         <p id="gripAuthError" class="auth-error" hidden></p>
         <button class="secondary-button" id="gripContinueLocalButton" type="button">
           Continue without sign-in (local only)

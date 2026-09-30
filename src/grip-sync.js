@@ -868,6 +868,11 @@
         // so claimSessionDB runs immediately and the DB session check is skipped.
         const treatAsNew = event === "SIGNED_IN" || isOAuthCallback;
         await setupAuthorizedUser(user, treatAsNew);
+      } else if (event === "PASSWORD_RECOVERY") {
+        showAuthOverlay(true);
+        document.getElementById("gripEmailForm")?.setAttribute("hidden", "");
+        document.getElementById("gripNewPasswordForm")?.removeAttribute("hidden");
+        return;
       } else if (event === "SIGNED_OUT") {
         initialDataReady = !isConfigured();
         _userSetupDone = false;
@@ -916,6 +921,61 @@
     pushAllLocalData,
     generateContractorLink,
     loadContractorSubmissions,
+
+    signInWithPassword(email, password) {
+      const client = getClient();
+      if (!client) return;
+      const btn = document.getElementById("gripEmailSignInButton");
+      const err = document.getElementById("gripAuthError");
+      if (btn) { btn.disabled = true; btn.textContent = "Signing in…"; }
+      if (err) { err.hidden = true; err.textContent = ""; }
+      client.auth.signInWithPassword({ email: email.trim(), password })
+        .then(({ error }) => {
+          if (error) {
+            if (err) { err.textContent = error.message; err.hidden = false; }
+            if (btn) { btn.disabled = false; btn.textContent = "Sign in"; }
+          }
+          // success: onAuthStateChange handles the rest
+        });
+    },
+
+    sendPasswordReset(email) {
+      const client = getClient();
+      if (!client) return;
+      const err = document.getElementById("gripAuthError");
+      const redirectTo = window.location.origin + window.location.pathname;
+      client.auth.resetPasswordForEmail((email || "").trim(), { redirectTo })
+        .then(({ error }) => {
+          if (err) {
+            err.textContent = error
+              ? error.message
+              : "Password reset email sent — check your inbox and click the link.";
+            err.className = error ? "auth-error" : "auth-success";
+            err.hidden = false;
+          }
+        });
+    },
+
+    updatePassword(newPassword) {
+      const client = getClient();
+      if (!client) return;
+      const btn = document.getElementById("gripSetPasswordButton");
+      const err = document.getElementById("gripAuthError");
+      if (btn) { btn.disabled = true; btn.textContent = "Saving…"; }
+      if (err) { err.hidden = true; err.textContent = ""; }
+      client.auth.updateUser({ password: newPassword })
+        .then(({ error }) => {
+          if (error) {
+            if (err) { err.textContent = error.message; err.hidden = false; }
+            if (btn) { btn.disabled = false; btn.textContent = "Set password & sign in"; }
+          } else {
+            document.getElementById("gripNewPasswordForm")?.setAttribute("hidden", "");
+            document.getElementById("gripEmailForm")?.removeAttribute("hidden");
+            if (err) { err.textContent = "Password set — you can now sign in with email."; err.className = "auth-success"; err.hidden = false; }
+            if (btn) { btn.disabled = false; btn.textContent = "Set password & sign in"; }
+          }
+        });
+    },
 
     signInWithGoogle() {
       const client = getClient();
