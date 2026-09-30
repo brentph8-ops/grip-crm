@@ -317,12 +317,11 @@ Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'lon
 
   // ── Build UI ─────────────────────────────────────────────────────
   function buildUI() {
-    if (document.getElementById('talon-root')) return;
+    const root = document.getElementById('talon-root');
+    if (!root || root.children.length > 0) return;
 
     const hasKey = !!localStorage.getItem(KEY_STORAGE);
 
-    const root = document.createElement('div');
-    root.id = 'talon-root';
     root.innerHTML = `
       <button id="talon-btn" class="talon-btn" aria-label="Open Talon AI assistant">
         ${eagleSvg(40)}
@@ -381,7 +380,6 @@ Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'lon
         </div>
       </div>
     `;
-    document.body.appendChild(root);
 
     // ── Wire events ────────────────────────────────────────────────
     document.getElementById('talon-btn').addEventListener('click', togglePanel);
