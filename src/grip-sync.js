@@ -86,7 +86,6 @@
   // Accumulates writes, then flushes after 800 ms of quiet.
 
   const pushQueue = {};
-  const _lastLocalWriteTime = {}; // tracks when WE last wrote each key
 
   // Strip device-specific OAuth tokens before pushing to the cloud so one
   // device's session doesn't overwrite another device's active connection.
@@ -101,8 +100,6 @@
     return value;
   }
 
-  const OUTBOX_KEY = "grip_pending_saves_v1";
-  const VERSION_KEY = "grip_cloud_versions_v1";
   const _origSetItem = localStorage.setItem.bind(localStorage);
   const inFlight = new Map();
   let syncProblem = false;
@@ -112,38 +109,13 @@
   if (!initialDataReady) showAuthOverlay(true);
 
   function releaseInitialData() {
-    // Discard only transient in-memory startup defaults, never stored/outbox data.
     window.gripReloadData?.();
     initialDataReady = true;
     const error = document.getElementById("gripAuthError");
     if (error) error.hidden = true;
     showAuthOverlay(false);
   }
-  const confirmedRecords = new Map();
-  function readMeta(key) {
-    try { return JSON.parse(localStorage.getItem(key) || "{}"); } catch { return {}; }
-  }
-  function hasPending(key) { return !!readMeta(OUTBOX_KEY)[key]; }
-  function rememberVersion(key, version) {
-    const versions = readMeta(VERSION_KEY);
-    versions[key] = version;
-    _origSetItem(VERSION_KEY, JSON.stringify(versions));
-  }
 
-  // Call completions and activity notes are independent records, even though
-  // the legacy database stores them in a shared JSON document.
-  function recordMap(key, value) {
-    const records = {};
-    if (key === "garlandCallLists") {
-      for (const [id, item] of Object.entries(value.completed || {})) records[JSON.stringify(["completed", id])] = item;
-      for (const item of value.rules || []) records[JSON.stringify(["rules", item.id])] = item;
-    } else if (key === "garlandAccountActivities") {
-      for (const [account, items] of Object.entries(value)) {
-        for (const item of items || []) records[JSON.stringify([account, item.id])] = item;
-      }
-    }
-    return records;
-  }
   function sameValue(a, b) {
     if (a === b) return true;
     if (a === null || b === null || typeof a !== "object" || typeof b !== "object") return false;
@@ -152,134 +124,30 @@
     return keys.length === Object.keys(b).length && keys.every(key =>
       Object.prototype.hasOwnProperty.call(b, key) && sameValue(a[key], b[key]));
   }
-  function trackRecordChanges(key, previous, next, changes = {}) {
-    if (!["garlandCallLists", "garlandAccountActivities"].includes(key)) return null;
-    const before = recordMap(key, JSON.parse(previous || "{}"));
-    const after = recordMap(key, JSON.parse(next));
-    for (const id of new Set([...Object.keys(before), ...Object.keys(after)])) {
-      if (sameValue(before[id], after[id])) continue;
-      const original = changes[id] || { before: before[id] };
-      changes[id] = { ...original, after: after[id] };
-      if (sameValue(changes[id].before, changes[id].after)) delete changes[id];
-    }
-    return changes;
-  }
-  function mergeRecordChanges(key, remote, changes) {
-    const result = JSON.parse(JSON.stringify(remote));
-    const current = recordMap(key, result);
-    for (const [id, edit] of Object.entries(changes)) {
-      if (!sameValue(current[id], edit.before) && !sameValue(current[id], edit.after)) {
-        throw new Error("GRIP_CONFLICT");
-      }
-      const [group, recordId] = JSON.parse(id);
-      if (key === "garlandCallLists" && group === "completed") {
-        result.completed ||= {};
-        if (edit.after === undefined) delete result.completed[recordId];
-        else result.completed[recordId] = edit.after;
-      } else {
-        const list = (result[group] || []).filter(item => item.id !== recordId);
-        if (edit.after !== undefined) list.unshift(edit.after);
-        result[group] = list;
-      }
-    }
-    return result;
-  }
 
-  async function flushKey(key, _retries = 3) {
+  // Cloud-primary write: upsert directly to Supabase, localStorage is the cache.
+  async function flushKey(key) {
     if (inFlight.has(key)) return inFlight.get(key);
     const operation = (async () => {
-      const queued = readMeta(OUTBOX_KEY)[key];
-      if (!queued) return true;
       const raw = localStorage.getItem(key);
+      if (!raw) return true;
       const client = getClient();
       const user = await getUser();
       if (!client || !user) { updateSyncIndicator("local"); return false; }
-      if (queued.owner && queued.owner !== user.id) return false;
       try {
-        // Read first, then condition the write on that server version. Another
-        // device cannot silently overwrite this write between read and update.
-        const { data: remote, error: readError } = await client.from("grip_data")
-          .select("data_value,updated_at").eq("user_id", user.id).eq("data_key", key).maybeSingle();
-        if (readError) throw readError;
-        let parsed = sanitizeForSync(key, JSON.parse(raw));
-        // Merge this device's tracked changes onto the server's copy so both
-        // devices' edits survive. Falls back to local copy for untracked keys.
-        if (remote && queued.changes) {
-          parsed = mergeRecordChanges(key, remote.data_value, queued.changes);
-        }
-        const same = remote && sameValue(remote.data_value, parsed);
-        const known = readMeta(VERSION_KEY)[key];
-        if (remote && !same && !Object.keys(queued.changes || {}).length && known !== remote.updated_at) {
-          // No fine-grained changes to merge — accept the server copy so the
-          // other device's edits aren't lost, then re-render with fresh data.
-          _origSetItem(key, JSON.stringify(remote.data_value));
-          rememberVersion(key, remote.updated_at);
-          const outbox = readMeta(OUTBOX_KEY);
-          delete outbox[key];
-          _origSetItem(OUTBOX_KEY, JSON.stringify(outbox));
-          window.gripReloadData?.();
-          _gripHandleRemoteUpdate?.(key);
-          _gripFullRender();
-          updateSyncIndicator("saved");
-          return true;
-        }
-        let version = remote?.updated_at;
-        if (!same) {
-          const row = { user_id: user.id, data_key: key, data_value: parsed };
-          const request = remote
-            ? client.from("grip_data").update({data_value: parsed}).eq("user_id", user.id)
-                .eq("data_key", key).eq("updated_at", remote.updated_at)
-            : client.from("grip_data").insert(row);
-          const { data, error } = await request.select("updated_at");
-          if (error) throw error;
-          if (!data?.length) {
-            // Another device wrote between our read and write. Retry by re-reading
-            // the new server version and merging our changes on top of it.
-            if (_retries > 0) {
-              console.log(`GRIP: OCC conflict on ${key}, retrying (${_retries} left)`);
-              inFlight.delete(key);
-              await new Promise(r => setTimeout(r, 200 + Math.random() * 300));
-              return flushKey(key, _retries - 1);
-            }
-            // Exhausted retries — keep local, show error once
-            syncProblem = "conflict";
-            updateSyncIndicator("conflict");
-            // Auto-clear the banner after 8 s so it doesn't stick forever
-            setTimeout(() => {
-              if (syncProblem === "conflict") { syncProblem = false; updateSyncIndicator("saved"); }
-            }, 8000);
-            return false;
-          }
-          version = data[0].updated_at;
-        }
-        confirmedRecords.set(key, parsed);
-        rememberVersion(key, version);
-        const latest = readMeta(OUTBOX_KEY);
-        // A newer edit made during this upload still needs its own upload.
-        if (latest[key]?.revision === queued.revision && localStorage.getItem(key) === raw) {
-          // Include independent records uploaded by another device in our copy.
-          if (queued.changes) _origSetItem(key, JSON.stringify(parsed));
-          delete latest[key];
-          _origSetItem(OUTBOX_KEY, JSON.stringify(latest));
-        }
-        if (latest[key]?.changes && queued.changes) {
-          // Recompute from the acknowledged local snapshot, including an edit
-          // reverted while its earlier value was still uploading.
-          latest[key].changes = trackRecordChanges(key, raw, localStorage.getItem(key));
-          _origSetItem(OUTBOX_KEY, JSON.stringify(latest));
-        }
-        setLocalPushTimestamp(key);
-        if (!hasPending(key) && localStorage.getItem(key) !== raw) {
-          window.gripReloadData?.();
-          _gripFullRender();
-        }
+        const parsed = sanitizeForSync(key, JSON.parse(raw));
+        updateSyncIndicator("syncing");
+        const { error } = await client.from("grip_data")
+          .upsert({ user_id: user.id, data_key: key, data_value: parsed },
+                  { onConflict: "user_id,data_key" });
+        if (error) throw error;
         broadcastChange(key, JSON.stringify(parsed));
         updateSyncIndicator("saved");
         return true;
       } catch (err) {
-        console.warn("GRIP save retained on this device:", key, err);
-        syncProblem = err.message === "GRIP_CONFLICT" ? "conflict" : "error";
-        updateSyncIndicator(syncProblem);
+        console.warn("GRIP save failed:", key, err);
+        syncProblem = "error";
+        updateSyncIndicator("error");
         return false;
       }
     })();
@@ -287,100 +155,55 @@
     try { return await operation; } finally { inFlight.delete(key); }
   }
 
-  async function flushPending() {
-    syncProblem = false;
-    const results = await Promise.all(Object.keys(readMeta(OUTBOX_KEY)).filter(key => SYNC_KEYS.has(key)).map(flushKey));
-    updateSyncIndicator(syncProblem || "saved");
-    return results.every(Boolean);
-  }
-
   function schedulePush(key) {
-    _lastLocalWriteTime[key] = Date.now();
     clearTimeout(pushQueue[key]);
-    pushQueue[key] = setTimeout(async () => {
-      const saved = await flushKey(key);
-      if (saved && hasPending(key) && !syncProblem) schedulePush(key);
-    }, 300);
+    pushQueue[key] = setTimeout(() => flushKey(key), 300);
   }
 
-  // Save the retry marker before the data. If storage is full, throw rather
-  // than allowing the app to claim that an unsaved edit succeeded.
-  // Storage instances have a named-property setter. Assigning setItem directly
-  // can store the function as text instead of installing a hook (notably Safari).
-  // Wrap the prototype and leave sessionStorage and other instances untouched.
+  // Intercept writes to sync keys and push them to Supabase immediately.
+  // Storage instances have a named-property setter — wrap the prototype so
+  // sessionStorage and other instances are unaffected (notably Safari).
   const storagePrototype = Object.getPrototypeOf(localStorage);
   const nativeSetItem = storagePrototype.setItem;
   storagePrototype.setItem = function (key, value) {
     if (this !== localStorage) return nativeSetItem.call(this, key, value);
     key = String(key);
     value = String(value);
-    if (SYNC_KEYS.has(key) && isConfigured()) {
-      if (!initialDataReady) return;
-      const previousQueue = localStorage.getItem(OUTBOX_KEY) || "{}";
-      const queued = readMeta(OUTBOX_KEY);
-      const changes = trackRecordChanges(key, localStorage.getItem(key), value, queued[key]?.changes);
-      queued[key] = { revision: crypto.randomUUID(), owner: localStorage.getItem("gripCurrentUserId"), changes };
-      try {
-        _origSetItem(OUTBOX_KEY, JSON.stringify(queued));
-        _origSetItem(key, value);
-      } catch (error) {
-        try { _origSetItem(OUTBOX_KEY, previousQueue); } catch (_) {}
-        syncProblem = "storage";
-        updateSyncIndicator("storage");
-        throw error;
-      }
-      updateSyncIndicator("pending");
+    try {
+      nativeSetItem.call(this, key, value);
+    } catch (error) {
+      syncProblem = "storage";
+      updateSyncIndicator("storage");
+      throw error;
+    }
+    if (SYNC_KEYS.has(key) && isConfigured() && initialDataReady && _userSetupDone) {
       schedulePush(key);
-    } else {
-      _origSetItem(key, value);
     }
   };
 
-  // ── Pull from Supabase on load ───────────────────────────────────
-
-  // Tracks when we last successfully pushed each key to Supabase (ms since epoch).
-  // Persisted across page loads so we can skip pulls of stale server data.
-  const LOCAL_PUSH_TS_KEY = "grip_last_push_ts";
-  function getLocalPushTimestamps() {
-    try { return JSON.parse(localStorage.getItem(LOCAL_PUSH_TS_KEY) || "{}"); } catch (_) { return {}; }
-  }
-  function setLocalPushTimestamp(key) {
-    const ts = getLocalPushTimestamps();
-    ts[key] = Date.now();
-    _origSetItem(LOCAL_PUSH_TS_KEY, JSON.stringify(ts));
-  }
+  // ── Pull from Supabase ───────────────────────────────────────────
+  // Cloud is the source of truth. pullAll always wins over local cache,
+  // except for keys currently being written (skip those to avoid clobbering
+  // an in-flight push that hasn't reached the server yet).
 
   async function pullAll() {
     const client = getClient();
     const user = await getUser();
     if (!client || !user) return false;
-    // Capture the exact local state before starting the request. A response may
-    // arrive after another pull or an upload has already installed newer data.
-    const versionsAtStart = readMeta(VERSION_KEY);
-    const valuesAtStart = new Map([...SYNC_KEYS].map(key => [key, localStorage.getItem(key)]));
-    const ownerAtStart = localStorage.getItem("gripCurrentUserId");
     try {
       const { data, error } = await client
         .from("grip_data")
-        .select("data_key, data_value, updated_at")
+        .select("data_key, data_value")
         .eq("user_id", user.id);
-      if (error) { syncProblem = "error"; updateSyncIndicator("error"); return false; }
-      if (localStorage.getItem("gripCurrentUserId") !== ownerAtStart) return "unchanged";
+      if (error) { updateSyncIndicator("error"); return false; }
       if (!data?.length) return "empty";
-      const currentVersions = readMeta(VERSION_KEY);
-      const localPushTs = getLocalPushTimestamps();
       let anyChanged = false;
       for (const row of data) {
-        if (!SYNC_KEYS.has(row.data_key) || hasPending(row.data_key)) continue;
-        if (currentVersions[row.data_key] !== versionsAtStart[row.data_key] ||
-            localStorage.getItem(row.data_key) !== valuesAtStart.get(row.data_key)) continue;
-        // Skip only if WE pushed this key in the last 30 seconds — protects in-flight
-        // local writes from being overwritten before they reach the server.
-        // Avoids comparing local-device time to Supabase server time (clock-skew safe).
-        const ourLastPush = localPushTs[row.data_key] || 0;
-        if (ourLastPush > 0 && (Date.now() - ourLastPush) < 30_000) continue;
+        if (!SYNC_KEYS.has(row.data_key)) continue;
+        // Don't clobber a key that's currently being pushed to the cloud.
+        if (inFlight.has(row.data_key)) continue;
+        // Preserve this device's active Gmail token (never stored in cloud).
         let incoming = row.data_value;
-        // Preserve this device's active Gmail token.
         if (row.data_key === "garlandOutreach" && incoming && typeof incoming === "object") {
           try {
             const local = JSON.parse(localStorage.getItem("garlandOutreach") || "{}");
@@ -393,8 +216,6 @@
             }
           } catch (_) {}
         }
-        confirmedRecords.set(row.data_key, incoming);
-        rememberVersion(row.data_key, row.updated_at);
         const serialized = JSON.stringify(incoming);
         if (localStorage.getItem(row.data_key) !== serialized) {
           _origSetItem(row.data_key, serialized);
@@ -403,7 +224,7 @@
       }
       return anyChanged ? "changed" : "unchanged";
     } catch (err) {
-      console.warn("GRIP pull from Supabase failed:", err);
+      console.warn("GRIP pull failed:", err);
       return false;
     }
   }
@@ -411,16 +232,9 @@
   // ── First-time local → cloud upload ─────────────────────────────
 
   async function pushAllLocalData() {
-    const client = getClient();
-    const user = await getUser();
-    if (!client || !user) return;
-    // Bootstrap only absent cloud records. Existing records go through the
-    // same version checks as ordinary saves; this never force-overwrites them.
     for (const key of SYNC_KEYS) {
-      const raw = localStorage.getItem(key);
-      if (raw && !hasPending(key)) localStorage.setItem(key, raw);
+      if (localStorage.getItem(key)) await flushKey(key);
     }
-    return flushPending();
   }
 
   // ── Auth UI ──────────────────────────────────────────────────────
@@ -435,19 +249,16 @@
   function updateSyncIndicator(state) {
     if (["saved", "ready"].includes(state)) {
       if (syncProblem) state = syncProblem;
-      else if (Object.keys(readMeta(OUTBOX_KEY)).length) state = "pending";
     }
     const el = document.getElementById("gripSyncStatus");
     if (!el) return;
     const states = {
-      syncing: { text: "⟳ Syncing…", cls: "sync-syncing" },
-      saved:   { text: "✓ Saved to cloud",   cls: "sync-saved"   },
-      ready:   { text: "● Cloud connected",     cls: "sync-ready"   },
-      error:   { text: "⚠ Cloud save failed — retry",  cls: "sync-error"   },
-      pending: { text: "Saved on device — upload pending", cls: "sync-syncing" },
-      conflict: { text: "⚠ Upload paused: conflicting changes saved on this device", cls: "sync-error" },
-      storage: { text: "⚠ Device storage full — edit not saved", cls: "sync-error" },
-      local:   { text: "Device only — sign in to sync", cls: "sync-local"   },
+      syncing: { text: "⟳ Syncing…",                             cls: "sync-syncing" },
+      saved:   { text: "✓ Saved to cloud",                       cls: "sync-saved"   },
+      ready:   { text: "● Cloud connected",                      cls: "sync-ready"   },
+      error:   { text: "⚠ Save failed — tap to retry",           cls: "sync-error"   },
+      storage: { text: "⚠ Device storage full — edit not saved", cls: "sync-error"   },
+      local:   { text: "Device only — sign in to sync",          cls: "sync-local"   },
     };
     const s = states[state] || states.local;
     if (state === "saved") lastSyncedAt = new Date();
@@ -601,12 +412,11 @@
 
   let _realtimeChannel = null;
   let _channelStatus = "UNSUBSCRIBED";
-  const ECHO_SUPPRESS_MS = 5000;
 
   // Shared handler: write remote data into localStorage, refresh in-memory
   // state, and re-render — used by both broadcast and postgres_changes paths.
   function applyRemoteData(key, incoming) {
-    if (hasPending(key)) return;
+    if (inFlight.has(key)) return; // don't clobber an in-flight write
     // Preserve this device's active Gmail tokens so they aren't stomped by
     // another device that doesn't have Gmail connected.
     if (key === "garlandOutreach" && incoming && typeof incoming === "object") {
@@ -675,9 +485,8 @@
       .on("broadcast", { event: "grip-change" }, (payload) => {
         const { key, value } = payload.payload || {};
         if (!key || !SYNC_KEYS.has(key)) return;
-        // Guard against somehow receiving our own write (belt-and-suspenders)
-        const lastWrite = _lastLocalWriteTime[key] || 0;
-        if (Date.now() - lastWrite < ECHO_SUPPRESS_MS) return;
+        // Skip if we're currently pushing this key (we'll receive a broadcast for it already)
+        if (inFlight.has(key)) return;
         // Treat broadcasts as a notification; read the durable cloud version.
         pullAll().then(result => {
           if (result === "changed") {
@@ -741,21 +550,11 @@
     if (_userSetupDone) return;
     _userSetupDone = true;
 
-    // If a different user signs in on this device, clear the previous user's local data
+    // If a different user signs in on this device, clear the previous user's local cache.
     const storedUserId = localStorage.getItem("gripCurrentUserId");
     if (storedUserId && storedUserId !== user.id) {
-      if (Object.keys(readMeta(OUTBOX_KEY)).length) {
-        _userSetupDone = false;
-        showAuthOverlay(true);
-        updateSyncIndicator("conflict");
-        alert("This device has unsent changes for another GRIP account. Sign back into that account to save them before switching accounts.");
-        return;
-      }
-      confirmedRecords.clear();
       for (const key of SYNC_KEYS) localStorage.removeItem(key);
       localStorage.removeItem("gripUserFirstName");
-      localStorage.removeItem(OUTBOX_KEY);
-      localStorage.removeItem(VERSION_KEY);
     }
     localStorage.setItem("gripCurrentUserId", user.id);
 
@@ -768,8 +567,6 @@
     if (loadingMessage) { loadingMessage.textContent = "Loading your saved GRIP data…"; loadingMessage.hidden = false; }
     updateSyncIndicator("syncing");
     subscribeToRemoteChanges(user);
-
-    await flushPending();
 
     // Timeout so "syncing" never hangs forever (e.g. on iOS Safari with slow/no connection)
     const pullResult = await Promise.race([
@@ -900,17 +697,12 @@
   // ── Public API ───────────────────────────────────────────────────
 
   function callSaveStatus(accountId, activityId, completionKey = "") {
-    const key = "garlandAccountActivities";
-    const local = readMeta(key)[accountId]?.find(item => item.id === activityId);
-    if (!local) return "Not saved";
-    const remote = confirmedRecords.get(key)?.[accountId]?.find(item => item.id === activityId);
-    const completion = completionKey ? readMeta("garlandCallLists").completed?.[completionKey] : null;
-    const remoteCompletion = completionKey ? confirmedRecords.get("garlandCallLists")?.completed?.[completionKey] : null;
-    if (sameValue(local, remote) && (!completionKey || (completion && sameValue(completion, remoteCompletion)))) return "Saved to cloud";
-    if (syncProblem === "conflict") return "Saved on phone · sync conflict";
-    if (syncProblem === "error") return "Saved on phone · retry upload";
-    if (hasPending(key) || (completionKey && hasPending("garlandCallLists"))) return "Saved on phone · upload pending";
-    return "Saved on phone · cloud not confirmed";
+    if (!isConfigured() || !_userSetupDone) return "Local only";
+    const saving = inFlight.has("garlandAccountActivities") ||
+                   (completionKey && inFlight.has("garlandCallLists"));
+    if (saving) return "Saving…";
+    if (syncProblem === "error") return "Save failed — tap sync to retry";
+    return "Saved to cloud";
   }
 
   window.gripSync = {
@@ -1027,8 +819,8 @@
     async forceSync() {
       const user = await getUser();
       if (!user) { updateSyncIndicator("error"); return; }
+      syncProblem = false;
       updateSyncIndicator("syncing");
-      await flushPending();
       const syncResult = await pullAll();
       if (syncResult) {
         if (!initialDataReady) releaseInitialData();
@@ -1075,9 +867,7 @@
     // dropped WebSocket, iOS background) without hammering the API.
     _heartbeatInterval = setInterval(async () => {
       if (!_userSetupDone) return;
-      await flushPending();
       const result = await pullAll();
-      if (result && !initialDataReady) releaseInitialData();
       if (result === "changed") {
         if (typeof window.gripReloadData === "function") window.gripReloadData();
         if (typeof window._gripHandleRemoteUpdate === "function") {
@@ -1092,27 +882,15 @@
     if (_heartbeatInterval) { clearInterval(_heartbeatInterval); _heartbeatInterval = null; }
   }
 
-  // When the browser comes back online, push any locally queued changes
-  // that may have failed while offline.
   window.addEventListener("online", () => {
-    if (_userSetupDone) {
-      updateSyncIndicator("syncing");
-      _onResume();
-    }
+    if (_userSetupDone) _onResume();
   });
 
-  // Unified resume handler: runs whenever the app becomes visible again.
-  // iOS PWA kills WebSockets silently — always re-subscribe (don't rely on
-  // _channelStatus which may be stale after background kill) then pull fresh data.
-  // If pullAll fails (network not ready on iOS resume), retry once after 3 s.
   async function _onResume() {
     if (!_userSetupDone) return;
-    // Always attempt re-subscribe — iOS may have silently killed the socket
-    // even though _channelStatus still reads "SUBSCRIBED".
     const u = await getUser();
     if (u) subscribeToRemoteChanges(u);
     const applyResult = async (result) => {
-      if (result && !initialDataReady) releaseInitialData();
       if (result === "changed") {
         if (typeof window.gripReloadData === "function") window.gripReloadData();
         if (typeof window._gripHandleRemoteUpdate === "function") {
@@ -1121,7 +899,6 @@
         _gripFullRender();
       }
     };
-    await flushPending();
     const result = await pullAll();
     if (result === false) {
       // Network may not be ready on iOS resume — retry after 3 s
