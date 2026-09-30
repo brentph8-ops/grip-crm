@@ -161,11 +161,12 @@ textarea {
   align-self: center;
 }
 
-.sync-local   { background: #f0f0f0; color: #666; }
-.sync-syncing { background: #e3f1ff; color: #0057a8; }
-.sync-saved   { background: #d8f1df; color: #147b48; }
-.sync-ready   { background: transparent; color: #22a05a; font-weight: 500; }
-.sync-error   { background: #fde8e8; color: #9c3f3a; }
+.sync-on    { background: transparent; color: #22a05a; font-weight: 600; }
+.sync-local { background: transparent; color: #94a3b8; font-weight: 500; }
+.sync-error { background: #fde8e8; color: #9c3f3a; }
+.sync-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; vertical-align: middle; position: relative; top: -1px; }
+.sync-dot--on  { background: #22a05a; box-shadow: 0 0 0 2px #bbf7d0; }
+.sync-dot--off { background: #94a3b8; }
 
 .grip-user-display {
   font-size: 0.75rem;
@@ -6557,12 +6558,6 @@ textarea {
   line-height: 1.4;
 }
 
-/* ── Last synced label ────────────────────────────────────────── */
-.grip-sync-time {
-  font-size: 10px;
-  color: var(--muted);
-  margin-left: 4px;
-}
 
 /* ── Task mini records in account detail ──────────────────────── */
 .task-mini-record {

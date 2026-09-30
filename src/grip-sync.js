@@ -244,38 +244,19 @@
     if (overlay) overlay.hidden = !show;
   }
 
-  let lastSyncedAt = null;
-
   function updateSyncIndicator(state) {
-    if (["saved", "ready"].includes(state)) {
+    if (["saved", "ready", "syncing"].includes(state)) {
       if (syncProblem) state = syncProblem;
     }
     const el = document.getElementById("gripSyncStatus");
     if (!el) return;
-    const states = {
-      syncing: { text: "⟳ Syncing…",                             cls: "sync-syncing" },
-      saved:   { text: "✓ Saved to cloud",                       cls: "sync-saved"   },
-      ready:   { text: "● Cloud connected",                      cls: "sync-ready"   },
-      error:   { text: "⚠ Save failed — tap to retry",           cls: "sync-error"   },
-      storage: { text: "⚠ Device storage full — edit not saved", cls: "sync-error"   },
-      local:   { text: "Device only — sign in to sync",          cls: "sync-local"   },
-    };
-    const s = states[state] || states.local;
-    if (state === "saved") lastSyncedAt = new Date();
-    const timeLabel = lastSyncedAt && state === "ready"
-      ? `<span class="grip-sync-time">${formatSyncTime(lastSyncedAt)}</span>`
-      : "";
-    el.innerHTML = s.text + timeLabel;
-    el.className = `grip-sync-status ${s.cls}`;
-    if (state === "saved") setTimeout(() => updateSyncIndicator("ready"), 3000);
-  }
-
-  function formatSyncTime(date) {
-    const mins = Math.round((Date.now() - date.getTime()) / 60000);
-    if (mins < 1) return "just now";
-    if (mins === 1) return "1 min ago";
-    if (mins < 60) return `${mins} min ago`;
-    return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    const isOn = ["syncing", "saved", "ready"].includes(state);
+    el.innerHTML = isOn
+      ? `<span class="sync-dot sync-dot--on"></span>Cloud On`
+      : state === "error"   ? "⚠ Save failed — tap to retry"
+      : state === "storage" ? "⚠ Storage full"
+      : `<span class="sync-dot sync-dot--off"></span>Cloud Off`;
+    el.className = `grip-sync-status ${isOn ? "sync-on" : state === "error" || state === "storage" ? "sync-error" : "sync-local"}`;
   }
 
   function updateUserDisplay(user) {
