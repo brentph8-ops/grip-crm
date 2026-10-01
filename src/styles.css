@@ -8656,3 +8656,47 @@ button#gripSyncStatus:hover { opacity: 0.75; }
 .drive-file-delete:hover { color: #ef4444; background: rgba(239,68,68,.1); }
 .drive-upload-row { margin-top: 4px; }
 .drive-upload-label { cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+
+/* ── Contacts ───────────────────────────────────────────────────── */
+.contacts-view-header { padding: 12px 16px 8px; }
+.contacts-list { padding: 0 8px 24px; }
+.contact-group { border-radius: 10px; overflow: hidden; margin-bottom: 8px; background: var(--card, #1c2d3f); }
+.contact-group-header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer; user-select: none; }
+.contact-group-header strong { flex: 1; font-size: .95rem; }
+.contact-count { font-size: .78rem; color: var(--muted, #9cacc0); background: rgba(255,255,255,.07); border-radius: 10px; padding: 1px 7px; }
+.contact-group-chevron { font-size: .8rem; color: var(--muted, #9cacc0); transition: transform .15s; }
+.contact-group-body { border-top: 1px solid rgba(255,255,255,.06); }
+.contact-group-body.is-collapsed { display: none; }
+.contact-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,.04); }
+.contact-row:last-child { border-bottom: none; }
+.contact-row-primary { background: rgba(77,166,255,.04); }
+.contact-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent, #4da6ff); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .9rem; flex-shrink: 0; }
+.contact-row-primary .contact-avatar { background: #e89010; }
+.contact-info { flex: 1; min-width: 0; }
+.contact-info strong { display: block; font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.contact-info span { display: block; font-size: .78rem; color: var(--muted, #9cacc0); }
+.contact-row-links { display: flex; gap: 6px; }
+.contact-quick { font-size: 1rem; text-decoration: none; opacity: .75; transition: opacity .15s; }
+.contact-quick:hover { opacity: 1; }
+.contact-badge-primary { font-size: .7rem; background: rgba(232,144,16,.18); color: #e89010; border-radius: 8px; padding: 2px 7px; white-space: nowrap; flex-shrink: 0; }
+/* In-drawer contact cards */
+.contacts-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.contacts-section-header h4 { margin: 0; }
+.contact-card { display: flex; align-items: flex-start; gap: 10px; padding: 10px; border-radius: 8px; background: rgba(255,255,255,.04); margin-bottom: 6px; }
+.contact-card-primary { background: rgba(232,144,16,.07); }
+.contact-card-avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--accent, #4da6ff); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .95rem; flex-shrink: 0; }
+.contact-card-primary .contact-card-avatar { background: #e89010; }
+.contact-card-info { flex: 1; min-width: 0; }
+.contact-card-info strong { display: block; font-size: .9rem; }
+.contact-title { display: block; font-size: .78rem; color: var(--muted, #9cacc0); }
+.contact-link { display: block; font-size: .8rem; color: var(--accent, #4da6ff); text-decoration: none; margin-top: 2px; }
+.contact-link:hover { text-decoration: underline; }
+.contact-notes { display: block; font-size: .78rem; color: var(--muted, #9cacc0); margin-top: 4px; font-style: italic; }
+.contact-card-actions { display: flex; gap: 4px; flex-shrink: 0; flex-direction: column; }
+.mini-button-danger { color: #ef4444 !important; }
+.mini-button-danger:hover { background: rgba(239,68,68,.12) !important; }
+/* Contact dialog */
+#contactDialog { max-width: 420px; width: calc(100% - 32px); }
+#contactDialog label { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: .85rem; color: var(--muted, #9cacc0); }
+#contactDialog input, #contactDialog textarea { font-size: 16px; padding: 8px 10px; border-radius: 7px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.06); color: var(--text, #e8edf3); width: 100%; box-sizing: border-box; }
+#contactDialog textarea { resize: vertical; min-height: 60px; }

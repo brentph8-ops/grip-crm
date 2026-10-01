@@ -93,10 +93,16 @@
             <span aria-hidden="true">🧭</span>
             Territory
           </button>
-          <button class="nav-button" data-view="accounts" type="button">
-            <span aria-hidden="true">🏢</span>
-            Accounts
-          </button>
+          <div class="nav-projects-group">
+            <button class="nav-button" data-view="accounts" type="button">
+              <span aria-hidden="true">🏢</span>
+              Accounts
+            </button>
+            <button class="nav-button nav-sub-button" data-view="contacts" type="button">
+              <span aria-hidden="true">👤</span>
+              Contacts
+            </button>
+          </div>
           <div class="nav-projects-group">
             <button class="nav-button" data-view="projects" type="button">
               <span aria-hidden="true">🏗️</span>
@@ -177,6 +183,7 @@
           <button class="nav-button nav-sub-button" data-view="pipeline" data-pipeline-graveyard type="button"><span aria-hidden="true">💀</span>Graveyard</button>
           <button class="nav-button" data-view="territory" type="button"><span aria-hidden="true">🧭</span>Territory</button>
           <button class="nav-button" data-view="accounts" type="button"><span aria-hidden="true">🏢</span>Accounts</button>
+          <button class="nav-button" data-view="contacts" type="button"><span aria-hidden="true">👤</span>Contacts</button>
           <button class="nav-button" data-view="projects" type="button"><span aria-hidden="true">🏗️</span>Projects</button>
           <button class="nav-button" data-view="proposals" type="button"><span aria-hidden="true">🛠️</span>Proposals</button>
           <button class="nav-button" data-view="activityLog" type="button"><span aria-hidden="true">📅</span>Activity</button>
@@ -398,6 +405,9 @@
           <div id="accountsManageList" class="manage-table" hidden></div>
           <div id="accountsGraveyardSection" class="record-grid graveyard-section" hidden></div>
         </section>
+
+        <!-- ── Contacts ─────────────────────────────────────────── -->
+        <section id="contactsView" class="view"></section>
 
         <section id="activityLogView" class="view">
           <div class="toolbar toolbar-split">

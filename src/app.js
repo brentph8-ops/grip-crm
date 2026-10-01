@@ -6694,6 +6694,7 @@ function showAccountDetail(record) {
       ${editableField("account", record.id, "zip", "Zip Code", record.zip || "")}
     </div>
 
+    ${accountContactsSection(record)}
     ${quickActionSection("account", record)}
     ${accountRelationshipMap(record)}
 
@@ -10975,10 +10976,12 @@ function setView(view) {
     renderCallList();
   }
   const projectSubViews = ["punchList", "takeoffEstimator", "warrantySummary"];
+  const accountSubViews = ["contacts"];
   document.querySelectorAll(".nav-button").forEach((button) => {
     const isMatch = button.dataset.view === view;
     const isProjectParent = button.dataset.view === "projects" && projectSubViews.includes(view) && !button.classList.contains("nav-sub-button");
-    button.classList.toggle("is-active", isMatch || isProjectParent);
+    const isAccountParent = button.dataset.view === "accounts" && accountSubViews.includes(view) && !button.classList.contains("nav-sub-button");
+    button.classList.toggle("is-active", isMatch || isProjectParent || isAccountParent);
   });
   const overflowViews = ["punchList", "takeoffEstimator", "warrantySummary", "followUpQueue", "tasks", "noteTaker", "activityLog", "scopeDatabase", "contractors", "newsReport", "outreach"];
   byId("mobileMoreButton")?.classList.toggle("is-active", overflowViews.includes(view));
@@ -10993,7 +10996,8 @@ function setView(view) {
   if (view === "today")     { if (window.gripToday)    window.gripToday.render(); }
   if (view === "pipeline")  { if (window.gripPipeline) window.gripPipeline.render(); }
   if (view === "territory" || view === "liveMap") { if (window.gripMap) window.gripMap.render(); }
-  const _viewTitles = { today: "Today", dashboard: "Dashboard", pipeline: "Pipeline", territory: "Territory", accounts: "Accounts", projects: "Projects", punchList: "Punch List", takeoffEstimator: "Takeoff Estimator", warrantySummary: "Warranty Summary Chart", proposals: "Proposals", scopeDatabase: "Scope of Work", tasks: "Tasks", callList: "Call List", followUpQueue: "Follow-Up Queue", activityLog: "Activity Log", newsReport: "Your News Report", contractors: "Contractors", noteTaker: "Note Taker", outreach: "Assistant", liveMap: "Live Account Map" };
+  if (view === "contacts") renderContacts();
+  const _viewTitles = { today: "Today", dashboard: "Dashboard", pipeline: "Pipeline", territory: "Territory", accounts: "Accounts", contacts: "Contacts", projects: "Projects", punchList: "Punch List", takeoffEstimator: "Takeoff Estimator", warrantySummary: "Warranty Summary Chart", proposals: "Proposals", scopeDatabase: "Scope of Work", tasks: "Tasks", callList: "Call List", followUpQueue: "Follow-Up Queue", activityLog: "Activity Log", newsReport: "Your News Report", contractors: "Contractors", noteTaker: "Note Taker", outreach: "Assistant", liveMap: "Live Account Map" };
   const _resolvedTitle = _viewTitles[view] || view;
   byId("viewTitle").textContent = _resolvedTitle;
   updateMobileViewLabel(_resolvedTitle);
@@ -12302,6 +12306,50 @@ function bindEvents() {
       if (await gripConfirm("Delete this price book reference?", "Delete", "Cancel")) deletePriceBook(deletePriceBookButton.dataset.deletePriceBook);
       return;
     }
+    const addContactBtn = event.target.closest("[data-add-contact-account]");
+    if (addContactBtn) {
+      openContactDialog(null, addContactBtn.dataset.addContactAccount, addContactBtn.dataset.addContactName);
+      return;
+    }
+    const editContactBtn = event.target.closest("[data-edit-contact]");
+    if (editContactBtn) {
+      const allContacts = loadContacts();
+      const c = allContacts.find(x => x.id === editContactBtn.dataset.editContact);
+      if (c) {
+        const data = (() => { try { return JSON.parse(localStorage.getItem("garlandCrmData") || "{}"); } catch { return {}; } })();
+        openContactDialog(c, c.accountId, data.accounts?.[c.accountId]?.client || "");
+      }
+      return;
+    }
+    const deleteContactBtn = event.target.closest("[data-delete-contact]");
+    if (deleteContactBtn) {
+      if (await gripConfirm("Remove this contact?", "Delete", "Cancel")) {
+        const updated = loadContacts().filter(x => x.id !== deleteContactBtn.dataset.deleteContact);
+        saveContacts(updated);
+        const data = (() => { try { return JSON.parse(localStorage.getItem("garlandCrmData") || "{}"); } catch { return {}; } })();
+        const card = deleteContactBtn.closest("[data-contact-id]");
+        const accountId = card ? null : null;
+        const drawerOpen = byId("detailDrawer").classList.contains("is-open");
+        if (drawerOpen) {
+          const detailTitle = byId("detailContent")?.querySelector("h3");
+          if (detailTitle) {
+            const acc = Object.values(data.accounts || {}).find(a => a.client === detailTitle.textContent.replace(/^\W+/, "").trim());
+            if (acc) showAccountDetail(acc);
+          }
+        }
+        if (state.view === "contacts") renderContacts();
+      }
+      return;
+    }
+    const contactGroupHeader = event.target.closest("[data-contact-group]");
+    if (contactGroupHeader && !event.target.closest("[data-add-contact-account]")) {
+      const body = contactGroupHeader.nextElementSibling;
+      if (body) {
+        const collapsed = body.classList.toggle("is-collapsed");
+        contactGroupHeader.querySelector(".contact-group-chevron").textContent = collapsed ? "▸" : "▾";
+      }
+      return;
+    }
     const record = event.target.closest("[data-type][data-id]");
     if (record && !shouldIgnoreRecordTap(event)) {
       if (isPhoneMode()) openRecordFromMobileTap(record.dataset.type, record.dataset.id);
@@ -12808,6 +12856,192 @@ setTimeout(() => { if (window.gripToday) { setView("today"); window.gripToday.re
     renderAccounts();
   });
 })();
+
+// ── Contacts ─────────────────────────────────────────────────────
+
+function loadContacts() {
+  try { return JSON.parse(localStorage.getItem("garlandContacts") || "[]"); } catch { return []; }
+}
+
+function saveContacts(contacts) {
+  localStorage.setItem("garlandContacts", JSON.stringify(contacts));
+}
+
+function contactsForAccount(accountId) {
+  return loadContacts().filter(c => c.accountId === accountId);
+}
+
+function makeContactId() {
+  return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function accountContactsSection(record) {
+  const contacts = contactsForAccount(record.id);
+  const primaryHtml = record.poc ? `
+    <div class="contact-card contact-card-primary">
+      <div class="contact-card-avatar">${escapeHtml((record.poc || "?").charAt(0).toUpperCase())}</div>
+      <div class="contact-card-info">
+        <strong>${escapeHtml(record.poc)}</strong>
+        ${record.title ? `<span class="contact-title">${escapeHtml(record.title)}</span>` : ""}
+        ${record.phone ? `<a class="contact-link" href="tel:${escapeHtml(record.phone)}">${escapeHtml(record.phone)}</a>` : ""}
+        ${record.email ? `<a class="contact-link" href="mailto:${escapeHtml(record.email)}">${escapeHtml(record.email)}</a>` : ""}
+      </div>
+      <span class="contact-badge-primary">Primary</span>
+    </div>` : "";
+
+  const addlHtml = contacts.map(c => `
+    <div class="contact-card" data-contact-id="${escapeHtml(c.id)}">
+      <div class="contact-card-avatar">${escapeHtml((c.name || "?").charAt(0).toUpperCase())}</div>
+      <div class="contact-card-info">
+        <strong>${escapeHtml(c.name)}</strong>
+        ${c.title ? `<span class="contact-title">${escapeHtml(c.title)}</span>` : ""}
+        ${c.phone ? `<a class="contact-link" href="tel:${escapeHtml(c.phone)}">${escapeHtml(c.phone)}</a>` : ""}
+        ${c.email ? `<a class="contact-link" href="mailto:${escapeHtml(c.email)}">${escapeHtml(c.email)}</a>` : ""}
+        ${c.notes ? `<span class="contact-notes">${escapeHtml(c.notes)}</span>` : ""}
+      </div>
+      <div class="contact-card-actions">
+        <button class="mini-button" data-edit-contact="${escapeHtml(c.id)}" type="button">Edit</button>
+        <button class="mini-button mini-button-danger" data-delete-contact="${escapeHtml(c.id)}" type="button">✕</button>
+      </div>
+    </div>`).join("");
+
+  return `<section class="detail-section">
+    <div class="contacts-section-header">
+      <h4>Contacts</h4>
+      <button class="mini-button" data-add-contact-account="${escapeHtml(record.id)}" data-add-contact-name="${escapeHtml(record.client)}" type="button">+ Add</button>
+    </div>
+    ${primaryHtml}${addlHtml}
+    ${!record.poc && !contacts.length ? `<p class="empty-state">No contacts yet.</p>` : ""}
+  </section>`;
+}
+
+function renderContacts() {
+  const view = byId("contactsView");
+  if (!view) return;
+  const query = (byId("contactsSearch")?.value || "").trim().toLowerCase();
+  const contacts = loadContacts();
+  const data = (() => { try { return JSON.parse(localStorage.getItem("garlandCrmData") || "{}"); } catch { return {}; } })();
+  const accounts = Object.values(data.accounts || {});
+
+  const grouped = {};
+  accounts.forEach(a => {
+    if (!a.poc && !contacts.some(c => c.accountId === a.id)) return;
+    grouped[a.id] = { name: a.client || "Unknown", primary: a.poc ? { name: a.poc, title: a.title, phone: a.phone, email: a.email } : null, contacts: [] };
+  });
+  contacts.forEach(c => {
+    if (!grouped[c.accountId]) grouped[c.accountId] = { name: data.accounts?.[c.accountId]?.client || "Unknown Account", primary: null, contacts: [] };
+    grouped[c.accountId].contacts.push(c);
+  });
+
+  const matches = (val) => (val || "").toLowerCase().includes(query);
+  const sortedGroups = Object.entries(grouped)
+    .filter(([, g]) => !query || matches(g.name) ||
+      (g.primary && [g.primary.name, g.primary.title, g.primary.phone, g.primary.email].some(matches)) ||
+      g.contacts.some(c => [c.name, c.title, c.phone, c.email].some(matches)))
+    .sort((a, b) => a[1].name.localeCompare(b[1].name));
+
+  const headerHtml = `<div class="view-header contacts-view-header">
+    <input id="contactsSearch" class="search-input" type="search" placeholder="Search contacts…" value="${escapeHtml(query)}" autocomplete="off" />
+  </div>`;
+
+  if (!sortedGroups.length) {
+    view.innerHTML = headerHtml + `<p class="empty-state">${query ? "No contacts match that search." : "No contacts yet — open an account and tap + Add."}</p>`;
+    byId("contactsSearch")?.addEventListener("input", renderContacts);
+    return;
+  }
+
+  const groupsHtml = sortedGroups.map(([accountId, g]) => {
+    const primaryRow = g.primary ? `<div class="contact-row contact-row-primary">
+      <div class="contact-avatar">${escapeHtml((g.primary.name || "?").charAt(0).toUpperCase())}</div>
+      <div class="contact-info"><strong>${escapeHtml(g.primary.name)}</strong>${g.primary.title ? `<span>${escapeHtml(g.primary.title)}</span>` : ""}</div>
+      <div class="contact-row-links">
+        ${g.primary.phone ? `<a class="contact-quick" href="tel:${escapeHtml(g.primary.phone)}" title="${escapeHtml(g.primary.phone)}">📞</a>` : ""}
+        ${g.primary.email ? `<a class="contact-quick" href="mailto:${escapeHtml(g.primary.email)}" title="${escapeHtml(g.primary.email)}">✉️</a>` : ""}
+      </div>
+      <span class="contact-badge-primary">Primary</span></div>` : "";
+
+    const addlRows = g.contacts.map(c => `<div class="contact-row">
+      <div class="contact-avatar">${escapeHtml((c.name || "?").charAt(0).toUpperCase())}</div>
+      <div class="contact-info"><strong>${escapeHtml(c.name)}</strong>${c.title ? `<span>${escapeHtml(c.title)}</span>` : ""}</div>
+      <div class="contact-row-links">
+        ${c.phone ? `<a class="contact-quick" href="tel:${escapeHtml(c.phone)}" title="${escapeHtml(c.phone)}">📞</a>` : ""}
+        ${c.email ? `<a class="contact-quick" href="mailto:${escapeHtml(c.email)}" title="${escapeHtml(c.email)}">✉️</a>` : ""}
+      </div></div>`).join("");
+
+    const total = (g.primary ? 1 : 0) + g.contacts.length;
+    return `<div class="contact-group">
+      <div class="contact-group-header" data-contact-group="${escapeHtml(accountId)}">
+        <strong>${escapeHtml(g.name)}</strong>
+        <span class="contact-count">${total}</span>
+        <button class="mini-button" data-add-contact-account="${escapeHtml(accountId)}" data-add-contact-name="${escapeHtml(g.name)}" type="button">+ Add</button>
+        <span class="contact-group-chevron">▾</span>
+      </div>
+      <div class="contact-group-body">${primaryRow}${addlRows}</div>
+    </div>`;
+  }).join("");
+
+  view.innerHTML = headerHtml + `<div class="contacts-list">${groupsHtml}</div>`;
+  byId("contactsSearch")?.addEventListener("input", renderContacts);
+}
+
+function openContactDialog(existingContact, accountId, accountName) {
+  let dialog = byId("contactDialog");
+  if (!dialog) {
+    dialog = document.createElement("dialog");
+    dialog.id = "contactDialog";
+    dialog.className = "grip-dialog";
+    dialog.innerHTML = `<form id="contactForm">
+      <h3 id="contactDialogTitle">Add Contact</h3>
+      <input type="hidden" name="id" />
+      <input type="hidden" name="accountId" />
+      <label>Name *<input name="name" type="text" required placeholder="Full name" /></label>
+      <label>Title<input name="title" type="text" placeholder="Job title" /></label>
+      <label>Phone<input name="phone" type="tel" placeholder="555-000-0000" /></label>
+      <label>Email<input name="email" type="email" placeholder="contact@email.com" /></label>
+      <label>Notes<textarea name="notes" placeholder="Optional notes" rows="2"></textarea></label>
+      <div class="modal-actions">
+        <button type="submit" class="primary-button">Save Contact</button>
+        <button type="button" id="contactCancelButton" class="secondary-button">Cancel</button>
+      </div>
+    </form>`;
+    document.body.appendChild(dialog);
+    byId("contactCancelButton").addEventListener("click", () => dialog.close());
+    byId("contactForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const form = byId("contactForm");
+      const id = form.elements.id.value || makeContactId();
+      const accId = form.elements.accountId.value;
+      const newContact = {
+        id,
+        accountId: accId,
+        name: form.elements.name.value.trim(),
+        title: form.elements.title.value.trim(),
+        phone: form.elements.phone.value.trim(),
+        email: form.elements.email.value.trim(),
+        notes: form.elements.notes.value.trim(),
+        createdAt: existingContact?.createdAt || new Date().toISOString(),
+      };
+      const updated = loadContacts().filter(c => c.id !== id);
+      updated.push(newContact);
+      saveContacts(updated);
+      dialog.close();
+      const d = (() => { try { return JSON.parse(localStorage.getItem("garlandCrmData") || "{}"); } catch { return {}; } })();
+      const acc = d.accounts?.[accId];
+      if (acc && byId("detailDrawer").classList.contains("is-open")) showAccountDetail(acc);
+      if (state.view === "contacts") renderContacts();
+    });
+  }
+  const form = byId("contactForm");
+  byId("contactDialogTitle").textContent = existingContact ? "Edit Contact" : "Add Contact";
+  form.elements.id.value = existingContact?.id || "";
+  form.elements.accountId.value = accountId;
+  form.elements.name.value = existingContact?.name || "";
+  form.elements.title.value = existingContact?.title || "";
+  form.elements.phone.value = existingContact?.phone || "";
+  form.elements.email.value = existingContact?.email || "";
+  form.elements.notes.value = existingContact?.notes || "";
+  dialog.showModal();
+}
 
 // ── Street address autocomplete (Nominatim) ───────────────────────
 (function initAddressAutocomplete() {

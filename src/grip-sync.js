@@ -33,6 +33,7 @@
     "garlandCrmNotes",           // account notes (was missing — notes never synced)
     "garlandPriceBooks",         // price books
     "garlandPriceBookProducts",  // price book line items
+    "garlandContacts",           // additional contacts per account
   ]);
 
   // ── Helpers ──────────────────────────────────────────────────────
