@@ -7,7 +7,7 @@
 
   const KEY_STORAGE  = 'grip_talon_key';
   const GROQ_URL     = 'https://api.groq.com/openai/v1/chat/completions';
-  const GROQ_MODEL   = 'openai/gpt-oss-20b';
+  const GROQ_MODEL   = 'openai/gpt-oss-120b';
 
   // ── Groq tools ───────────────────────────────────────────────────
   const TOOLS = [
@@ -21,7 +21,7 @@
           properties: {
             section: {
               type: 'string',
-              enum: ['today', 'dashboard', 'tasks', 'pipeline', 'territory', 'accounts', 'proposals', 'assistant'],
+              enum: ['today', 'dashboard', 'tasks', 'pipeline', 'territory', 'accounts', 'contacts', 'proposals', 'assistant'],
               description: 'Which section to open',
             },
           },
