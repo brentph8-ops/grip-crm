@@ -284,7 +284,7 @@ Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'lon
     if (dots)  dots.hidden    = !on;
   }
 
-  // ── Avatar SVG (Talon — cartoon eagle head) ──────────────────────
+  // ── Avatar SVG (Talon — front-facing cartoon eagle) ──────────────
   let _eid = 0;
   function eagleSvg(size) {
     const u = ++_eid;
@@ -292,26 +292,27 @@ Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'lon
       <defs>
         <clipPath id="ec${u}"><circle cx="24" cy="24" r="22"/></clipPath>
       </defs>
-      <circle cx="24" cy="24" r="23" fill="#16213e"/>
+      <circle cx="24" cy="24" r="23" fill="#1a2744"/>
       <g clip-path="url(#ec${u})">
-        <!-- Brown chest -->
-        <path d="M0 48 Q6 28 20 24 Q34 20 48 30 L48 48Z" fill="#8C5E0A"/>
-        <!-- White head (large clean ellipse) -->
-        <ellipse cx="27" cy="20" rx="17" ry="18.5" fill="#EDE5C0"/>
-        <!-- Brown crown cap -->
-        <path d="M16 7 Q26 2 37 7 Q39 13 36 15 Q30 7 22 8 Q16 9 15 14 Q13 10 16 7Z" fill="#8C5E0A"/>
-        <!-- Angry brow: thick diagonal dark wedge -->
-        <path d="M10 23 Q19 12 31 15 Q22 16 12 25Z" fill="#150900"/>
-        <!-- Eye: cartoon-big amber -->
-        <circle cx="29" cy="25" r="7.5" fill="#E8A010"/>
-        <circle cx="29" cy="25" r="4.5" fill="#0D0805"/>
-        <circle cx="32.2" cy="21.8" r="2.2" fill="white" opacity="0.92"/>
-        <!-- Beak upper: bold orange cartoon hook -->
-        <path d="M13 20 L3 19 Q-1 21 0 25 Q2 28.5 6.5 27 Q5 26 5 23.5 L13 21.5Z" fill="#F5A820"/>
-        <!-- Hook curl at tip -->
-        <path d="M0 25 Q-2 28 1 30.5 Q3.5 31.5 6.5 29 Q4.5 28.5 4 27Z" fill="#C88010"/>
-        <!-- Beak lower: jaw -->
-        <path d="M13 22 L7 26.5 L5.5 28.5 Q7.5 29.5 10.5 28 L13 24.5Z" fill="#D09018"/>
+        <!-- White face -->
+        <ellipse cx="24" cy="30" rx="18" ry="17" fill="#EDE5C0"/>
+        <!-- Brown head cap (dome over top) -->
+        <path d="M2 23 Q3 4 24 2 Q45 4 46 23 Q38 13 24 13 Q10 13 2 23Z" fill="#7A4E08"/>
+        <!-- Left brow: thick dark wedge angled inward — key fierce look -->
+        <polygon points="9,26 17,17 22,21 14,28" fill="#130700"/>
+        <!-- Right brow: mirror -->
+        <polygon points="39,26 31,17 26,21 34,28" fill="#130700"/>
+        <!-- Left eye -->
+        <circle cx="17" cy="27" r="6.5" fill="#E89010"/>
+        <circle cx="17" cy="27" r="3.8" fill="#080503"/>
+        <circle cx="19.5" cy="24.5" r="2" fill="white" opacity="0.9"/>
+        <!-- Right eye -->
+        <circle cx="31" cy="27" r="6.5" fill="#E89010"/>
+        <circle cx="31" cy="27" r="3.8" fill="#080503"/>
+        <circle cx="33.5" cy="24.5" r="2" fill="white" opacity="0.9"/>
+        <!-- Beak: downward orange hook -->
+        <path d="M19 33 Q24 35 29 33 L26.5 42 Q24 46 21.5 42Z" fill="#F5A820"/>
+        <path d="M26.5 42 Q27 45 24.5 47 Q22 45 21.5 42Z" fill="#C07808"/>
       </g>
     </svg>`;
   }
