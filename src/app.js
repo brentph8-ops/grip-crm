@@ -13005,11 +13005,9 @@ function contactRowHtml(c) {
     <div class="contact-avatar">${escapeHtml((c.name || "?").charAt(0).toUpperCase())}</div>
     <div class="contact-info">
       <strong>${escapeHtml(c.name)}</strong>
-      <span>${escapeHtml([c.title, c.accountName].filter(Boolean).join(" · "))}</span>
-    </div>
-    <div class="contact-row-links">
-      ${c.phone ? `<a class="contact-quick" href="tel:${escapeHtml(c.phone)}" title="${escapeHtml(c.phone)}">📞</a>` : ""}
-      ${c.email ? `<a class="contact-quick" href="mailto:${escapeHtml(c.email)}" title="${escapeHtml(c.email)}">✉️</a>` : ""}
+      ${[c.title, c.accountName].filter(Boolean).length ? `<span class="contact-meta">${escapeHtml([c.title, c.accountName].filter(Boolean).join(" · "))}</span>` : ""}
+      ${c.phone ? `<a class="contact-detail-link" href="tel:${escapeHtml(c.phone)}">📞 ${escapeHtml(c.phone)}</a>` : ""}
+      ${c.email ? `<a class="contact-detail-link" href="mailto:${escapeHtml(c.email)}">✉️ ${escapeHtml(c.email)}</a>` : ""}
     </div>
     ${c.isPrimary ? `<span class="contact-badge-primary">Primary</span>` : ""}
   </div>`;

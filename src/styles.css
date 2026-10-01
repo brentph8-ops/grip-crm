@@ -8672,10 +8672,9 @@ button#gripSyncStatus:hover { opacity: 0.75; }
 .contact-row-primary .contact-avatar { background: var(--orange); }
 .contact-info { flex: 1; min-width: 0; }
 .contact-info strong { display: block; font-size: .9rem; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.contact-info span { display: block; font-size: .76rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.contact-row-links { display: flex; gap: 6px; }
-.contact-quick { font-size: 1.05rem; text-decoration: none; opacity: .65; transition: opacity .15s; }
-.contact-quick:hover { opacity: 1; }
+.contact-meta { display: block; font-size: .76rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.contact-detail-link { display: block; font-size: .78rem; color: var(--blue); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.contact-detail-link:hover { text-decoration: underline; }
 .contact-badge-primary { font-size: .68rem; background: #fff3e0; color: var(--orange); border: 1px solid #ffd59e; border-radius: 8px; padding: 2px 7px; white-space: nowrap; flex-shrink: 0; font-weight: 600; }
 /* In-drawer contact cards */
 .contacts-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
