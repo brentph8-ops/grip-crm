@@ -3558,6 +3558,7 @@ function commandCenterCards() {
     commandCard("No Activity 45+ Days", noActivity45.length, "accounts", "Reconnect"),
     commandCard("Missing Bids", missingBids.length, "proposals", "Track contractors"),
     backupReminderCard(),
+    cloudSaveCard(),
   ];
 }
 
@@ -3585,6 +3586,15 @@ function backupReminderCard() {
     <span>Backup Now</span>
     <strong>${escapeHtml(backup.value)}</strong>
     <small>${escapeHtml(backup.hint)}</small>
+  </button>`;
+}
+
+function cloudSaveCard() {
+  const on = window.gripSync?.isConfigured();
+  return `<button class="command-row command-row-cloudsave" data-hard-save type="button">
+    <span>Save to Cloud</span>
+    <strong>${on ? "↑" : "—"}</strong>
+    <small>${on ? "Push all data now" : "Sign in to enable"}</small>
   </button>`;
 }
 
@@ -11167,6 +11177,21 @@ function bindEvents() {
   });
   byId("exportBackupButton").addEventListener("click", exportBackup);
   byId("importBackupButton").addEventListener("click", () => byId("backupImportInput").click());
+  byId("hardSaveButton")?.addEventListener("click", async () => {
+    const btn = byId("hardSaveButton");
+    if (!window.gripSync?.isConfigured()) { alert("Sign in with Google to enable cloud save."); return; }
+    btn.disabled = true;
+    btn.textContent = "Saving…";
+    try {
+      await window.gripSync.forceUpload();
+      btn.textContent = "Saved ✓";
+      setTimeout(() => { btn.textContent = "Save to Cloud"; btn.disabled = false; }, 2500);
+    } catch (_) {
+      btn.textContent = "Save to Cloud";
+      btn.disabled = false;
+      alert("Save failed — check your connection and try again.");
+    }
+  });
   byId("backupImportInput").addEventListener("change", (event) => {
     importBackup(event.target.files?.[0]);
     event.target.value = "";
@@ -11882,6 +11907,18 @@ function bindEvents() {
     const backupNow = event.target.closest("[data-backup-now]");
     if (backupNow) {
       exportBackup();
+      return;
+    }
+    const hardSave = event.target.closest("[data-hard-save]");
+    if (hardSave) {
+      if (!window.gripSync?.isConfigured()) { alert("Sign in with Google to enable cloud save."); return; }
+      hardSave.querySelector("strong").textContent = "…";
+      hardSave.disabled = true;
+      window.gripSync.forceUpload().then(() => {
+        hardSave.querySelector("strong").textContent = "✓";
+        hardSave.querySelector("small").textContent = "All data saved";
+        setTimeout(() => { hardSave.querySelector("strong").textContent = "↑"; hardSave.querySelector("small").textContent = "Push all data now"; hardSave.disabled = false; }, 2500);
+      }).catch(() => { hardSave.querySelector("strong").textContent = "↑"; hardSave.disabled = false; });
       return;
     }
     const removeTakeoffProduct = event.target.closest("[data-remove-takeoff-product]");
