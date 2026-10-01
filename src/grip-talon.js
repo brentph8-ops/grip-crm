@@ -7,7 +7,7 @@
 
   const KEY_STORAGE  = 'grip_talon_key';
   const GROQ_URL     = 'https://api.groq.com/openai/v1/chat/completions';
-  const GROQ_MODEL   = 'llama-3.1-8b-instant';
+  const GROQ_MODEL   = 'openai/gpt-oss-20b';
 
   // ── Groq tools ───────────────────────────────────────────────────
   const TOOLS = [
