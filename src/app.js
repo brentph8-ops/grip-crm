@@ -6707,9 +6707,13 @@ function showAccountDetail(record) {
       <h4>CRM Note</h4>
       <textarea class="note-box" data-note-id="${record.id}" placeholder="Add a private note for this browser">${escapeHtml(noteValue)}</textarea>
     </section>
+    ${typeof window.GripDrive !== "undefined" ? window.GripDrive.renderSection(record.id, record.client) : ""}
     ${deleteButton("account", record.id, "account")}
   `;
   byId("detailDrawer").classList.add("is-open");
+  if (typeof window.GripDrive !== "undefined" && window.GripDrive.isConnected()) {
+    window.GripDrive.refreshFileList(record.id, record.client);
+  }
 }
 
 function recordPipelineDeals(type, record) {

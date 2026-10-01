@@ -8638,3 +8638,21 @@ button#gripSyncStatus:hover { opacity: 0.75; }
   #callActivityDialog .modal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   #saveNextCallActivityButton { grid-column: 1 / -1; }
 }
+
+/* ── Google Drive integration ───────────────────────────────────── */
+.drive-section { }
+.drive-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.drive-section-header h4 { margin: 0; }
+.drive-open-folder { font-size: .78rem; color: var(--accent, #4da6ff); text-decoration: none; opacity: .85; }
+.drive-open-folder:hover { opacity: 1; }
+.drive-file-list { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+.drive-file-row { display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-radius: 6px; }
+.drive-file-row:hover { background: rgba(255,255,255,.04); }
+.drive-file-icon { font-size: 1rem; flex-shrink: 0; width: 20px; text-align: center; }
+.drive-file-name { flex: 1; font-size: .85rem; color: var(--accent, #4da6ff); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; min-width: 0; }
+.drive-file-name:hover { text-decoration: underline; }
+.drive-file-date { font-size: .75rem; color: var(--muted, #9cacc0); white-space: nowrap; flex-shrink: 0; }
+.drive-file-delete { background: none; border: none; color: var(--muted, #9cacc0); cursor: pointer; font-size: .85rem; padding: 2px 4px; border-radius: 4px; flex-shrink: 0; line-height: 1; }
+.drive-file-delete:hover { color: #ef4444; background: rgba(239,68,68,.1); }
+.drive-upload-row { margin-top: 4px; }
+.drive-upload-label { cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }

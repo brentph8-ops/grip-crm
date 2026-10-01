@@ -623,6 +623,10 @@
 
       if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
         if (!user) return;
+        // Capture Google Drive access token while it's present in the session
+        if (session?.provider_token && typeof window.GripDrive?.saveToken === "function") {
+          window.GripDrive.saveToken(session.provider_token, session.expires_in);
+        }
         // ── Access guard ─────────────────────────────────────────
         const authorizedEmail = window.GRIP_AUTHORIZED_EMAIL;
         const authorizedList = Array.isArray(authorizedEmail) ? authorizedEmail : (authorizedEmail ? [authorizedEmail] : []);
@@ -763,7 +767,12 @@
         provider: "google",
         options: {
           redirectTo,
-          queryParams: hd ? { hd } : {},
+          scopes: "https://www.googleapis.com/auth/drive.file",
+          queryParams: {
+            ...(hd ? { hd } : {}),
+            access_type: "offline",
+            prompt: "consent",
+          },
         },
       });
     },

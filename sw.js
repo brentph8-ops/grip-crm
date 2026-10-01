@@ -2,7 +2,7 @@
 // GRIP Service Worker — offline caching + PWA support
 // ─────────────────────────────────────────────────────────────────
 
-const CACHE = 'grip-v123';
+const CACHE = 'grip-v124';
 
 const BASE = '/grip-crm';
 
@@ -21,6 +21,7 @@ const PRECACHE = [
   `${BASE}/src/pipeline.js`,
   `${BASE}/src/territory.js`,
   `${BASE}/src/map.js`,
+  `${BASE}/src/grip-drive.js`,
   `${BASE}/src/grip-talon.js`,
   `${BASE}/src/leaflet.min.js`,
   `${BASE}/src/leaflet.min.css`,
@@ -70,6 +71,7 @@ self.addEventListener('fetch', e => {
     url.hostname.includes('nominatim.openstreetmap.org') ||
     url.hostname.includes('arcgisonline.com') ||
     url.hostname.includes('api.groq.com') ||
+    url.hostname.includes('googleapis.com') ||
     e.request.method !== 'GET' ||
     !url.protocol.startsWith('http')
   ) return;

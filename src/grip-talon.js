@@ -284,60 +284,45 @@ Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'lon
     if (dots)  dots.hidden    = !on;
   }
 
-  // ── Avatar SVG (Talon — bald eagle head) ─────────────────────────
+  // ── Avatar SVG (Talon — white bald eagle head) ───────────────────
   let _eid = 0;
   function eagleSvg(size) {
     const u = ++_eid;
     return `<svg width="${size}" height="${size}" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <clipPath id="ec${u}"><circle cx="24" cy="24" r="22"/></clipPath>
+        <clipPath id="ec${u}"><circle cx="24" cy="24" r="22.5"/></clipPath>
       </defs>
-      <!-- Dark navy bg -->
       <circle cx="24" cy="24" r="23" fill="#16213e"/>
       <g clip-path="url(#ec${u})">
-        <!-- Brown feathered body/neck fanning down -->
-        <path d="M6 50 C10 28 18 20 26 18 C34 16 42 20 50 28 L50 50Z" fill="#7a5010"/>
-        <!-- Darker under-feather layer -->
-        <path d="M4 50 C8 33 16 25 22 23 C20 28 18 35 16 44Z" fill="#5a3808"/>
-        <!-- Feather V-marks (like in reference image) -->
-        <path d="M12 34 L17 26 L22 34" stroke="#4a2a04" stroke-width="1.3" fill="none" stroke-linejoin="round"/>
-        <path d="M19 42 L24 32 L29 42" stroke="#4a2a04" stroke-width="1.2" fill="none" stroke-linejoin="round"/>
-        <path d="M26 50 L31 40 L36 50" stroke="#4a2a04" stroke-width="1.1" fill="none" stroke-linejoin="round"/>
-        <path d="M6 44 L11 36 L16 44" stroke="#4a2a04" stroke-width="1" fill="none" stroke-linejoin="round"/>
-        <!-- Feather highlight lines -->
-        <path d="M10 38 Q16 29 24 24" stroke="#9a6c20" stroke-width="0.9" fill="none" opacity="0.7"/>
-        <path d="M16 44 Q21 34 28 28" stroke="#9a6c20" stroke-width="0.8" fill="none" opacity="0.6"/>
-        <!-- WHITE HEAD -->
-        <path d="M13 4 C21 2 36 6 39 16 C41 24 37 35 30 37 C23 39 15 34 11 26 C7 18 7 8 13 4Z" fill="#eae4d2"/>
-        <!-- Brown crown / top of head -->
-        <path d="M13 4 C21 2 36 6 39 16 C35 8 26 4 18 6 C13 7 11 11 11 15 C10 10 11 6 13 4Z" fill="#7a5010"/>
-        <!-- Subtle brown streaks on white head -->
-        <path d="M20 11 C23 9 27 9 30 11" stroke="#b08030" stroke-width="0.9" fill="none" opacity="0.4"/>
-        <path d="M16 16 C19 13 24 12 28 14" stroke="#b08030" stroke-width="0.8" fill="none" opacity="0.35"/>
-        <!-- BROW RIDGE — angry dark V above eye -->
-        <path d="M10 20 C14 13 21 12 27 15 C21 15 14 17 10 20Z" fill="#5a3808"/>
-        <path d="M10 20 C15 12 22 11 28 15" stroke="#3a2004" stroke-width="2.2" fill="none" stroke-linecap="round"/>
-        <!-- EYE: fierce amber -->
-        <circle cx="26" cy="23" r="5.2" fill="#c87808"/>
-        <circle cx="26" cy="23" r="3.1" fill="#0c0802"/>
-        <circle cx="27.8" cy="21.4" r="1.3" fill="rgba(255,255,255,0.88)"/>
-        <circle cx="26" cy="23" r="5" fill="none" stroke="#e8a018" stroke-width="0.7"/>
-        <!-- BEAK: hooked, facing left -->
-        <!-- Upper mandible -->
-        <path d="M12 19 C8 18 4 19 2 21 C3.5 21 7 21.5 11 22 L12 21Z" fill="#e09010"/>
-        <!-- Hooked tip -->
-        <path d="M2 21 C0 21.5 -0.5 23.5 1 25 C2.5 25.5 5 24.5 5.5 23 C4 23.5 2.5 22.5 2 21Z" fill="#c07008"/>
-        <!-- Lower mandible -->
-        <path d="M12 21.5 L8 23 L5.5 24" stroke="#d08010" stroke-width="1.9" fill="none" stroke-linecap="round"/>
-        <!-- Beak highlight ridge -->
-        <path d="M12 19 C8 18.2 4.5 19.2 2.5 20.5" stroke="#f0b828" stroke-width="0.8" fill="none"/>
-        <!-- Nostril -->
-        <ellipse cx="8" cy="19.5" rx="1.8" ry="0.9" fill="#8a5508" opacity="0.75"/>
-        <!-- Mouth line -->
-        <path d="M12 20.5 C9.5 21 7 22.5 5.5 23.5" stroke="#9a6508" stroke-width="0.7" fill="none"/>
+        <!-- Brown feathered chest -->
+        <path d="M4 50 C8 30 16 22 25 20 C35 18 44 23 50 34 L50 50Z" fill="#7d5214"/>
+        <!-- V-feather marks -->
+        <path d="M9 40 L14 31 L19 40"  stroke="#4e3008" stroke-width="1.5" fill="none" stroke-linejoin="round"/>
+        <path d="M17 47 L22 37 L27 47" stroke="#4e3008" stroke-width="1.4" fill="none" stroke-linejoin="round"/>
+        <path d="M25 50 L30 42 L35 50" stroke="#4e3008" stroke-width="1.2" fill="none" stroke-linejoin="round"/>
+        <path d="M7 42 Q15 28 27 22" stroke="#9a6a20" stroke-width="0.9" fill="none" opacity="0.55"/>
+        <!-- WHITE HEAD — dominant feature -->
+        <path d="M20 3 C29 1 39 6 41 16 C43 25 38 36 29 38 C21 40 12 34 9 24 C7 16 8 7 13 5 C15 3 18 2 20 3Z" fill="#e8e2cc"/>
+        <!-- Brown crown cap -->
+        <path d="M20 3 C29 1 39 6 41 16 C37 7 27 3 18 5 C14 6 11 10 11 14 C10 9 11 5 13 5 C15 3 18 2 20 3Z" fill="#7d5214"/>
+        <!-- Subtle tan streaks on white -->
+        <path d="M22 11 C26 9 31 10 34 14" stroke="#c9a850" stroke-width="0.9" fill="none" opacity="0.3"/>
+        <path d="M16 18 C20 14 26 13 30 16" stroke="#c9a850" stroke-width="0.8" fill="none" opacity="0.25"/>
+        <!-- ANGRY BROW: dark filled shape above eye -->
+        <path d="M11 21 C15 13 23 11 29 14 C23 15 15 18 11 21Z" fill="#3d2103"/>
+        <!-- EYE: large fierce amber -->
+        <circle cx="27" cy="23" r="5.8" fill="#c87808"/>
+        <circle cx="27" cy="23" r="3.4" fill="#0c0803"/>
+        <circle cx="29.2" cy="21.1" r="1.5" fill="rgba(255,255,255,0.9)"/>
+        <circle cx="27" cy="23" r="5.6" fill="none" stroke="#a86006" stroke-width="0.7"/>
+        <!-- HOOKED BEAK -->
+        <path d="M13 18 C8 17 3 18.5 1 21 C2.5 21 7 21.5 12 22Z" fill="#e09010"/>
+        <path d="M1 21 C-1 22 -1.5 24.5 1 26 C3 26.5 5.5 25 5.5 23 C4 24 2.5 23 1 21Z" fill="#c07008"/>
+        <path d="M12 22 L8 24 L5.5 25.5" stroke="#d08010" stroke-width="2.1" fill="none" stroke-linecap="round"/>
+        <path d="M13 18 C8 17.5 4 18.8 2 20.5" stroke="#f0b828" stroke-width="0.9" fill="none"/>
+        <ellipse cx="8.5" cy="19" rx="1.8" ry="0.9" fill="#7a4808" opacity="0.65"/>
+        <path d="M13 21 C10 21.5 7 23 5.5 24" stroke="#906010" stroke-width="0.7" fill="none"/>
       </g>
-      <!-- Gold border ring -->
-      <circle cx="24" cy="24" r="22" fill="none" stroke="rgba(210,165,40,0.3)" stroke-width="1.2"/>
     </svg>`;
   }
 
