@@ -8393,13 +8393,18 @@ function importAccountContactsCsv(file) {
 function importBackup(file) {
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = async () => {
     try {
       const payload = JSON.parse(reader.result);
       const storage = payload.localStorage || payload;
       Object.entries(storage).forEach(([key, value]) => {
         if (key.startsWith("garland") && value !== null && value !== undefined) localStorage.setItem(key, value);
       });
+      // Push to cloud immediately before reloading so data is never lost.
+      // If not signed in this is a no-op and the auto-push on next sign-in handles it.
+      if (typeof window.gripSync?.forceUpload === "function") {
+        try { await window.gripSync.forceUpload(); } catch (_) {}
+      }
       window.location.reload();
     } catch (error) {
       alert("That backup file could not be imported.");
