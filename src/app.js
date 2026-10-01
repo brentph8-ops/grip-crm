@@ -6684,10 +6684,6 @@ function showAccountDetail(record) {
       ${editableField("account", record.id, "county", "County", record.county, accountCountyOptions())}
       ${editableField("account", record.id, "sharedRep", "Shared Rep", record.sharedRep)}
       ${editableField("account", record.id, "nextFollowUp", "Follow-up Date", record.nextFollowUp)}
-      ${editableField("account", record.id, "poc", "Contact", record.poc)}
-      ${editableField("account", record.id, "title", "Title", record.title)}
-      ${editableField("account", record.id, "phone", "Phone", record.phone)}
-      ${editableField("account", record.id, "email", "Email", record.email)}
       ${editableField("account", record.id, "street", "Street", record.street || "")}
       ${editableField("account", record.id, "city", "City", record.city || "")}
       ${editableField("account", record.id, "state", "State", record.state || "")}
