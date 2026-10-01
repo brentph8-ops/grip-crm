@@ -12918,70 +12918,101 @@ function accountContactsSection(record) {
 function renderContacts() {
   const view = byId("contactsView");
   if (!view) return;
+
   const query = (byId("contactsSearch")?.value || "").trim().toLowerCase();
-  const contacts = loadContacts();
+  const sortVal = byId("contactsSortFilter")?.value || "name-az";
+  const accountFilterVal = byId("contactsAccountFilter")?.value || "all";
+
+  const addlContacts = loadContacts();
   const data = (() => { try { return JSON.parse(localStorage.getItem("garlandCrmData") || "{}"); } catch { return {}; } })();
   const accounts = Object.values(data.accounts || {});
 
-  const grouped = {};
+  // Flatten all contacts: primary contacts from account records + additional contacts
+  const allContacts = [];
   accounts.forEach(a => {
-    if (!a.poc && !contacts.some(c => c.accountId === a.id)) return;
-    grouped[a.id] = { name: a.client || "Unknown", primary: a.poc ? { name: a.poc, title: a.title, phone: a.phone, email: a.email } : null, contacts: [] };
+    if (a.poc) allContacts.push({ _id: `primary-${a.id}`, name: a.poc, title: a.title || "", phone: a.phone || "", email: a.email || "", accountId: a.id, accountName: a.client || "", isPrimary: true });
   });
-  contacts.forEach(c => {
-    if (!grouped[c.accountId]) grouped[c.accountId] = { name: data.accounts?.[c.accountId]?.client || "Unknown Account", primary: null, contacts: [] };
-    grouped[c.accountId].contacts.push(c);
+  addlContacts.forEach(c => {
+    const accName = data.accounts?.[c.accountId]?.client || "Unknown Account";
+    allContacts.push({ ...c, _id: c.id, accountName: accName, isPrimary: false });
   });
 
+  // Build account options for filter dropdown
+  const accountNames = [...new Set(allContacts.map(c => c.accountName))].sort();
+
+  // Apply filters
   const matches = (val) => (val || "").toLowerCase().includes(query);
-  const sortedGroups = Object.entries(grouped)
-    .filter(([, g]) => !query || matches(g.name) ||
-      (g.primary && [g.primary.name, g.primary.title, g.primary.phone, g.primary.email].some(matches)) ||
-      g.contacts.some(c => [c.name, c.title, c.phone, c.email].some(matches)))
-    .sort((a, b) => a[1].name.localeCompare(b[1].name));
+  let filtered = allContacts
+    .filter(c => accountFilterVal === "all" || c.accountName === accountFilterVal)
+    .filter(c => !query || [c.name, c.title, c.phone, c.email, c.accountName].some(matches));
 
-  const headerHtml = `<div class="view-header contacts-view-header">
+  // Sort
+  if (sortVal === "name-az") filtered.sort((a, b) => a.name.localeCompare(b.name));
+  else if (sortVal === "name-za") filtered.sort((a, b) => b.name.localeCompare(a.name));
+  else if (sortVal === "account-az") filtered.sort((a, b) => a.accountName.localeCompare(b.accountName) || a.name.localeCompare(b.name));
+
+  const accountFilterOptions = accountNames.map(n => `<option value="${escapeHtml(n)}"${accountFilterVal === n ? " selected" : ""}>${escapeHtml(n)}</option>`).join("");
+
+  const toolbarHtml = `<div class="contacts-toolbar">
     <input id="contactsSearch" class="search-input" type="search" placeholder="Search contacts…" value="${escapeHtml(query)}" autocomplete="off" />
+    <select id="contactsSortFilter" class="select-sm">
+      <option value="name-az"${sortVal === "name-az" ? " selected" : ""}>Name A–Z</option>
+      <option value="name-za"${sortVal === "name-za" ? " selected" : ""}>Name Z–A</option>
+      <option value="account-az"${sortVal === "account-az" ? " selected" : ""}>By Account</option>
+    </select>
+    <select id="contactsAccountFilter" class="select-sm">
+      <option value="all"${accountFilterVal === "all" ? " selected" : ""}>All accounts</option>
+      ${accountFilterOptions}
+    </select>
+    <span class="contacts-count-label">${filtered.length} contact${filtered.length !== 1 ? "s" : ""}</span>
   </div>`;
 
-  if (!sortedGroups.length) {
-    view.innerHTML = headerHtml + `<p class="empty-state">${query ? "No contacts match that search." : "No contacts yet — open an account and tap + Add."}</p>`;
+  if (!filtered.length) {
+    view.innerHTML = toolbarHtml + `<p class="empty-state">${query || accountFilterVal !== "all" ? "No contacts match those filters." : "No contacts yet — open an account and tap + Add."}</p>`;
     byId("contactsSearch")?.addEventListener("input", renderContacts);
+    byId("contactsSortFilter")?.addEventListener("change", renderContacts);
+    byId("contactsAccountFilter")?.addEventListener("change", renderContacts);
     return;
   }
 
-  const groupsHtml = sortedGroups.map(([accountId, g]) => {
-    const primaryRow = g.primary ? `<div class="contact-row contact-row-primary">
-      <div class="contact-avatar">${escapeHtml((g.primary.name || "?").charAt(0).toUpperCase())}</div>
-      <div class="contact-info"><strong>${escapeHtml(g.primary.name)}</strong>${g.primary.title ? `<span>${escapeHtml(g.primary.title)}</span>` : ""}</div>
-      <div class="contact-row-links">
-        ${g.primary.phone ? `<a class="contact-quick" href="tel:${escapeHtml(g.primary.phone)}" title="${escapeHtml(g.primary.phone)}">📞</a>` : ""}
-        ${g.primary.email ? `<a class="contact-quick" href="mailto:${escapeHtml(g.primary.email)}" title="${escapeHtml(g.primary.email)}">✉️</a>` : ""}
-      </div>
-      <span class="contact-badge-primary">Primary</span></div>` : "";
+  // Group by first letter of contact name for A-Z / Z-A sort; by account for account sort
+  let rows = "";
+  if (sortVal === "account-az") {
+    const byAccount = {};
+    filtered.forEach(c => { (byAccount[c.accountName] = byAccount[c.accountName] || []).push(c); });
+    rows = Object.entries(byAccount).sort((a, b) => a[0].localeCompare(b[0])).map(([accName, cs]) => `
+      <div class="contact-alpha-header">${escapeHtml(accName)}</div>
+      ${cs.map(c => contactRowHtml(c)).join("")}`).join("");
+  } else {
+    // Alphabetical section headers by first letter
+    let lastLetter = "";
+    rows = filtered.map(c => {
+      const letter = (c.name || "?").charAt(0).toUpperCase();
+      const header = letter !== lastLetter ? `<div class="contact-alpha-header">${escapeHtml(letter)}</div>` : "";
+      lastLetter = letter;
+      return header + contactRowHtml(c);
+    }).join("");
+  }
 
-    const addlRows = g.contacts.map(c => `<div class="contact-row">
-      <div class="contact-avatar">${escapeHtml((c.name || "?").charAt(0).toUpperCase())}</div>
-      <div class="contact-info"><strong>${escapeHtml(c.name)}</strong>${c.title ? `<span>${escapeHtml(c.title)}</span>` : ""}</div>
-      <div class="contact-row-links">
-        ${c.phone ? `<a class="contact-quick" href="tel:${escapeHtml(c.phone)}" title="${escapeHtml(c.phone)}">📞</a>` : ""}
-        ${c.email ? `<a class="contact-quick" href="mailto:${escapeHtml(c.email)}" title="${escapeHtml(c.email)}">✉️</a>` : ""}
-      </div></div>`).join("");
-
-    const total = (g.primary ? 1 : 0) + g.contacts.length;
-    return `<div class="contact-group">
-      <div class="contact-group-header" data-contact-group="${escapeHtml(accountId)}">
-        <strong>${escapeHtml(g.name)}</strong>
-        <span class="contact-count">${total}</span>
-        <button class="mini-button" data-add-contact-account="${escapeHtml(accountId)}" data-add-contact-name="${escapeHtml(g.name)}" type="button">+ Add</button>
-        <span class="contact-group-chevron">▾</span>
-      </div>
-      <div class="contact-group-body">${primaryRow}${addlRows}</div>
-    </div>`;
-  }).join("");
-
-  view.innerHTML = headerHtml + `<div class="contacts-list">${groupsHtml}</div>`;
+  view.innerHTML = toolbarHtml + `<div class="contacts-list">${rows}</div>`;
   byId("contactsSearch")?.addEventListener("input", renderContacts);
+  byId("contactsSortFilter")?.addEventListener("change", renderContacts);
+  byId("contactsAccountFilter")?.addEventListener("change", renderContacts);
+}
+
+function contactRowHtml(c) {
+  return `<div class="contact-row${c.isPrimary ? " contact-row-primary" : ""}">
+    <div class="contact-avatar">${escapeHtml((c.name || "?").charAt(0).toUpperCase())}</div>
+    <div class="contact-info">
+      <strong>${escapeHtml(c.name)}</strong>
+      <span>${escapeHtml([c.title, c.accountName].filter(Boolean).join(" · "))}</span>
+    </div>
+    <div class="contact-row-links">
+      ${c.phone ? `<a class="contact-quick" href="tel:${escapeHtml(c.phone)}" title="${escapeHtml(c.phone)}">📞</a>` : ""}
+      ${c.email ? `<a class="contact-quick" href="mailto:${escapeHtml(c.email)}" title="${escapeHtml(c.email)}">✉️</a>` : ""}
+    </div>
+    ${c.isPrimary ? `<span class="contact-badge-primary">Primary</span>` : ""}
+  </div>`;
 }
 
 function openContactDialog(existingContact, accountId, accountName) {
