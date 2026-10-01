@@ -284,44 +284,34 @@ Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'lon
     if (dots)  dots.hidden    = !on;
   }
 
-  // ── Avatar SVG (Talon — white bald eagle head) ───────────────────
+  // ── Avatar SVG (Talon — cartoon eagle head) ──────────────────────
   let _eid = 0;
   function eagleSvg(size) {
     const u = ++_eid;
     return `<svg width="${size}" height="${size}" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <clipPath id="ec${u}"><circle cx="24" cy="24" r="22.5"/></clipPath>
+        <clipPath id="ec${u}"><circle cx="24" cy="24" r="22"/></clipPath>
       </defs>
       <circle cx="24" cy="24" r="23" fill="#16213e"/>
       <g clip-path="url(#ec${u})">
-        <!-- Brown feathered chest -->
-        <path d="M4 50 C8 30 16 22 25 20 C35 18 44 23 50 34 L50 50Z" fill="#7d5214"/>
-        <!-- V-feather marks -->
-        <path d="M9 40 L14 31 L19 40"  stroke="#4e3008" stroke-width="1.5" fill="none" stroke-linejoin="round"/>
-        <path d="M17 47 L22 37 L27 47" stroke="#4e3008" stroke-width="1.4" fill="none" stroke-linejoin="round"/>
-        <path d="M25 50 L30 42 L35 50" stroke="#4e3008" stroke-width="1.2" fill="none" stroke-linejoin="round"/>
-        <path d="M7 42 Q15 28 27 22" stroke="#9a6a20" stroke-width="0.9" fill="none" opacity="0.55"/>
-        <!-- WHITE HEAD — dominant feature -->
-        <path d="M20 3 C29 1 39 6 41 16 C43 25 38 36 29 38 C21 40 12 34 9 24 C7 16 8 7 13 5 C15 3 18 2 20 3Z" fill="#e8e2cc"/>
+        <!-- Brown chest -->
+        <path d="M0 48 Q6 28 20 24 Q34 20 48 30 L48 48Z" fill="#8C5E0A"/>
+        <!-- White head (large clean ellipse) -->
+        <ellipse cx="27" cy="20" rx="17" ry="18.5" fill="#EDE5C0"/>
         <!-- Brown crown cap -->
-        <path d="M20 3 C29 1 39 6 41 16 C37 7 27 3 18 5 C14 6 11 10 11 14 C10 9 11 5 13 5 C15 3 18 2 20 3Z" fill="#7d5214"/>
-        <!-- Subtle tan streaks on white -->
-        <path d="M22 11 C26 9 31 10 34 14" stroke="#c9a850" stroke-width="0.9" fill="none" opacity="0.3"/>
-        <path d="M16 18 C20 14 26 13 30 16" stroke="#c9a850" stroke-width="0.8" fill="none" opacity="0.25"/>
-        <!-- ANGRY BROW: dark filled shape above eye -->
-        <path d="M11 21 C15 13 23 11 29 14 C23 15 15 18 11 21Z" fill="#3d2103"/>
-        <!-- EYE: large fierce amber -->
-        <circle cx="27" cy="23" r="5.8" fill="#c87808"/>
-        <circle cx="27" cy="23" r="3.4" fill="#0c0803"/>
-        <circle cx="29.2" cy="21.1" r="1.5" fill="rgba(255,255,255,0.9)"/>
-        <circle cx="27" cy="23" r="5.6" fill="none" stroke="#a86006" stroke-width="0.7"/>
-        <!-- HOOKED BEAK -->
-        <path d="M13 18 C8 17 3 18.5 1 21 C2.5 21 7 21.5 12 22Z" fill="#e09010"/>
-        <path d="M1 21 C-1 22 -1.5 24.5 1 26 C3 26.5 5.5 25 5.5 23 C4 24 2.5 23 1 21Z" fill="#c07008"/>
-        <path d="M12 22 L8 24 L5.5 25.5" stroke="#d08010" stroke-width="2.1" fill="none" stroke-linecap="round"/>
-        <path d="M13 18 C8 17.5 4 18.8 2 20.5" stroke="#f0b828" stroke-width="0.9" fill="none"/>
-        <ellipse cx="8.5" cy="19" rx="1.8" ry="0.9" fill="#7a4808" opacity="0.65"/>
-        <path d="M13 21 C10 21.5 7 23 5.5 24" stroke="#906010" stroke-width="0.7" fill="none"/>
+        <path d="M16 7 Q26 2 37 7 Q39 13 36 15 Q30 7 22 8 Q16 9 15 14 Q13 10 16 7Z" fill="#8C5E0A"/>
+        <!-- Angry brow: thick diagonal dark wedge -->
+        <path d="M10 23 Q19 12 31 15 Q22 16 12 25Z" fill="#150900"/>
+        <!-- Eye: cartoon-big amber -->
+        <circle cx="29" cy="25" r="7.5" fill="#E8A010"/>
+        <circle cx="29" cy="25" r="4.5" fill="#0D0805"/>
+        <circle cx="32.2" cy="21.8" r="2.2" fill="white" opacity="0.92"/>
+        <!-- Beak upper: bold orange cartoon hook -->
+        <path d="M13 20 L3 19 Q-1 21 0 25 Q2 28.5 6.5 27 Q5 26 5 23.5 L13 21.5Z" fill="#F5A820"/>
+        <!-- Hook curl at tip -->
+        <path d="M0 25 Q-2 28 1 30.5 Q3.5 31.5 6.5 29 Q4.5 28.5 4 27Z" fill="#C88010"/>
+        <!-- Beak lower: jaw -->
+        <path d="M13 22 L7 26.5 L5.5 28.5 Q7.5 29.5 10.5 28 L13 24.5Z" fill="#D09018"/>
       </g>
     </svg>`;
   }
