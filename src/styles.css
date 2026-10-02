@@ -8683,6 +8683,9 @@ button#gripSyncStatus:hover { opacity: 0.75; }
 .contact-badge-primary { font-size: .68rem; background: #fff3e0; color: var(--orange); border: 1px solid #ffd59e; border-radius: 8px; padding: 2px 7px; white-space: nowrap; flex-shrink: 0; font-weight: 600; }
 .contact-activity-date { display: inline-block; font-size: .75rem; color: var(--muted); background: none; border: none; cursor: pointer; padding: 0; text-decoration: underline dotted; text-underline-offset: 2px; }
 .contact-activity-date:hover { color: var(--blue); }
+.contact-name-link { background: none; border: none; cursor: pointer; padding: 0; font-weight: 600; font-size: inherit; color: var(--ink); text-align: left; }
+.contact-name-link:hover { color: var(--blue); text-decoration: underline; }
+.contact-row-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: auto; }
 /* In-drawer contact cards */
 .contacts-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .contacts-section-header h4 { margin: 0; }

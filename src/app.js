@@ -12305,6 +12305,23 @@ function bindEvents() {
     }
     const activityDateBtn = event.target.closest("[data-show-contact-activity]");
     if (activityDateBtn) { showContactActivityPopup(activityDateBtn); return; }
+    const editContactViewBtn = event.target.closest("[data-edit-contact-view]");
+    if (editContactViewBtn) {
+      const val = editContactViewBtn.dataset.editContactView;
+      if (val.startsWith("primary:")) {
+        const accountId = val.slice(8);
+        const acc = cleanAccounts().find(a => a.id === accountId);
+        if (acc) showDetail("account", accountId);
+      } else if (val.startsWith("contact:")) {
+        const contactId = val.slice(8);
+        const c = loadContacts().find(x => x.id === contactId);
+        if (c) {
+          const acc = cleanAccounts().find(a => a.id === c.accountId);
+          openContactDialog(c, c.accountId, acc?.client || "");
+        }
+      }
+      return;
+    }
     const addContactBtn = event.target.closest("[data-add-contact-account]");
     if (addContactBtn) {
       openContactDialog(null, addContactBtn.dataset.addContactAccount, addContactBtn.dataset.addContactName);
@@ -12935,22 +12952,21 @@ function renderContacts() {
   const entityFilterVal = byId("contactsEntityFilter")?.value || "all";
 
   const addlContacts = loadContacts();
-  const data = (() => { try { return JSON.parse(localStorage.getItem("garlandCrmData") || "{}"); } catch { return {}; } })();
-  const activitiesMap = (() => { try { return JSON.parse(localStorage.getItem("garlandAccountActivities") || "{}"); } catch { return {}; } })();
-  const accounts = Object.values(data.accounts || {});
+  const crmAccounts = cleanAccounts();
+  const accMap = new Map(crmAccounts.map(a => [a.id, a]));
 
   const latestActivity = (accountId) => {
-    const entries = (activitiesMap[accountId] || []);
+    const entries = (state.activities[accountId] || []);
     return entries.reduce((best, e) => (!best || dateValue(e.createdAt) > dateValue(best.createdAt)) ? e : best, null);
   };
 
   // Flatten all contacts: primary contacts from account records + additional contacts
   const allContacts = [];
-  accounts.forEach(a => {
+  crmAccounts.forEach(a => {
     if (a.poc) allContacts.push({ _id: `primary-${a.id}`, name: a.poc, title: a.title || "", phone: a.phone || "", email: a.email || "", accountId: a.id, accountName: a.client || "", county: a.county || "", entity: a.entity || "", lastActivity: latestActivity(a.id), isPrimary: true });
   });
   addlContacts.forEach(c => {
-    const acc = data.accounts?.[c.accountId];
+    const acc = accMap.get(c.accountId);
     const accName = acc?.client || "Unknown Account";
     allContacts.push({ ...c, _id: c.id, accountName: accName, county: acc?.county || "", entity: acc?.entity || "", lastActivity: latestActivity(c.accountId), isPrimary: false });
   });
@@ -13047,16 +13063,22 @@ function renderContacts() {
 
 function contactRowHtml(c) {
   const activityJson = c.lastActivity ? escapeHtml(JSON.stringify({ createdAt: c.lastActivity.createdAt, note: c.lastActivity.note || "", source: c.lastActivity.source || "" })) : "";
+  const editAttr = c.isPrimary
+    ? `data-edit-contact-view="primary:${escapeHtml(c.accountId)}"`
+    : `data-edit-contact-view="contact:${escapeHtml(c.id || c._id)}"`;
   return `<div class="contact-row${c.isPrimary ? " contact-row-primary" : ""}">
     <div class="contact-avatar">${escapeHtml((c.name || "?").charAt(0).toUpperCase())}</div>
     <div class="contact-info">
-      <strong>${escapeHtml(c.name)}</strong>
+      <button class="contact-name-link" ${editAttr} type="button">${escapeHtml(c.name)}</button>
       ${[c.title, c.accountName].filter(Boolean).length ? `<span class="contact-meta">${escapeHtml([c.title, c.accountName].filter(Boolean).join(" · "))}</span>` : ""}
       ${c.phone ? `<a class="contact-detail-link" href="tel:${escapeHtml(c.phone)}">📞 ${escapeHtml(c.phone)}</a>` : ""}
       ${c.email ? `<a class="contact-detail-link" href="mailto:${escapeHtml(c.email)}">✉️ ${escapeHtml(c.email)}</a>` : ""}
       ${c.lastActivity ? `<button class="contact-activity-date" data-show-contact-activity="${activityJson}" type="button">🗓 ${compactDate(c.lastActivity.createdAt)}</button>` : ""}
     </div>
-    ${c.isPrimary ? `<span class="contact-badge-primary">Primary</span>` : ""}
+    <div class="contact-row-actions">
+      <button class="mini-button" ${editAttr} type="button">Edit</button>
+      ${c.isPrimary ? `<span class="contact-badge-primary">Primary</span>` : ""}
+    </div>
   </div>`;
 }
 
@@ -13077,11 +13099,27 @@ function openContactDialog(existingContact, accountId, accountName) {
       <label>Notes<textarea name="notes" placeholder="Optional notes" rows="2"></textarea></label>
       <div class="modal-actions">
         <button type="submit" class="primary-button">Save Contact</button>
+        <button type="button" id="contactDeleteButton" class="secondary-button" style="color:#b91c1c;display:none">Delete Contact</button>
         <button type="button" id="contactCancelButton" class="secondary-button">Cancel</button>
       </div>
     </form>`;
     document.body.appendChild(dialog);
     byId("contactCancelButton").addEventListener("click", () => dialog.close());
+    byId("contactDeleteButton").addEventListener("click", async () => {
+      const id = byId("contactForm").elements.id.value;
+      if (!id) return;
+      if (await gripConfirm("Delete this contact?", "Delete", "Cancel")) {
+        saveContacts(loadContacts().filter(c => c.id !== id));
+        dialog.close();
+        const d = (() => { try { return JSON.parse(localStorage.getItem("garlandCrmData") || "{}"); } catch { return {}; } })();
+        if (byId("detailDrawer").classList.contains("is-open")) {
+          const accId = byId("contactForm").elements.accountId.value;
+          const acc = cleanAccounts().find(a => a.id === accId);
+          if (acc) showAccountDetail(acc);
+        }
+        if (state.view === "contacts") renderContacts();
+      }
+    });
     byId("contactForm").addEventListener("submit", (e) => {
       e.preventDefault();
       const form = byId("contactForm");
@@ -13101,14 +13139,14 @@ function openContactDialog(existingContact, accountId, accountName) {
       updated.push(newContact);
       saveContacts(updated);
       dialog.close();
-      const d = (() => { try { return JSON.parse(localStorage.getItem("garlandCrmData") || "{}"); } catch { return {}; } })();
-      const acc = d.accounts?.[accId];
+      const acc = cleanAccounts().find(a => a.id === accId);
       if (acc && byId("detailDrawer").classList.contains("is-open")) showAccountDetail(acc);
       if (state.view === "contacts") renderContacts();
     });
   }
   const form = byId("contactForm");
   byId("contactDialogTitle").textContent = existingContact ? "Edit Contact" : "Add Contact";
+  byId("contactDeleteButton").style.display = existingContact ? "" : "none";
   form.elements.id.value = existingContact?.id || "";
   form.elements.accountId.value = accountId;
   form.elements.name.value = existingContact?.name || "";
