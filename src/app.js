@@ -7187,8 +7187,7 @@ function renderCallList() {
                 ${account.poc ? `<small>${escapeHtml(account.poc)}</small>` : ""}
               </button>
               ${contactChips ? `<div class="call-contact-chips">${contactChips}</div>` : ""}
-              ${latestAccountActivity(account) ? `<p class="call-saved-note"><strong>Latest saved:</strong> ${escapeHtml(latestAccountActivity(account).note || "")} <small>${escapeHtml(compactDate(latestAccountActivity(account).createdAt))}</small></p>` : ""}
-              ${latestAccountActivity(account) ? `<p class="call-save-label" data-call-save-account="${escapeHtml(account.id)}" data-call-save-id="${escapeHtml(latestAccountActivity(account).id)}" data-call-save-completion="${escapeHtml(latestAccountActivity(account).completionKey || "")}">${escapeHtml(callSaveLabel(account.id, latestAccountActivity(account).id, latestAccountActivity(account).completionKey || ""))}</p>` : ""}
+              ${latestAccountActivity(account) ? `<p class="call-saved-note">${escapeHtml(latestAccountActivity(account).note || "")}<small>${escapeHtml(compactDate(latestAccountActivity(account).createdAt))}</small></p>` : ""}
               <button class="mini-button call-log-button" data-open-call-account="${escapeHtml(account.id)}" data-call-log-day="${escapeHtml(day)}" type="button">Log call / note</button>
             </div>
             <button class="call-account-page-btn" data-open-account-page="${escapeHtml(account.id)}" type="button" title="Open account page">↗</button>
@@ -12305,6 +12304,12 @@ function bindEvents() {
     }
     const activityDateBtn = event.target.closest("[data-show-contact-activity]");
     if (activityDateBtn) { showContactActivityPopup(activityDateBtn); return; }
+    const editPrimaryContactBtn = event.target.closest("[data-edit-primary-contact]");
+    if (editPrimaryContactBtn) {
+      const acc = cleanAccounts().find(a => a.id === editPrimaryContactBtn.dataset.editPrimaryContact);
+      if (acc) openPrimaryContactDialog(acc);
+      return;
+    }
     const editContactViewBtn = event.target.closest("[data-edit-contact-view]");
     if (editContactViewBtn) {
       const val = editContactViewBtn.dataset.editContactView;
@@ -12897,19 +12902,22 @@ function accountContactsSection(record) {
     <div class="contact-card contact-card-primary">
       <div class="contact-card-avatar">${escapeHtml((record.poc || "?").charAt(0).toUpperCase())}</div>
       <div class="contact-card-info">
-        <strong>${escapeHtml(record.poc)}</strong>
+        <button class="contact-name-link" data-edit-primary-contact="${escapeHtml(record.id)}" type="button">${escapeHtml(record.poc)}</button>
         ${record.title ? `<span class="contact-title">${escapeHtml(record.title)}</span>` : ""}
         ${record.phone ? `<a class="contact-link" href="tel:${escapeHtml(record.phone)}">${escapeHtml(record.phone)}</a>` : ""}
         ${record.email ? `<a class="contact-link" href="mailto:${escapeHtml(record.email)}">${escapeHtml(record.email)}</a>` : ""}
       </div>
-      <span class="contact-badge-primary">Primary</span>
+      <div class="contact-row-actions">
+        <button class="mini-button" data-edit-primary-contact="${escapeHtml(record.id)}" type="button">Edit</button>
+        <span class="contact-badge-primary">Primary</span>
+      </div>
     </div>` : "";
 
   const addlHtml = contacts.map(c => `
     <div class="contact-card" data-contact-id="${escapeHtml(c.id)}">
       <div class="contact-card-avatar">${escapeHtml((c.name || "?").charAt(0).toUpperCase())}</div>
       <div class="contact-card-info">
-        <strong>${escapeHtml(c.name)}</strong>
+        <button class="contact-name-link" data-edit-contact="${escapeHtml(c.id)}" type="button">${escapeHtml(c.name)}</button>
         ${c.title ? `<span class="contact-title">${escapeHtml(c.title)}</span>` : ""}
         ${c.phone ? `<a class="contact-link" href="tel:${escapeHtml(c.phone)}">${escapeHtml(c.phone)}</a>` : ""}
         ${c.email ? `<a class="contact-link" href="mailto:${escapeHtml(c.email)}">${escapeHtml(c.email)}</a>` : ""}
@@ -13154,6 +13162,50 @@ function openContactDialog(existingContact, accountId, accountName) {
   form.elements.phone.value = existingContact?.phone || "";
   form.elements.email.value = existingContact?.email || "";
   form.elements.notes.value = existingContact?.notes || "";
+  dialog.showModal();
+}
+
+function openPrimaryContactDialog(record) {
+  let dialog = byId("primaryContactDialog");
+  if (!dialog) {
+    dialog = document.createElement("dialog");
+    dialog.id = "primaryContactDialog";
+    dialog.className = "grip-dialog";
+    dialog.innerHTML = `<form id="primaryContactForm">
+      <h3>Edit Primary Contact</h3>
+      <input type="hidden" name="accountId" />
+      <label>Name<input name="poc" type="text" placeholder="Full name" /></label>
+      <label>Title<input name="title" type="text" placeholder="Job title" /></label>
+      <label>Phone<input name="phone" type="tel" placeholder="555-000-0000" /></label>
+      <label>Email<input name="email" type="email" placeholder="contact@email.com" /></label>
+      <div class="modal-actions">
+        <button type="submit" class="primary-button">Save</button>
+        <button type="button" id="primaryContactCancel" class="secondary-button">Cancel</button>
+      </div>
+    </form>`;
+    document.body.appendChild(dialog);
+    byId("primaryContactCancel").addEventListener("click", () => dialog.close());
+    byId("primaryContactForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const form = byId("primaryContactForm");
+      const accId = form.elements.accountId.value;
+      ["poc", "title", "phone", "email"].forEach(key => {
+        persistRecordEdit("account", accId, key, form.elements[key].value.trim(), false);
+      });
+      renderFilters();
+      render();
+      dialog.close();
+      const updated = cleanAccounts().find(a => a.id === accId);
+      if (updated) showAccountDetail(updated);
+      if (state.view === "contacts") renderContacts();
+    });
+  }
+  const form = byId("primaryContactForm");
+  form.elements.accountId.value = record.id;
+  form.elements.poc.value = record.poc || "";
+  form.elements.title.value = record.title || "";
+  form.elements.phone.value = record.phone || "";
+  form.elements.email.value = record.email || "";
   dialog.showModal();
 }
 
