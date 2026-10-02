@@ -2270,7 +2270,7 @@ function taskCard(task) {
       <span class="pill ${taskTypeClass(task.task_type)}">${escapeHtml(task.task_type || "Task")}</span>
       <span class="pill ${taskPriorityClass(task.priority)}">${escapeHtml(task.priority || "Normal")}</span>
       <span class="pill ${taskStatusClass(task.status)}">${escapeHtml(task.status || "Open")}</span>
-      <span class="pill task-due-${dueLevel}">${escapeHtml(taskDueLabel(task))}</span>
+      <button type="button" class="pill task-due-${dueLevel} task-due-pill" data-quick-date-task="${escapeHtml(task.task_id)}">${escapeHtml(taskDueLabel(task))}</button>
       ${task.assigned_user ? `<span class="pill">${escapeHtml(task.assigned_user)}</span>` : ""}
       ${task.attachments?.length ? `<span class="pill">${task.attachments.length} attachment${task.attachments.length === 1 ? "" : "s"}</span>` : ""}
     </div>
@@ -3325,37 +3325,91 @@ function showTaskDetail(task) {
 }
 
 function saveTaskInline(taskId) {
-  const task = findTask(taskId);
-  if (!task) return;
-  const form = byId("detailContent").querySelector(`[data-task-inline-id="${CSS.escape(taskId)}"]`);
-  if (!form) return;
-  const get = (field) => {
-    const el = form.querySelector(`[data-task-inline-field="${field}"]`);
-    if (!el) return undefined;
-    if (el.type === "radio") {
-      const checked = form.querySelector(`[data-task-inline-field="${field}"]:checked`);
-      return checked ? checked.value : el.value;
-    }
-    return el.value;
-  };
-  const newStatus = get("status") || task.status;
-  Object.assign(task, {
-    title: (get("title") || task.title || "").trim(),
-    description: get("description") ?? task.description,
-    due_date: get("due_date") || task.due_date,
-    status: newStatus,
-    task_type: get("task_type") || task.task_type,
-    priority: get("priority") || task.priority,
-    next_action: get("next_action") ?? task.next_action,
-    completed_outcome: get("completed_outcome") ?? task.completed_outcome,
-    completed_at: newStatus === "Completed" ? (task.completed_at || new Date().toISOString()) : "",
+  const idx = state.tasks.findIndex(t => t.task_id === taskId);
+  if (idx === -1) return;
+  const task = state.tasks[idx];
+
+  const title = byId("taskInlineTitle")?.value?.trim() || task.title;
+  const dueDate = byId("taskInlineDueDate")?.value || task.due_date;
+  const status = byId("taskInlineStatus")?.value || task.status;
+  const typeEl = byId("detailContent")?.querySelector('[data-task-inline-field="task_type"]');
+  const taskType = typeEl?.value || task.task_type;
+  const priorityEl = byId("detailContent")?.querySelector('[name="taskInlinePriority"]:checked');
+  const priority = priorityEl?.value || task.priority;
+  const description = byId("taskInlineDesc")?.value ?? task.description;
+  const nextAction = byId("taskInlineNextAction")?.value ?? task.next_action;
+  const outcome = byId("taskInlineOutcome")?.value ?? task.completed_outcome;
+
+  if (!title) { alert("Task needs a title."); return; }
+
+  state.tasks[idx] = {
+    ...task,
+    title,
+    due_date: dueDate,
+    status,
+    task_type: taskType,
+    priority,
+    description,
+    next_action: nextAction,
+    completed_outcome: outcome,
+    completed_at: status === "Completed" ? (task.completed_at || new Date().toISOString()) : "",
     updated_at: new Date().toISOString(),
-  });
-  if (!task.title) { alert("Task needs a title."); return; }
+  };
+
   saveTasks();
   renderFilters();
-  render();
-  showTaskDetail(task);
+  renderDashboard();
+  renderTasks();
+  showTaskDetail(state.tasks[idx]);
+  showDetailSaveStatus("Saved");
+}
+
+function showQuickDatePicker(taskId, triggerEl) {
+  byId("gripQuickDatePicker")?.remove();
+  const task = findTask(taskId);
+  if (!task) return;
+  const rect = triggerEl.getBoundingClientRect();
+  const picker = document.createElement("div");
+  picker.id = "gripQuickDatePicker";
+  picker.className = "quick-date-picker";
+  picker.innerHTML = `
+    <button type="button" class="qd-btn" data-qd-task="${escapeHtml(taskId)}" data-qd-shortcut="today">Today</button>
+    <button type="button" class="qd-btn" data-qd-task="${escapeHtml(taskId)}" data-qd-shortcut="tomorrow">Tomorrow</button>
+    <button type="button" class="qd-btn" data-qd-task="${escapeHtml(taskId)}" data-qd-shortcut="7">+7 Days</button>
+    <div class="qd-custom-row">
+      <input type="date" id="gripQdInput" value="${escapeHtml(dateKeyFromValue(task.due_date) || toLocalDateKey(new Date()))}" />
+      <button type="button" class="qd-btn qd-set" data-qd-task="${escapeHtml(taskId)}" data-qd-shortcut="custom">Set</button>
+    </div>`;
+  const top = rect.bottom + window.scrollY + 6;
+  const left = Math.min(rect.left + window.scrollX, window.innerWidth - 220);
+  picker.style.cssText = `top:${top}px;left:${left}px`;
+  document.body.appendChild(picker);
+  setTimeout(() => {
+    const closeQD = (e) => {
+      if (!picker.contains(e.target) && e.target !== triggerEl) {
+        picker.remove();
+        document.removeEventListener("click", closeQD);
+      }
+    };
+    document.addEventListener("click", closeQD);
+  }, 10);
+}
+
+function applyQuickTaskDate(taskId, shortcut) {
+  const idx = state.tasks.findIndex(t => t.task_id === taskId);
+  if (idx === -1) return;
+  let dateKey;
+  if (shortcut === "today") dateKey = toLocalDateKey(new Date());
+  else if (shortcut === "tomorrow") dateKey = toLocalDateKey(addDays(new Date(), 1));
+  else if (shortcut === "7") dateKey = toLocalDateKey(addDays(new Date(), 7));
+  else if (shortcut === "custom") { dateKey = byId("gripQdInput")?.value; }
+  if (!dateKey) return;
+  byId("gripQuickDatePicker")?.remove();
+  state.tasks[idx] = { ...state.tasks[idx], due_date: dateKey, updated_at: new Date().toISOString() };
+  saveTasks();
+  renderDashboard();
+  renderTasks();
+  showTaskDetail(state.tasks[idx]);
   showDetailSaveStatus("Saved");
 }
 
@@ -12267,6 +12321,17 @@ function bindEvents() {
       if (v === "today") input.value = toLocalDateKey(new Date());
       else if (v === "tomorrow") input.value = toLocalDateKey(addDays(new Date(), 1));
       else if (v === "7") input.value = toLocalDateKey(addDays(new Date(), 7));
+      return;
+    }
+    const quickDateBtn = event.target.closest("[data-quick-date-task]");
+    if (quickDateBtn) {
+      event.stopPropagation();
+      showQuickDatePicker(quickDateBtn.dataset.quickDateTask, quickDateBtn);
+      return;
+    }
+    const qdShortcut = event.target.closest("[data-qd-shortcut]");
+    if (qdShortcut) {
+      applyQuickTaskDate(qdShortcut.dataset.qdTask, qdShortcut.dataset.qdShortcut);
       return;
     }
     const completeTaskButton = event.target.closest("[data-complete-task]");
