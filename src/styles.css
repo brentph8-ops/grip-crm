@@ -4524,7 +4524,26 @@ textarea {
 }
 
 .quick-record-shell {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
   padding: 22px;
+}
+
+.quick-record-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.quick-record-footer {
+  flex-shrink: 0;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+  padding-top: 14px;
 }
 
 .modal-header,

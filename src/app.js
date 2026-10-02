@@ -12016,6 +12016,10 @@ function bindEvents() {
     saveCallActivity(new FormData(event.currentTarget));
   });
   byId("cancelRecordQuickButton").addEventListener("click", () => byId("recordQuickDialog").close());
+  byId("saveRecordQuickButton").addEventListener("click", () => {
+    document.activeElement?.blur();
+    byId("recordQuickDialog").close();
+  });
   byId("callListRuleForm").addEventListener("submit", (event) => {
     event.preventDefault();
     addCallListRule(new FormData(event.currentTarget));
@@ -12654,6 +12658,8 @@ function bindEvents() {
     if (recordCardEl.dataset.type === "account") openAccountProfileDialog(recordCardEl.dataset.id);
     else if (["project", "proposal", "contractor"].includes(recordCardEl.dataset.type)) {
       openRecordQuickDialog(recordCardEl.dataset.type, recordCardEl.dataset.id);
+    } else if (recordCardEl.dataset.type === "task") {
+      openTaskDialog(recordCardEl.dataset.id);
     }
   });
   byId("cancelAccountProfileButton").addEventListener("click", () => byId("accountProfileDialog").close());
