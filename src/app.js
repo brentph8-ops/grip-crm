@@ -8229,26 +8229,17 @@ function saveGoalsFromSettings(form) {
 }
 
 function exportBackup() {
+  // Export every garland* localStorage key dynamically so new data stores
+  // (e.g. garlandContacts) are never silently dropped from backups again.
+  const storage = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith("garland")) storage[key] = localStorage.getItem(key);
+  }
   const payload = {
     exportedAt: new Date().toISOString(),
-    version: 1,
-    localStorage: {
-      garlandCrmData: localStorage.getItem("garlandCrmData"),
-      garlandProposalUpdates: localStorage.getItem("garlandProposalUpdates"),
-      garlandCrmNotes: localStorage.getItem("garlandCrmNotes"),
-      garlandAccountActivities: localStorage.getItem("garlandAccountActivities"),
-      garlandProposalAttachments: localStorage.getItem("garlandProposalAttachments"),
-      garlandScopeDatabase: localStorage.getItem("garlandScopeDatabase"),
-      garlandCallLists: localStorage.getItem("garlandCallLists"),
-      garlandTasks: localStorage.getItem("garlandTasks"),
-      garlandPunchLists: localStorage.getItem("garlandPunchLists"),
-      garlandTerritorySettings: localStorage.getItem("garlandTerritorySettings"),
-      garlandPriceBooks: localStorage.getItem("garlandPriceBooks"),
-      garlandPriceBookProducts: localStorage.getItem("garlandPriceBookProducts"),
-      garlandTakeoffManualProducts: localStorage.getItem("garlandTakeoffManualProducts"),
-      garlandFavoriteSystems: localStorage.getItem("garlandFavoriteSystems"),
-      garlandLastBackupAt: localStorage.getItem("garlandLastBackupAt"),
-    },
+    version: 2,
+    localStorage: storage,
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const link = document.createElement("a");
