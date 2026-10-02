@@ -8727,3 +8727,36 @@ button#gripSyncStatus:hover { opacity: 0.75; }
 .coverage-rate-val { color: var(--ink); }
 .coverage-wetmil { color: var(--muted); font-size: 0.72rem; }
 .coverage-pallet { text-align: center; font-weight: 700; }
+
+/* ── Task inline edit form (detail pane) ────────────────────────── */
+.task-inline-form { padding: 0 0 8px; }
+.task-inline-form .task-field-block:first-of-type { border-top: none; }
+.task-inline-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.task-inline-row .task-field-block { border-top: none; padding: 0; }
+.task-inline-select {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.88rem;
+  padding: 7px 10px;
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--surface, #fff);
+  color: var(--ink);
+  cursor: pointer;
+}
+.task-inline-select:focus { outline: none; border-color: var(--blue); }
+.task-inline-save-bar {
+  padding: 14px 0 4px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  margin-top: 4px;
+}
+.task-inline-save-bar .primary-button { min-width: 130px; }

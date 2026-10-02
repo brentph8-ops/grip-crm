@@ -3235,10 +3235,8 @@ function completeTask(taskId, checked) {
   const task = findTask(taskId);
   if (!task) return;
   if (checked) {
-    const outcome = prompt("Completed outcome", task.completed_outcome || "Spoke with Contact");
     task.status = "Completed";
-    task.completed_outcome = String(outcome || task.completed_outcome || "").trim();
-    task.completed_at = new Date().toISOString();
+    task.completed_at = task.completed_at || new Date().toISOString();
   } else {
     task.status = "Open";
     task.completed_at = "";
@@ -3253,39 +3251,112 @@ function completeTask(taskId, checked) {
 function showTaskDetail(task) {
   if (!task) return;
   setDetailsHidden(false);
-  const dueLevel = taskDueLevel(task);
+  const isCompleted = task.status === "Completed";
+  const dueVal = dateKeyFromValue(task.due_date) || toLocalDateKey(new Date());
+  const typeOpts = ["Call", "Follow-Up", "Email", "Actionable", "Project Related"].map(t =>
+    `<option value="${escapeHtml(t)}" ${task.task_type === t ? "selected" : ""}>${escapeHtml(t)}</option>`).join("");
+  const statusOpts = taskStatuses.map(s =>
+    `<option value="${escapeHtml(s)}" ${task.status === s ? "selected" : ""}>${escapeHtml(s)}</option>`).join("");
   byId("detailContent").innerHTML = `
     <div class="detail-sticky-header"><div class="detail-actions">
       <div>
         <h3>${escapeHtml(task.title || "Task")}</h3>
-        <p>${escapeHtml([task.account_name || "Unassigned", taskDueLabel(task)].filter(Boolean).join(" | "))}</p>
+        <p>${escapeHtml(task.account_name || "Unassigned")}</p>
       </div>
       <div class="detail-header-actions">
-        <button class="edit-button" data-open-task-dialog="${escapeHtml(task.task_id)}" type="button">Edit</button>
+        <button class="delete-button" data-delete-task="${escapeHtml(task.task_id)}" type="button">Delete</button>
       </div>
     </div></div>
-    <div class="field-grid">
-      ${field("Due Date", taskDueLabel(task))}
-      ${field("Priority", task.priority)}
-      ${field("Task Type", task.task_type)}
-      ${field("Status", task.status)}
-      ${field("Next Action", task.next_action)}
-      ${field("Assigned User", task.assigned_user)}
-      ${field("Reminder", [task.reminder_settings?.type, task.reminder_settings?.custom].filter(Boolean).join(" | "))}
-      ${field("Recurring", task.recurring_settings?.type)}
-      ${field("Completed Outcome", task.completed_outcome)}
+    <div class="task-inline-form" data-task-inline-id="${escapeHtml(task.task_id)}">
+      <div class="task-field-block">
+        <label class="task-field-label" for="taskInlineTitle">Task</label>
+        <input id="taskInlineTitle" class="task-title-input" value="${escapeHtml(task.title || "")}" placeholder="Task title" data-task-inline-field="title" />
+      </div>
+      <div class="task-inline-row">
+        <div class="task-field-block">
+          <span class="task-field-label">Status</span>
+          <select class="task-inline-select" data-task-inline-field="status" id="taskInlineStatus">${statusOpts}</select>
+        </div>
+        <div class="task-field-block">
+          <span class="task-field-label">Type</span>
+          <select class="task-inline-select" data-task-inline-field="task_type">${typeOpts}</select>
+        </div>
+      </div>
+      <div class="task-field-block">
+        <span class="task-field-label">Priority</span>
+        <div class="task-pill-group">
+          ${["Low","Medium","High"].map(p => `<label class="task-pill task-pill--${p.toLowerCase()}"><input type="radio" name="taskInlinePriority" value="${escapeHtml(p)}" ${task.priority === p ? "checked" : ""} data-task-inline-field="priority" />${escapeHtml(p)}</label>`).join("")}
+        </div>
+      </div>
+      <div class="task-field-block">
+        <span class="task-field-label">Due Date</span>
+        <div class="task-due-row">
+          <button type="button" class="task-pill task-pill--due" data-task-inline-due="today">Today</button>
+          <button type="button" class="task-pill task-pill--due" data-task-inline-due="tomorrow">Tomorrow</button>
+          <button type="button" class="task-pill task-pill--due" data-task-inline-due="7">+7 Days</button>
+          <input id="taskInlineDueDate" type="date" class="task-date-input" value="${escapeHtml(dueVal)}" data-task-inline-field="due_date" />
+        </div>
+      </div>
+      <div class="task-field-block">
+        <label class="task-field-label" for="taskInlineDesc">Notes</label>
+        <textarea id="taskInlineDesc" class="task-desc-input" rows="3" placeholder="Notes, context, or field instructions" data-task-inline-field="description">${escapeHtml(task.description || "")}</textarea>
+      </div>
+      <div class="task-field-block">
+        <label class="task-field-label" for="taskInlineNextAction">Next Action</label>
+        <input id="taskInlineNextAction" class="task-account-input" value="${escapeHtml(task.next_action || "")}" placeholder="Next step" data-task-inline-field="next_action" />
+      </div>
+      <div class="task-field-block" id="taskInlineOutcomeBlock" ${isCompleted ? "" : "hidden"}>
+        <label class="task-field-label" for="taskInlineOutcome">Completed Outcome</label>
+        <input id="taskInlineOutcome" class="task-account-input" value="${escapeHtml(task.completed_outcome || "")}" placeholder="What was the result?" data-task-inline-field="completed_outcome" list="taskInlineOutcomeList" />
+        <datalist id="taskInlineOutcomeList">${taskCompletedOutcomes.map(o => `<option value="${escapeHtml(o)}"></option>`).join("")}</datalist>
+      </div>
+      <div class="task-inline-save-bar">
+        <button type="button" class="primary-button" data-save-task-inline="${escapeHtml(task.task_id)}">Save Changes</button>
+      </div>
     </div>
-    <section class="detail-section task-detail-status ${dueLevel}">
-      <h4>Notes</h4>
-      <p>${escapeHtml(task.description || "No task notes yet.")}</p>
-    </section>
-    <section class="detail-section">
-      <h4>Attachments</h4>
-      ${task.attachments?.length ? `<div class="file-list">${task.attachments.map((file) => `<div class="file-row">${file.dataUrl ? `<a href="${file.dataUrl}" download="${escapeHtml(file.file_name)}">${escapeHtml(file.file_name)}</a>` : escapeHtml(file.file_name)}</div>`).join("")}</div>` : `<p class="empty-state">No attachments.</p>`}
-    </section>
-    <section class="danger-zone"><button class="delete-button" data-delete-task="${escapeHtml(task.task_id)}" type="button">Delete Task</button></section>
+    ${task.attachments?.length ? `<section class="detail-section"><h4>Attachments</h4><div class="file-list">${task.attachments.map((file) => `<div class="file-row">${file.dataUrl ? `<a href="${file.dataUrl}" download="${escapeHtml(file.file_name)}">${escapeHtml(file.file_name)}</a>` : escapeHtml(file.file_name)}</div>`).join("")}</div></section>` : ""}
   `;
+  const statusSel = byId("taskInlineStatus");
+  if (statusSel) statusSel.addEventListener("change", () => {
+    const outcomeBlock = byId("taskInlineOutcomeBlock");
+    if (outcomeBlock) outcomeBlock.hidden = statusSel.value !== "Completed";
+  });
   byId("detailDrawer").classList.add("is-open");
+}
+
+function saveTaskInline(taskId) {
+  const task = findTask(taskId);
+  if (!task) return;
+  const form = byId("detailContent").querySelector(`[data-task-inline-id="${CSS.escape(taskId)}"]`);
+  if (!form) return;
+  const get = (field) => {
+    const el = form.querySelector(`[data-task-inline-field="${field}"]`);
+    if (!el) return undefined;
+    if (el.type === "radio") {
+      const checked = form.querySelector(`[data-task-inline-field="${field}"]:checked`);
+      return checked ? checked.value : el.value;
+    }
+    return el.value;
+  };
+  const newStatus = get("status") || task.status;
+  Object.assign(task, {
+    title: (get("title") || task.title || "").trim(),
+    description: get("description") ?? task.description,
+    due_date: get("due_date") || task.due_date,
+    status: newStatus,
+    task_type: get("task_type") || task.task_type,
+    priority: get("priority") || task.priority,
+    next_action: get("next_action") ?? task.next_action,
+    completed_outcome: get("completed_outcome") ?? task.completed_outcome,
+    completed_at: newStatus === "Completed" ? (task.completed_at || new Date().toISOString()) : "",
+    updated_at: new Date().toISOString(),
+  });
+  if (!task.title) { alert("Task needs a title."); return; }
+  saveTasks();
+  renderFilters();
+  render();
+  showTaskDetail(task);
+  showDetailSaveStatus("Saved");
 }
 
 function compactDate(value) {
@@ -12181,6 +12252,21 @@ function bindEvents() {
     const openTaskEdit = event.target.closest("[data-open-task-dialog]");
     if (openTaskEdit) {
       openTaskDialog(openTaskEdit.dataset.openTaskDialog);
+      return;
+    }
+    const saveTaskInlineBtn = event.target.closest("[data-save-task-inline]");
+    if (saveTaskInlineBtn) {
+      saveTaskInline(saveTaskInlineBtn.dataset.saveTaskInline);
+      return;
+    }
+    const inlineDueBtn = event.target.closest("[data-task-inline-due]");
+    if (inlineDueBtn) {
+      const input = byId("taskInlineDueDate");
+      if (!input) return;
+      const v = inlineDueBtn.dataset.taskInlineDue;
+      if (v === "today") input.value = toLocalDateKey(new Date());
+      else if (v === "tomorrow") input.value = toLocalDateKey(addDays(new Date(), 1));
+      else if (v === "7") input.value = toLocalDateKey(addDays(new Date(), 7));
       return;
     }
     const completeTaskButton = event.target.closest("[data-complete-task]");
