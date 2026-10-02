@@ -71,10 +71,24 @@
             <span aria-hidden="true">🏠</span>
             Dashboard
           </button>
-          <button class="nav-button" data-view="territory" type="button">
-            <span aria-hidden="true">🧭</span>
-            Territory
-          </button>
+          <div class="nav-projects-group">
+            <button class="nav-button" data-view="territory" type="button">
+              <span aria-hidden="true">🧭</span>
+              Territory
+            </button>
+            <button class="nav-button nav-sub-button" data-view="accounts" type="button">
+              <span aria-hidden="true">🏢</span>
+              Accounts
+            </button>
+            <button class="nav-button nav-sub-button" data-view="contacts" type="button">
+              <span aria-hidden="true">👤</span>
+              Contacts
+            </button>
+            <button class="nav-button nav-sub-button" data-view="contractors" type="button">
+              <span aria-hidden="true">👷🏻‍♂️</span>
+              Contractors
+            </button>
+          </div>
           <div class="nav-projects-group">
             <button class="nav-button" data-view="activityLog" type="button">
               <span aria-hidden="true">📅</span>
@@ -112,16 +126,6 @@
             </button>
           </div>
           <div class="nav-projects-group">
-            <button class="nav-button" data-view="accounts" type="button">
-              <span aria-hidden="true">🏢</span>
-              Accounts
-            </button>
-            <button class="nav-button nav-sub-button" data-view="contacts" type="button">
-              <span aria-hidden="true">👤</span>
-              Contacts
-            </button>
-          </div>
-          <div class="nav-projects-group">
             <button class="nav-button" data-view="projects" type="button">
               <span aria-hidden="true">🏗️</span>
               Projects
@@ -138,6 +142,10 @@
               <span aria-hidden="true">📊</span>
               Warranty Summary
             </button>
+            <button class="nav-button nav-sub-button" data-view="coverageRate" type="button">
+              <span aria-hidden="true">📏</span>
+              Coverage Rates
+            </button>
           </div>
           <div class="nav-projects-group">
             <button class="nav-button" data-view="proposals" type="button">
@@ -149,10 +157,6 @@
               Scope of Work
             </button>
           </div>
-          <button class="nav-button" data-view="contractors" type="button">
-            <span aria-hidden="true">👷🏻‍♂️</span>
-            Contractors
-          </button>
           <button class="nav-button" data-view="outreach" type="button">
             <span aria-hidden="true">👾</span>
             Assistant
@@ -180,6 +184,9 @@
           <button class="nav-button" data-view="today" type="button"><span aria-hidden="true">☀️</span>Today</button>
           <button class="nav-button" data-view="dashboard" type="button"><span aria-hidden="true">🏠</span>Dashboard</button>
           <button class="nav-button" data-view="territory" type="button"><span aria-hidden="true">🧭</span>Territory</button>
+          <button class="nav-button nav-sub-button" data-view="accounts" type="button"><span aria-hidden="true">🏢</span>Accounts</button>
+          <button class="nav-button nav-sub-button" data-view="contacts" type="button"><span aria-hidden="true">👤</span>Contacts</button>
+          <button class="nav-button nav-sub-button" data-view="contractors" type="button"><span aria-hidden="true">👷🏻‍♂️</span>Contractors</button>
           <button class="nav-button" data-view="activityLog" type="button"><span aria-hidden="true">📅</span>Activity</button>
           <button class="nav-button nav-sub-button" data-view="callList" type="button"><span aria-hidden="true">☎️</span>Calls</button>
           <button class="nav-button nav-sub-button" data-view="tasks" type="button"><span aria-hidden="true">✅</span>Tasks</button>
@@ -188,15 +195,13 @@
           <button class="nav-button nav-sub-button" data-view="newsReport" type="button"><span aria-hidden="true">🗞️</span>News Report</button>
           <button class="nav-button" data-view="pipeline" type="button"><span aria-hidden="true">💰</span>Pipeline</button>
           <button class="nav-button nav-sub-button" data-view="pipeline" data-pipeline-graveyard type="button"><span aria-hidden="true">💀</span>Graveyard</button>
-          <button class="nav-button" data-view="accounts" type="button"><span aria-hidden="true">🏢</span>Accounts</button>
-          <button class="nav-button nav-sub-button" data-view="contacts" type="button"><span aria-hidden="true">👤</span>Contacts</button>
           <button class="nav-button" data-view="projects" type="button"><span aria-hidden="true">🏗️</span>Projects</button>
           <button class="nav-button nav-sub-button" data-view="punchList" type="button"><span aria-hidden="true">📋</span>Punch</button>
-          <button class="nav-button nav-sub-button" data-view="scopeDatabase" type="button"><span aria-hidden="true">🧰</span>Scope</button>
           <button class="nav-button nav-sub-button" data-view="takeoffEstimator" type="button"><span aria-hidden="true">📐</span>Takeoff</button>
           <button class="nav-button nav-sub-button" data-view="warrantySummary" type="button"><span aria-hidden="true">📊</span>Warranty</button>
+          <button class="nav-button nav-sub-button" data-view="coverageRate" type="button"><span aria-hidden="true">📏</span>Coverage Rates</button>
           <button class="nav-button" data-view="proposals" type="button"><span aria-hidden="true">🛠️</span>Proposals</button>
-          <button class="nav-button" data-view="contractors" type="button"><span aria-hidden="true">👷🏻‍♂️</span>Contractors</button>
+          <button class="nav-button nav-sub-button" data-view="scopeDatabase" type="button"><span aria-hidden="true">🧰</span>Scope</button>
           <button class="nav-button" data-view="outreach" type="button"><span aria-hidden="true">👾</span>Assistant</button>
         </div>
 
@@ -205,11 +210,11 @@
           <button class="nav-button" data-view="punchList" type="button"><span aria-hidden="true">📋</span>Punch</button>
           <button class="nav-button" data-view="takeoffEstimator" type="button"><span aria-hidden="true">📐</span>Takeoff</button>
           <button class="nav-button" data-view="warrantySummary" type="button"><span aria-hidden="true">📊</span>Warranty</button>
+          <button class="nav-button" data-view="coverageRate" type="button"><span aria-hidden="true">📏</span>Coverage</button>
           <button class="nav-button" data-view="tasks" type="button"><span aria-hidden="true">✅</span>Tasks</button>
           <button class="nav-button" data-view="followUpQueue" type="button"><span aria-hidden="true">⏱️</span>Follow-Up</button>
           <button class="nav-button" data-view="activityLog" type="button"><span aria-hidden="true">📅</span>Activity</button>
           <button class="nav-button" data-view="scopeDatabase" type="button"><span aria-hidden="true">🧰</span>Scope</button>
-          <button class="nav-button" data-view="contractors" type="button"><span aria-hidden="true">👷🏻‍♂️</span>Contractors</button>
           <button class="nav-button" data-view="newsReport" type="button"><span aria-hidden="true">🗞️</span>News</button>
           <button class="nav-button" data-view="noteTaker" type="button"><span aria-hidden="true">📝</span>Notes</button>
           <button class="nav-button" data-view="outreach" type="button"><span aria-hidden="true">👾</span>Assistant</button>
@@ -731,6 +736,8 @@
             <div id="takeoffEstimateList" class="record-grid"></div>
           </div>
         </section>
+
+        <section id="coverageRateView" class="view"></section>
 
         <section id="warrantySummaryView" class="view">
           <div class="takeoff-panel">

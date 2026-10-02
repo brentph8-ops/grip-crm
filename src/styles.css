@@ -2277,6 +2277,11 @@ textarea {
   border-radius: 8px;
   padding: 14px;
   margin-bottom: 14px;
+  min-width: 0;
+}
+
+.takeoff-results-panel {
+  overflow-x: auto;
 }
 
 .price-book-uploader {
@@ -8709,3 +8714,16 @@ button#gripSyncStatus:hover { opacity: 0.75; }
 #contactDialog label { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: .85rem; color: var(--muted); }
 #contactDialog input, #contactDialog textarea { font-size: 16px; padding: 8px 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); width: 100%; box-sizing: border-box; }
 #contactDialog textarea { resize: vertical; min-height: 60px; }
+
+/* ── Coverage Rate View ─────────────────────────────────────── */
+.coverage-disclaimer { background: #fffbea; border: 1px solid #fde68a; border-radius: 6px; padding: 8px 12px; margin: 8px 0 10px; color: #78350f; font-size: 0.78rem; }
+.coverage-table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--line); margin-top: 4px; }
+.coverage-table { border-collapse: collapse; min-width: 680px; width: 100%; background: #fff; }
+.coverage-table th { background: #f4f8fc; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--muted); padding: 8px 10px; text-align: left; border-bottom: 2px solid var(--line); }
+.coverage-table td { padding: 7px 10px; font-size: 0.83rem; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--ink); }
+.coverage-cat-header td { background: var(--blue); color: #fff; font-size: 0.70rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; padding: 5px 10px; }
+.coverage-num { font-family: ui-monospace, monospace; font-size: 0.80rem; color: var(--blue); font-weight: 700; white-space: nowrap; }
+.coverage-name { font-weight: 600; }
+.coverage-rate-val { color: var(--ink); }
+.coverage-wetmil { color: var(--muted); font-size: 0.72rem; }
+.coverage-pallet { text-align: center; font-weight: 700; }

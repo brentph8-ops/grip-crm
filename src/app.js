@@ -5343,6 +5343,87 @@ function systemRollupNotesFromSelections(system, logic, selections) {
   ].join("\n");
 }
 
+function buildCoverageRateData() {
+  const seen = new Set();
+  const items = [];
+  for (const [number, detail] of Object.entries(productNumberDetails)) {
+    if (!detail.coverage || seen.has(number)) continue;
+    seen.add(number);
+    const mapped = mappedProductNumbers.find(m => m.number === number && !m.match.includes("["));
+    const name = detail.application
+      ? detail.application
+      : mapped ? displayProductName(mapped.match) : `#${number}`;
+    const covL = (detail.coverage || "").toLowerCase();
+    const sizeL = (detail.size || "").toLowerCase();
+    let category;
+    if (covL.includes("sq. ft./roll")) {
+      category = "Roll Goods";
+    } else if (sizeL.includes("pail") || sizeL.includes("drum") || covL.includes("gal.") || detail.wetMil) {
+      category = "Coatings, Mastics & Adhesives";
+    } else if (sizeL.includes("cartridge") || sizeL.includes("tube") || covL.includes(" lf ") || covL.includes("lf per") || covL.includes("linear")) {
+      category = "Sealants & Accessories";
+    } else if (sizeL.includes("keg") || covL.includes("lb./sq.")) {
+      category = "Coatings, Mastics & Adhesives";
+    } else {
+      category = "Other";
+    }
+    items.push({ number, name, category, coverage: detail.coverage, size: detail.size || "—", perPallet: detail.perPallet || "—", wetMil: detail.wetMil || "" });
+  }
+  return items.sort((a, b) => compareText(a.category, b.category) || compareText(a.number, b.number));
+}
+
+function renderCoverageRate() {
+  const view = byId("coverageRateView");
+  if (!view) return;
+  const prevFocusId = document.activeElement?.id;
+  const prevSelStart = document.activeElement?.selectionStart;
+  const prevSelEnd = document.activeElement?.selectionEnd;
+  const restoreFocus = () => {
+    if (!prevFocusId) return;
+    const el = byId(prevFocusId);
+    if (el) { el.focus(); if (el.setSelectionRange && prevSelStart != null) el.setSelectionRange(prevSelStart, prevSelEnd); }
+  };
+  const search = normalize(byId("coverageRateSearch")?.value || "");
+  const catFilter = byId("coverageRateCatFilter")?.value || "all";
+  const allItems = buildCoverageRateData();
+  const categories = [...new Set(allItems.map(i => i.category))].sort();
+  const filtered = allItems.filter(item => {
+    const catMatch = catFilter === "all" || item.category === catFilter;
+    const searchMatch = !search || normalize(item.number).includes(search) || normalize(item.name).includes(search) || normalize(item.coverage).includes(search);
+    return catMatch && searchMatch;
+  });
+  const groups = {};
+  filtered.forEach(item => { if (!groups[item.category]) groups[item.category] = []; groups[item.category].push(item); });
+  const catOptions = `<option value="all">All categories</option>${categories.map(c => `<option value="${escapeHtml(c)}"${catFilter === c ? " selected" : ""}>${escapeHtml(c)}</option>`).join("")}`;
+  const tableBody = Object.entries(groups).sort(([a], [b]) => compareText(a, b)).map(([cat, items]) =>
+    `<tbody><tr class="coverage-cat-header"><td colspan="5">${escapeHtml(cat)}</td></tr>${items.map(item =>
+      `<tr>
+        <td class="coverage-num">${escapeHtml(item.number)}</td>
+        <td><span class="coverage-name">${escapeHtml(item.name)}</span></td>
+        <td><span class="coverage-rate-val">${escapeHtml(item.coverage)}</span>${item.wetMil ? `<br><small class="coverage-wetmil">${escapeHtml(item.wetMil)}</small>` : ""}</td>
+        <td>${escapeHtml(item.size)}</td>
+        <td class="coverage-pallet">${escapeHtml(item.perPallet)}</td>
+      </tr>`).join("")}</tbody>`).join("");
+  view.innerHTML = `
+    <div class="toolbar toolbar-split">
+      <div class="toolbar-group">
+        <input id="coverageRateSearch" class="toolbar-input" type="search" placeholder="Search product # or name…" value="${escapeHtml(byId("coverageRateSearch")?.value || "")}">
+        <select id="coverageRateCatFilter">${catOptions}</select>
+      </div>
+      <span class="view-record-count">${filtered.length} product${filtered.length !== 1 ? "s" : ""}</span>
+    </div>
+    <p class="coverage-disclaimer"><small>Coverage rates are catalog reference values only. Confirm rate requirements, field conditions, and package yield against the current product TDS before ordering. Not a substitute for specification review.</small></p>
+    <div class="coverage-table-wrap">
+      <table class="coverage-table">
+        <thead><tr><th>Product #</th><th>Description</th><th>Coverage Rate</th><th>Size / Format</th><th>Per Pallet</th></tr></thead>
+        ${tableBody || "<tbody><tr><td colspan='5' class='empty-state' style='padding:20px;text-align:center'>No products match this search.</td></tr></tbody>"}
+      </table>
+    </div>`;
+  byId("coverageRateSearch").addEventListener("input", renderCoverageRate);
+  byId("coverageRateCatFilter").addEventListener("change", renderCoverageRate);
+  restoreFocus();
+}
+
 function renderWarrantySummaryChart() {
   if (!byId("warrantyProjectTypeInput")) return;
   const projectType = normalizeProjectTypeLabel(byId("warrantyProjectTypeInput").value || defaultProjectType);
@@ -10971,17 +11052,18 @@ function setView(view) {
     if (byId("callListDay")) byId("callListDay").value = state.callListDay;
     renderCallList();
   }
-  const projectSubViews = ["punchList", "takeoffEstimator", "warrantySummary"];
-  const accountSubViews = ["contacts"];
+  const projectSubViews = ["punchList", "takeoffEstimator", "warrantySummary", "coverageRate"];
+  const territorySubViews = ["accounts", "contacts", "contractors"];
   const activitySubViews = ["callList", "tasks", "noteTaker", "followUpQueue", "newsReport"];
   document.querySelectorAll(".nav-button").forEach((button) => {
     const isMatch = button.dataset.view === view;
     const isProjectParent = button.dataset.view === "projects" && projectSubViews.includes(view) && !button.classList.contains("nav-sub-button");
-    const isAccountParent = button.dataset.view === "accounts" && accountSubViews.includes(view) && !button.classList.contains("nav-sub-button");
+    const isTerritoryParent = button.dataset.view === "territory" && territorySubViews.includes(view) && !button.classList.contains("nav-sub-button");
+    const isAccountsForContacts = button.dataset.view === "accounts" && view === "contacts" && button.classList.contains("nav-sub-button");
     const isActivityParent = button.dataset.view === "activityLog" && activitySubViews.includes(view) && !button.classList.contains("nav-sub-button");
-    button.classList.toggle("is-active", isMatch || isProjectParent || isAccountParent || isActivityParent);
+    button.classList.toggle("is-active", isMatch || isProjectParent || isTerritoryParent || isAccountsForContacts || isActivityParent);
   });
-  const overflowViews = ["punchList", "takeoffEstimator", "warrantySummary", "noteTaker", "activityLog", "scopeDatabase", "contractors", "outreach", "tasks", "followUpQueue", "newsReport"];
+  const overflowViews = ["punchList", "takeoffEstimator", "warrantySummary", "coverageRate", "noteTaker", "activityLog", "scopeDatabase", "outreach", "tasks", "followUpQueue", "newsReport"];
   byId("mobileMoreButton")?.classList.toggle("is-active", overflowViews.includes(view));
   document.querySelectorAll(".view").forEach((section) => section.classList.toggle("is-active", section.id === `${view}View`));
   if (view === "newsReport") renderNewsReport();
@@ -10989,13 +11071,14 @@ function setView(view) {
   if (view === "punchList") renderPunchLists();
   if (view === "takeoffEstimator") renderTakeoffEstimator();
   if (view === "warrantySummary") renderWarrantySummaryChart();
+  if (view === "coverageRate") renderCoverageRate();
   if (view === "noteTaker") renderNoteTaker();
   if (view === "outreach") { if (window.gripOutreach) window.gripOutreach.render(); }
   if (view === "today")     { if (window.gripToday)    window.gripToday.render(); }
   if (view === "pipeline")  { if (window.gripPipeline) window.gripPipeline.render(); }
   if (view === "territory" || view === "liveMap") { if (window.gripMap) window.gripMap.render(); }
   if (view === "contacts") renderContacts();
-  const _viewTitles = { today: "Today", dashboard: "Dashboard", pipeline: "Pipeline", territory: "Territory", accounts: "Accounts", contacts: "Contacts", projects: "Projects", punchList: "Punch List", takeoffEstimator: "Takeoff Estimator", warrantySummary: "Warranty Summary Chart", proposals: "Proposals", scopeDatabase: "Scope of Work", tasks: "Tasks", callList: "Call List", followUpQueue: "Follow-Up Queue", activityLog: "Activity Log", newsReport: "Your News Report", contractors: "Contractors", noteTaker: "Note Taker", outreach: "Assistant", liveMap: "Live Account Map" };
+  const _viewTitles = { today: "Today", dashboard: "Dashboard", pipeline: "Pipeline", territory: "Territory", accounts: "Accounts", contacts: "Contacts", projects: "Projects", punchList: "Punch List", takeoffEstimator: "Takeoff Estimator", warrantySummary: "Warranty Summary Chart", coverageRate: "Coverage Rates", proposals: "Proposals", scopeDatabase: "Scope of Work", tasks: "Tasks", callList: "Call List", followUpQueue: "Follow-Up Queue", activityLog: "Activity Log", newsReport: "Your News Report", contractors: "Contractors", noteTaker: "Note Taker", outreach: "Assistant", liveMap: "Live Account Map" };
   const _resolvedTitle = _viewTitles[view] || view;
   byId("viewTitle").textContent = _resolvedTitle;
   updateMobileViewLabel(_resolvedTitle);
