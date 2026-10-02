@@ -5,9 +5,10 @@
 
 (function () {
 
-  const STAGES = ["Client", "Contacted", "Meeting", "Bucket", "Follow-up Meeting", "Budget", "Project Planning", "Bidding", "Project Completed"];
+  const STAGES = ["Client", "Unresponsive", "Contacted", "Meeting", "Bucket", "Follow-up Meeting", "Budget", "Project Planning", "Bidding", "Project Completed"];
   const STAGE_COLORS = {
     "Client":            { bg: "#f1f5f9", text: "#475569" },
+    "Unresponsive":      { bg: "#fef2f2", text: "#b91c1c" },
     "Contacted":         { bg: "#e0f2fe", text: "#0369a1" },
     "Meeting":           { bg: "#dbeafe", text: "#1d4ed8" },
     "Bucket":            { bg: "#e0e7ff", text: "#4338ca" },
@@ -20,6 +21,7 @@
   // Rank auto-syncs when a deal moves to any stage
   const STAGE_RANK_SYNC = {
     "Client":            "Prospecting",
+    "Unresponsive":      "Unresponsive",
     "Contacted":         "In Progress",
     "Meeting":           "Meeting",
     "Bucket":            "In Progress",
@@ -31,11 +33,12 @@
     "Graveyard":         "Dead End",
   };
   const GRAVEYARD_COLOR = { bg: "#1e293b", text: "#64748b" };
-  const RANK_OPTIONS = ["Prospecting", "In Progress", "Meeting", "C", "B", "A", "Dead End"];
+  const RANK_OPTIONS = ["Prospecting", "In Progress", "Meeting", "C", "B", "A", "Unresponsive", "Dead End"];
   const RANK_COLORS = {
     "A":           { bg: "#bbf7d0", text: "#15803d" },
     "B":           { bg: "#dbeafe", text: "#1d4ed8" },
     "C":           { bg: "#fef9c3", text: "#b45309" },
+    "Unresponsive": { bg: "#fef2f2", text: "#b91c1c" },
     "Dead End":    { bg: "#f1f5f9", text: "#94a3b8" },
     "Prospecting": { bg: "#f8fafc", text: "#94a3b8" },
     "In Progress": { bg: "#e0e7ff", text: "#4338ca" },

@@ -268,7 +268,7 @@ function projectAutoArchived(item) {
 }
 
 const abcScores = ["Job Won", "A (90%)", "B (50%)", "C (25%)"];
-const accountRankOptions = ["Prospecting", "In Progress", "Meeting", "C", "B", "A", "Dead End"];
+const accountRankOptions = ["Prospecting", "In Progress", "Meeting", "C", "B", "A", "Unresponsive", "Dead End"];
 const defaultProjectType = "N/A";
 const projectTypes = ["N/A", "New Roof/Reroof", "Recover", "Restoration"];
 const contractorWarrantyOptions = ["Not selected", "2-year contractor warranty", "3-year contractor warranty", "4-year contractor warranty", "5-year contractor warranty"];
@@ -3413,6 +3413,7 @@ function entityClass(value) {
 
 function rankClass(value) {
   const rank = normalize(value);
+  if (rank === "unresponsive") return "rank-unresponsive";
   if (rank === "dead end") return "rank-dead-end";
   if (rank.includes("job won") || rank.includes("job secured")) return "score-job";
   if (rank === "a") return "score-a";

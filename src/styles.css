@@ -3285,6 +3285,11 @@ textarea {
   color: #6d3419;
 }
 
+.pill.rank-unresponsive {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
 .pill.rank-dead-end {
   background: #000;
   color: #fff;
