@@ -10973,7 +10973,7 @@ function setView(view) {
   }
   const projectSubViews = ["punchList", "takeoffEstimator", "warrantySummary"];
   const accountSubViews = ["contacts"];
-  const activitySubViews = ["callList", "tasks", "followUpQueue", "newsReport"];
+  const activitySubViews = ["callList", "tasks", "noteTaker", "followUpQueue", "newsReport"];
   document.querySelectorAll(".nav-button").forEach((button) => {
     const isMatch = button.dataset.view === view;
     const isProjectParent = button.dataset.view === "projects" && projectSubViews.includes(view) && !button.classList.contains("nav-sub-button");
