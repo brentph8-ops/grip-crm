@@ -5344,15 +5344,50 @@ function systemRollupNotesFromSelections(system, logic, selections) {
 }
 
 function buildCoverageRateData() {
+  const productNames = {
+    "4701": "OptiMax", "4702": "OptiMax FR Mineral",
+    "4360": "StressPly", "4365": "StressPly FR Mineral",
+    "4376": "StressPly Plus", "4377": "StressPly Plus FR Mineral",
+    "4377-G-P-80": "StressPly Plus FR Min Sunburst",
+    "4383": "StressPly IV Plus", "4384": "StressPly IV Plus Mineral",
+    "4385-W": "StressPly IV Plus UV Mineral",
+    "4901": "StressPly Legacy", "4902": "StressPly Legacy Mineral",
+    "4902-S": "StressPly Legacy Mineral SA",
+    "4357": "StressPly EUV", "4358-W": "StressPly EUV FR Mineral",
+    "4950": "StressPly Max", "4951-W": "StressPly Max FR Mineral",
+    "4125": "StressPly SA FR Base Sheet",
+    "4364": "VersiPly 80", "4369": "VersiPly Mineral",
+    "9500": "KEE-Stone FB 60", "9500-25": "KEE-Stone FB 60 (25 ft)",
+    "9500-50": "KEE-Stone FB 60 (50 ft)", "9501-NF": "KEE-Stone FB 60 NF Flashing",
+    "9504-24": "KEE-Stone FB 60 Detail Roll (24\")", "9504-R": "KEE-Stone FB 60 Utility Roll",
+    "9525": "KEE-Stone FB 60 Gray", "9525-50": "KEE-Stone FB 60 Gray (50 ft)",
+    "9600": "KEE-Stone HP", "9600-50": "KEE-Stone HP (50 ft)",
+    "9601-NF": "KEE-Stone HP NF Flashing",
+    "9700": "KEE-Stone Legacy", "9700-50": "KEE-Stone Legacy (50 ft)",
+    "9701-NF": "KEE-Stone Legacy NF Flashing",
+    "9901-NF": "KEE-Stone Legacy NF Flashing (Alt)",
+    "9904-24": "KEE-Stone HP Detail Roll (24\")", "9904-R": "KEE-Stone HP Utility Roll",
+    "4113-P": "HPR TorchBase", "4112": "HPR GlasBase",
+    "4116": "HPR Premium GlasBase", "4122": "HPR GlasFelt",
+    "4121": "HPR Tri-Base Premium", "4114": "HPR SA FR Base Sheet",
+    "4143-80-P": "FlexBase 80", "4145-80-P": "FlexBase E 80",
+    "4144-80-P": "FlexBase Plus 80",
+    "4411-80": "StressBase 80", "4411-80-PRM": "StressBase 80 Plus",
+    "4411-120": "StressBase 120",
+    "51-5411": "Ultra-Shield Torch Base",
+    "4879": "GRIP Polyester Firm", "4876": "GRIP Polyester Soft",
+    "4133": "R-Mer Seal",
+    "7305-5-S": "Green-Lock Plus Membrane Adhesive",
+    "7340": "HPR All-Temp Asphalt",
+  };
   const seen = new Set();
   const items = [];
   for (const [number, detail] of Object.entries(productNumberDetails)) {
     if (!detail.coverage || seen.has(number)) continue;
     seen.add(number);
-    const mapped = mappedProductNumbers.find(m => m.number === number && !m.match.includes("["));
     const name = detail.application
       ? detail.application
-      : mapped ? displayProductName(mapped.match) : `#${number}`;
+      : (productNames[number] || `#${number}`);
     const covL = (detail.coverage || "").toLowerCase();
     const sizeL = (detail.size || "").toLowerCase();
     let category;
