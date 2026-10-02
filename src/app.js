@@ -10973,13 +10973,15 @@ function setView(view) {
   }
   const projectSubViews = ["punchList", "takeoffEstimator", "warrantySummary"];
   const accountSubViews = ["contacts"];
+  const activitySubViews = ["tasks", "followUpQueue", "newsReport"];
   document.querySelectorAll(".nav-button").forEach((button) => {
     const isMatch = button.dataset.view === view;
     const isProjectParent = button.dataset.view === "projects" && projectSubViews.includes(view) && !button.classList.contains("nav-sub-button");
     const isAccountParent = button.dataset.view === "accounts" && accountSubViews.includes(view) && !button.classList.contains("nav-sub-button");
-    button.classList.toggle("is-active", isMatch || isProjectParent || isAccountParent);
+    const isActivityParent = button.dataset.view === "activityLog" && activitySubViews.includes(view) && !button.classList.contains("nav-sub-button");
+    button.classList.toggle("is-active", isMatch || isProjectParent || isAccountParent || isActivityParent);
   });
-  const overflowViews = ["punchList", "takeoffEstimator", "warrantySummary", "followUpQueue", "tasks", "noteTaker", "activityLog", "scopeDatabase", "contractors", "newsReport", "outreach"];
+  const overflowViews = ["punchList", "takeoffEstimator", "warrantySummary", "noteTaker", "activityLog", "scopeDatabase", "contractors", "outreach", "tasks", "followUpQueue", "newsReport"];
   byId("mobileMoreButton")?.classList.toggle("is-active", overflowViews.includes(view));
   document.querySelectorAll(".view").forEach((section) => section.classList.toggle("is-active", section.id === `${view}View`));
   if (view === "newsReport") renderNewsReport();
