@@ -5,7 +5,7 @@
 
 (function () {
 
-  const STAGES = ["Client", "Unresponsive", "Contacted", "Meeting", "Bucket", "Follow-up Meeting", "Budget", "Project Planning", "Bidding", "Project Completed"];
+  const STAGES = ["Client", "Contacted", "Unresponsive", "Meeting", "Bucket", "Follow-up Meeting", "Budget", "Project Planning", "Bidding", "Project Completed"];
   const STAGE_COLORS = {
     "Client":            { bg: "#f1f5f9", text: "#475569" },
     "Unresponsive":      { bg: "#fef2f2", text: "#b91c1c" },
