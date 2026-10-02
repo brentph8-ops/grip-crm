@@ -12303,6 +12303,8 @@ function bindEvents() {
       if (await gripConfirm("Delete this price book reference?", "Delete", "Cancel")) deletePriceBook(deletePriceBookButton.dataset.deletePriceBook);
       return;
     }
+    const activityDateBtn = event.target.closest("[data-show-contact-activity]");
+    if (activityDateBtn) { showContactActivityPopup(activityDateBtn); return; }
     const addContactBtn = event.target.closest("[data-add-contact-account]");
     if (addContactBtn) {
       openContactDialog(null, addContactBtn.dataset.addContactAccount, addContactBtn.dataset.addContactName);
@@ -12916,32 +12918,55 @@ function renderContacts() {
   const view = byId("contactsView");
   if (!view) return;
 
+  const prevFocusId = document.activeElement?.id;
+  const prevSelStart = document.activeElement?.selectionStart;
+  const prevSelEnd = document.activeElement?.selectionEnd;
+
+  const restoreFocus = () => {
+    if (!prevFocusId) return;
+    const el = byId(prevFocusId);
+    if (el) { el.focus(); if (el.setSelectionRange && prevSelStart != null) el.setSelectionRange(prevSelStart, prevSelEnd); }
+  };
+
   const query = (byId("contactsSearch")?.value || "").trim().toLowerCase();
   const sortVal = byId("contactsSortFilter")?.value || "name-az";
   const accountFilterVal = byId("contactsAccountFilter")?.value || "all";
+  const countyFilterVal = byId("contactsCountyFilter")?.value || "all";
+  const entityFilterVal = byId("contactsEntityFilter")?.value || "all";
 
   const addlContacts = loadContacts();
   const data = (() => { try { return JSON.parse(localStorage.getItem("garlandCrmData") || "{}"); } catch { return {}; } })();
+  const activitiesMap = (() => { try { return JSON.parse(localStorage.getItem("garlandAccountActivities") || "{}"); } catch { return {}; } })();
   const accounts = Object.values(data.accounts || {});
+
+  const latestActivity = (accountId) => {
+    const entries = (activitiesMap[accountId] || []);
+    return entries.reduce((best, e) => (!best || dateValue(e.createdAt) > dateValue(best.createdAt)) ? e : best, null);
+  };
 
   // Flatten all contacts: primary contacts from account records + additional contacts
   const allContacts = [];
   accounts.forEach(a => {
-    if (a.poc) allContacts.push({ _id: `primary-${a.id}`, name: a.poc, title: a.title || "", phone: a.phone || "", email: a.email || "", accountId: a.id, accountName: a.client || "", isPrimary: true });
+    if (a.poc) allContacts.push({ _id: `primary-${a.id}`, name: a.poc, title: a.title || "", phone: a.phone || "", email: a.email || "", accountId: a.id, accountName: a.client || "", county: a.county || "", entity: a.entity || "", lastActivity: latestActivity(a.id), isPrimary: true });
   });
   addlContacts.forEach(c => {
-    const accName = data.accounts?.[c.accountId]?.client || "Unknown Account";
-    allContacts.push({ ...c, _id: c.id, accountName: accName, isPrimary: false });
+    const acc = data.accounts?.[c.accountId];
+    const accName = acc?.client || "Unknown Account";
+    allContacts.push({ ...c, _id: c.id, accountName: accName, county: acc?.county || "", entity: acc?.entity || "", lastActivity: latestActivity(c.accountId), isPrimary: false });
   });
 
-  // Build account options for filter dropdown
+  // Build filter option lists
   const accountNames = [...new Set(allContacts.map(c => c.accountName))].sort();
+  const counties = [...new Set(allContacts.map(c => c.county).filter(Boolean))].sort();
+  const entities = [...new Set(allContacts.map(c => c.entity).filter(Boolean))].sort();
 
   // Apply filters
   const matches = (val) => (val || "").toLowerCase().includes(query);
   let filtered = allContacts
     .filter(c => accountFilterVal === "all" || c.accountName === accountFilterVal)
-    .filter(c => !query || [c.name, c.title, c.phone, c.email, c.accountName].some(matches));
+    .filter(c => countyFilterVal === "all" || c.county === countyFilterVal)
+    .filter(c => entityFilterVal === "all" || c.entity === entityFilterVal)
+    .filter(c => !query || [c.name, c.title, c.phone, c.email, c.accountName, c.entity, c.county].some(matches));
 
   // Sort
   if (sortVal === "name-az") filtered.sort((a, b) => a.name.localeCompare(b.name));
@@ -12949,9 +12974,11 @@ function renderContacts() {
   else if (sortVal === "account-az") filtered.sort((a, b) => a.accountName.localeCompare(b.accountName) || a.name.localeCompare(b.name));
 
   const accountFilterOptions = accountNames.map(n => `<option value="${escapeHtml(n)}"${accountFilterVal === n ? " selected" : ""}>${escapeHtml(n)}</option>`).join("");
+  const countyFilterOptions = counties.map(n => `<option value="${escapeHtml(n)}"${countyFilterVal === n ? " selected" : ""}>${escapeHtml(n)}</option>`).join("");
+  const entityFilterOptions = entities.map(n => `<option value="${escapeHtml(n)}"${entityFilterVal === n ? " selected" : ""}>${escapeHtml(n)}</option>`).join("");
 
   const toolbarHtml = `<div class="contacts-toolbar">
-    <input id="contactsSearch" class="search-input" type="search" placeholder="Search contacts…" value="${escapeHtml(query)}" autocomplete="off" />
+    <input id="contactsSearch" class="search-input" type="search" placeholder="Search name, account, entity…" value="${escapeHtml(query)}" autocomplete="off" />
     <select id="contactsSortFilter" class="select-sm">
       <option value="name-az"${sortVal === "name-az" ? " selected" : ""}>Name A–Z</option>
       <option value="name-za"${sortVal === "name-za" ? " selected" : ""}>Name Z–A</option>
@@ -12961,14 +12988,36 @@ function renderContacts() {
       <option value="all"${accountFilterVal === "all" ? " selected" : ""}>All accounts</option>
       ${accountFilterOptions}
     </select>
+    <select id="contactsCountyFilter" class="select-sm">
+      <option value="all"${countyFilterVal === "all" ? " selected" : ""}>All counties</option>
+      ${countyFilterOptions}
+    </select>
+    <select id="contactsEntityFilter" class="select-sm">
+      <option value="all"${entityFilterVal === "all" ? " selected" : ""}>All entities</option>
+      ${entityFilterOptions}
+    </select>
     <span class="contacts-count-label">${filtered.length} contact${filtered.length !== 1 ? "s" : ""}</span>
+    <button class="mini-button" id="contactsImportBtn" type="button">⬆ Import</button>
+    <button class="mini-button" id="contactsExportBtn" type="button">⬇ Export</button>
+    <input id="contactsImportFile" type="file" accept=".csv,.vcf" style="display:none" />
   </div>`;
 
-  if (!filtered.length) {
-    view.innerHTML = toolbarHtml + `<p class="empty-state">${query || accountFilterVal !== "all" ? "No contacts match those filters." : "No contacts yet — open an account and tap + Add."}</p>`;
+  const wireContactsToolbar = () => {
     byId("contactsSearch")?.addEventListener("input", renderContacts);
     byId("contactsSortFilter")?.addEventListener("change", renderContacts);
     byId("contactsAccountFilter")?.addEventListener("change", renderContacts);
+    byId("contactsCountyFilter")?.addEventListener("change", renderContacts);
+    byId("contactsEntityFilter")?.addEventListener("change", renderContacts);
+    byId("contactsExportBtn")?.addEventListener("click", exportContactsCsv);
+    byId("contactsImportBtn")?.addEventListener("click", () => byId("contactsImportFile")?.click());
+    byId("contactsImportFile")?.addEventListener("change", handleContactsImport);
+  };
+
+  const hasFilter = query || accountFilterVal !== "all" || countyFilterVal !== "all" || entityFilterVal !== "all";
+  if (!filtered.length) {
+    view.innerHTML = toolbarHtml + `<p class="empty-state">${hasFilter ? "No contacts match those filters." : "No contacts yet — open an account and tap + Add."}</p>`;
+    wireContactsToolbar();
+    restoreFocus();
     return;
   }
 
@@ -12992,12 +13041,12 @@ function renderContacts() {
   }
 
   view.innerHTML = toolbarHtml + `<div class="contacts-list">${rows}</div>`;
-  byId("contactsSearch")?.addEventListener("input", renderContacts);
-  byId("contactsSortFilter")?.addEventListener("change", renderContacts);
-  byId("contactsAccountFilter")?.addEventListener("change", renderContacts);
+  wireContactsToolbar();
+  restoreFocus();
 }
 
 function contactRowHtml(c) {
+  const activityJson = c.lastActivity ? escapeHtml(JSON.stringify({ createdAt: c.lastActivity.createdAt, note: c.lastActivity.note || "", source: c.lastActivity.source || "" })) : "";
   return `<div class="contact-row${c.isPrimary ? " contact-row-primary" : ""}">
     <div class="contact-avatar">${escapeHtml((c.name || "?").charAt(0).toUpperCase())}</div>
     <div class="contact-info">
@@ -13005,6 +13054,7 @@ function contactRowHtml(c) {
       ${[c.title, c.accountName].filter(Boolean).length ? `<span class="contact-meta">${escapeHtml([c.title, c.accountName].filter(Boolean).join(" · "))}</span>` : ""}
       ${c.phone ? `<a class="contact-detail-link" href="tel:${escapeHtml(c.phone)}">📞 ${escapeHtml(c.phone)}</a>` : ""}
       ${c.email ? `<a class="contact-detail-link" href="mailto:${escapeHtml(c.email)}">✉️ ${escapeHtml(c.email)}</a>` : ""}
+      ${c.lastActivity ? `<button class="contact-activity-date" data-show-contact-activity="${activityJson}" type="button">🗓 ${compactDate(c.lastActivity.createdAt)}</button>` : ""}
     </div>
     ${c.isPrimary ? `<span class="contact-badge-primary">Primary</span>` : ""}
   </div>`;
@@ -13067,6 +13117,113 @@ function openContactDialog(existingContact, accountId, accountName) {
   form.elements.email.value = existingContact?.email || "";
   form.elements.notes.value = existingContact?.notes || "";
   dialog.showModal();
+}
+
+function showContactActivityPopup(btn) {
+  let activity;
+  try { activity = JSON.parse(btn.dataset.showContactActivity); } catch { return; }
+  let popup = byId("contactActivityPopup");
+  if (!popup) {
+    popup = document.createElement("dialog");
+    popup.id = "contactActivityPopup";
+    popup.className = "grip-dialog";
+    document.body.appendChild(popup);
+  }
+  popup.innerHTML = `
+    <div class="dialog-header">
+      <h3>Last Activity</h3>
+      <button class="icon-button" id="closeActivityPopupX" type="button" aria-label="Close">✕</button>
+    </div>
+    <div class="dialog-body" style="padding:16px;min-width:240px">
+      <p style="font-weight:600;margin:0 0 8px">${compactDate(activity.createdAt) || "Unknown date"}</p>
+      ${activity.source ? `<p style="margin:0 0 6px"><span class="pill">${escapeHtml(activity.source)}</span></p>` : ""}
+      <p style="margin:0;color:var(--ink)">${activity.note ? escapeHtml(activity.note) : "<em>No notes recorded.</em>"}</p>
+    </div>
+    <div class="modal-actions" style="padding:12px 16px">
+      <button class="secondary-button" id="closeActivityPopupOk" type="button">Close</button>
+    </div>`;
+  popup.showModal();
+  byId("closeActivityPopupX")?.addEventListener("click", () => popup.close());
+  byId("closeActivityPopupOk")?.addEventListener("click", () => popup.close());
+  popup.addEventListener("click", e => { if (e.target === popup) popup.close(); }, { once: true });
+}
+
+function exportContactsCsv() {
+  const data = (() => { try { return JSON.parse(localStorage.getItem("garlandCrmData") || "{}"); } catch { return {}; } })();
+  const accounts = data.accounts || {};
+  const rows = [["Name", "Title", "Phone", "Email", "Account", "County", "Entity", "Notes", "Type"]];
+  Object.values(accounts).forEach(a => {
+    if (a.poc) rows.push([a.poc, a.title || "", a.phone || "", a.email || "", a.client || "", a.county || "", a.entity || "", "", "Primary"]);
+  });
+  loadContacts().forEach(c => {
+    const acc = accounts[c.accountId] || {};
+    rows.push([c.name || "", c.title || "", c.phone || "", c.email || "", acc.client || "", acc.county || "", acc.entity || "", c.notes || "", "Contact"]);
+  });
+  const csv = rows.map(r => r.map(f => `"${String(f).replace(/"/g, '""')}"`).join(",")).join("\n");
+  const a = document.createElement("a");
+  a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
+  a.download = `grip-contacts-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+}
+
+function handleContactsImport(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  e.target.value = "";
+  const reader = new FileReader();
+  reader.onload = () => {
+    const text = reader.result;
+    if (file.name.toLowerCase().endsWith(".vcf")) importContactsVcf(text);
+    else importContactsCsv(text);
+  };
+  reader.readAsText(file);
+}
+
+function importContactsCsv(text) {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return;
+  const headers = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, "").toLowerCase());
+  const idx = (name) => headers.findIndex(h => h.includes(name));
+  const iName = idx("name"), iTitle = idx("title"), iPhone = idx("phone"), iEmail = idx("email"), iAccount = idx("account"), iNotes = idx("notes");
+  const data = (() => { try { return JSON.parse(localStorage.getItem("garlandCrmData") || "{}"); } catch { return {}; } })();
+  const accounts = Object.values(data.accounts || {});
+  const existing = loadContacts();
+  let added = 0;
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].match(/("(?:[^"]|"")*"|[^,]*)/g)?.map(c => c.trim().replace(/^"|"$/g, "").replace(/""/g, '"')) || [];
+    const name = iName >= 0 ? cols[iName] || "" : "";
+    if (!name) continue;
+    const accountName = iAccount >= 0 ? cols[iAccount] || "" : "";
+    const acc = accounts.find(a => normalize(a.client) === normalize(accountName));
+    const newC = { id: makeContactId(), name, title: iTitle >= 0 ? cols[iTitle] || "" : "", phone: iPhone >= 0 ? cols[iPhone] || "" : "", email: iEmail >= 0 ? cols[iEmail] || "" : "", notes: iNotes >= 0 ? cols[iNotes] || "" : "", accountId: acc?.id || "", createdAt: new Date().toISOString() };
+    existing.push(newC);
+    added++;
+  }
+  saveContacts(existing);
+  if (state.view === "contacts") renderContacts();
+  alert(`Imported ${added} contact${added !== 1 ? "s" : ""}.`);
+}
+
+function importContactsVcf(text) {
+  const cards = text.split(/BEGIN:VCARD/i).slice(1);
+  const data = (() => { try { return JSON.parse(localStorage.getItem("garlandCrmData") || "{}"); } catch { return {}; } })();
+  const existing = loadContacts();
+  let added = 0;
+  cards.forEach(card => {
+    const get = (prop) => { const m = card.match(new RegExp(`^${prop}[^:]*:(.+)$`, "im")); return m ? m[1].trim() : ""; };
+    const name = get("FN") || get("N").replace(/;+/g, " ").trim();
+    if (!name) return;
+    const phone = (get("TEL") || get("TEL;TYPE")).replace(/[\s\-()]/g, "");
+    const email = get("EMAIL");
+    const org = get("ORG").split(";")[0].trim();
+    const title = get("TITLE");
+    const acc = org ? Object.values(data.accounts || {}).find(a => normalize(a.client) === normalize(org)) : undefined;
+    existing.push({ id: makeContactId(), name, title, phone, email, notes: "", accountId: acc?.id || "", createdAt: new Date().toISOString() });
+    added++;
+  });
+  saveContacts(existing);
+  if (state.view === "contacts") renderContacts();
+  alert(`Imported ${added} contact${added !== 1 ? "s" : ""}.`);
 }
 
 // ── Street address autocomplete (Nominatim) ───────────────────────
