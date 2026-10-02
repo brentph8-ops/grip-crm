@@ -8681,8 +8681,10 @@ button#gripSyncStatus:hover { opacity: 0.75; }
 .contact-detail-link { display: block; font-size: .78rem; color: var(--blue); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .contact-detail-link:hover { text-decoration: underline; }
 .contact-badge-primary { font-size: .68rem; background: #fff3e0; color: var(--orange); border: 1px solid #ffd59e; border-radius: 8px; padding: 2px 7px; white-space: nowrap; flex-shrink: 0; font-weight: 600; }
-.contact-activity-date { display: inline-block; font-size: .75rem; color: var(--muted); background: none; border: none; cursor: pointer; padding: 0; text-decoration: underline dotted; text-underline-offset: 2px; }
+.contact-activity-date { display: inline-flex; align-items: center; gap: 4px; font-size: .75rem; color: var(--muted); background: none; border: none; cursor: pointer; padding: 0; }
 .contact-activity-date:hover { color: var(--blue); }
+.contact-activity-label { font-weight: 600; }
+.contact-activity-date:hover .contact-activity-label { color: var(--blue); }
 .contact-name-link { background: none; border: none; cursor: pointer; padding: 0; font-weight: 600; font-size: inherit; color: var(--ink); text-align: left; }
 .contact-name-link:hover { color: var(--blue); text-decoration: underline; }
 .contact-row-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: auto; }

@@ -13081,7 +13081,7 @@ function contactRowHtml(c) {
       ${[c.title, c.accountName].filter(Boolean).length ? `<span class="contact-meta">${escapeHtml([c.title, c.accountName].filter(Boolean).join(" · "))}</span>` : ""}
       ${c.phone ? `<a class="contact-detail-link" href="tel:${escapeHtml(c.phone)}">📞 ${escapeHtml(c.phone)}</a>` : ""}
       ${c.email ? `<a class="contact-detail-link" href="mailto:${escapeHtml(c.email)}">✉️ ${escapeHtml(c.email)}</a>` : ""}
-      ${c.lastActivity ? `<button class="contact-activity-date" data-show-contact-activity="${activityJson}" type="button">🗓 ${compactDate(c.lastActivity.createdAt)}</button>` : ""}
+      ${c.lastActivity ? `<button class="contact-activity-date" data-show-contact-activity="${activityJson}" type="button"><span class="contact-activity-label">Last Activity:</span> 🗓 ${compactDate(c.lastActivity.createdAt)}</button>` : ""}
     </div>
     <div class="contact-row-actions">
       <button class="mini-button" ${editAttr} type="button">Edit</button>
