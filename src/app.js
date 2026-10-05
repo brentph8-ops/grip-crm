@@ -13362,7 +13362,9 @@ function contactRowHtml(c) {
     </div>
     <div class="contact-row-actions">
       <button class="mini-button" ${editAttr} type="button">Edit</button>
-      ${c.isPrimary ? `<span class="contact-badge-primary">Primary</span>` : ""}
+      ${c.isPrimary
+        ? `<span class="contact-badge-primary">Primary</span>`
+        : `<button class="mini-button mini-button-danger" data-delete-contact="${escapeHtml(c.id || c._id)}" type="button" title="Remove contact">✕</button>`}
     </div>
   </div>`;
 }
