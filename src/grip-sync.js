@@ -83,10 +83,8 @@
     }
   }
 
-  // ── Debounced push queue ─────────────────────────────────────────
-  // Accumulates writes, then flushes after 800 ms of quiet.
-
-  const pushQueue = {};
+  // (Debounced push queue and retry timers are declared with the flush
+  // implementation below.)
 
   // Strip device-specific OAuth tokens before pushing to the cloud so one
   // device's session doesn't overwrite another device's active connection.
@@ -102,10 +100,11 @@
   }
 
   const _origSetItem = localStorage.setItem.bind(localStorage);
-  const inFlight = new Map();
+  const flushing = new Map();
   let syncProblem = false;
   // Before authentication/hydration, app scripts may seed or normalize data.
-  // Those automatic writes must not become user edits or replace stored work.
+  // Those automatic writes must not become user edits or replace stored work:
+  // sync-key writes are suppressed until the first cloud hydration completes.
   let initialDataReady = !isConfigured();
   if (!initialDataReady) showAuthOverlay(true);
 
@@ -126,50 +125,419 @@
       Object.prototype.hasOwnProperty.call(b, key) && sameValue(a[key], b[key]));
   }
 
-  // Cloud-primary write: upsert directly to Supabase, localStorage is the cache.
-  async function flushKey(key) {
-    if (inFlight.has(key)) return inFlight.get(key);
-    const operation = (async () => {
-      const raw = localStorage.getItem(key);
-      if (!raw) return true;
-      const client = getClient();
-      const user = await getUser();
-      if (!client || !user) { updateSyncIndicator("local"); return false; }
-      try {
-        const parsed = sanitizeForSync(key, JSON.parse(raw));
-        updateSyncIndicator("syncing");
-        const { error } = await client.from("grip_data")
-          .upsert({ user_id: user.id, data_key: key, data_value: parsed },
-                  { onConflict: "user_id,data_key" });
-        if (error) throw error;
-        broadcastChange(key, JSON.stringify(parsed));
-        updateSyncIndicator("saved");
-        return true;
-      } catch (err) {
-        console.warn("GRIP save failed:", key, err);
-        syncProblem = "error";
-        updateSyncIndicator("error");
-        return false;
-      }
-    })();
-    inFlight.set(key, operation);
-    try { return await operation; } finally { inFlight.delete(key); }
+  function safeParse(s) {
+    if (s == null) return undefined;
+    try { return JSON.parse(s); } catch { return undefined; }
   }
+
+  function deepClone(v) {
+    return v === undefined ? undefined : JSON.parse(JSON.stringify(v));
+  }
+
+  // ── Durable pending queue ──────────────────────────────────────────
+  // Every local edit to a sync key is recorded here with the value that was
+  // last synced ("base"). The queue survives reloads, so offline edits are
+  // never lost and pulls can never clobber unsynced work.
+
+  const PENDING_KEY = "grip_pending_saves_v1";
+  const PUSH_VER_KEY = "grip_push_ver_v1";
+  const LAST_PUSH_KEY = "grip_last_push_ts";
+
+  function readPendingQueue() {
+    try {
+      const raw = localStorage.getItem(PENDING_KEY);
+      const q = raw ? JSON.parse(raw) : {};
+      return q && typeof q === "object" ? q : {};
+    } catch { return {}; }
+  }
+
+  function writePendingQueue(q) {
+    try { _origSetItem(PENDING_KEY, JSON.stringify(q)); } catch (err) {
+      console.warn("GRIP: could not persist pending queue", err);
+    }
+  }
+
+  function markPending(key, prevRaw) {
+    const q = readPendingQueue();
+    if (!q[key]) {
+      q[key] = { base: prevRaw == null ? null : String(prevRaw), error: false, updatedAt: Date.now() };
+      writePendingQueue(q);
+    }
+  }
+
+  function ensurePending(key, baseRaw) {
+    const q = readPendingQueue();
+    if (!q[key]) {
+      q[key] = { base: baseRaw == null ? null : String(baseRaw), error: false, updatedAt: Date.now() };
+      writePendingQueue(q);
+    }
+    return q[key];
+  }
+
+  function clearPending(key) {
+    const q = readPendingQueue();
+    if (q[key]) { delete q[key]; writePendingQueue(q); }
+  }
+
+  function setPendingBase(key, baseRaw) {
+    const q = readPendingQueue();
+    q[key] = { base: baseRaw == null ? null : String(baseRaw), error: false, updatedAt: Date.now() };
+    writePendingQueue(q);
+  }
+
+  function markPendingError(key, kind) {
+    const q = readPendingQueue();
+    if (q[key]) { q[key].error = kind; writePendingQueue(q); }
+  }
+
+  function hasPending(key) {
+    return !!readPendingQueue()[key];
+  }
+
+  function readPushVersions() {
+    try {
+      const raw = localStorage.getItem(PUSH_VER_KEY);
+      const v = raw ? JSON.parse(raw) : {};
+      return v && typeof v === "object" ? v : {};
+    } catch { return {}; }
+  }
+
+  function setPushVersion(key, ver) {
+    try {
+      const v = readPushVersions();
+      v[key] = String(ver);
+      _origSetItem(PUSH_VER_KEY, JSON.stringify(v));
+    } catch (_) {}
+  }
+
+  // Compare version stamps (Supabase updated_at or mock counters).
+  function verCmp(a, b) {
+    const na = Number(a), nb = Number(b);
+    const aNum = a != null && a !== "" && !isNaN(na);
+    const bNum = b != null && b !== "" && !isNaN(nb);
+    if (aNum && bNum) return na < nb ? -1 : na > nb ? 1 : 0;
+    const sa = String(a), sb = String(b);
+    return sa < sb ? -1 : sa > sb ? 1 : 0;
+  }
+
+  function refreshSyncProblem() {
+    const q = readPendingQueue();
+    let problem = false;
+    for (const k of Object.keys(q)) {
+      if (q[k] && q[k].error === "conflict") { problem = "conflict"; break; }
+      if (q[k] && q[k].error) problem = "error";
+    }
+    syncProblem = problem;
+    return problem;
+  }
+
+  // ── Record-level change tracking & merge ───────────────────────────
+  // For keys that hold independent records (call lists, activity logs),
+  // concurrent edits from two devices merge instead of clobbering each other.
+
+  function trackRecordChanges(key, oldJson, newJson) {
+    const oldVal = safeParse(oldJson);
+    const newVal = safeParse(newJson);
+    if (key === "garlandCallLists") {
+      const oldC = (oldVal && oldVal.completed) || {};
+      const newC = (newVal && newVal.completed) || {};
+      const set = {}, del = {};
+      let changed = false;
+      for (const k of Object.keys(newC)) {
+        if (!sameValue(oldC[k], newC[k])) { set[k] = newC[k]; changed = true; }
+      }
+      for (const k of Object.keys(oldC)) {
+        if (!Object.prototype.hasOwnProperty.call(newC, k)) { del[k] = oldC[k]; changed = true; }
+      }
+      const fields = {}, baseFields = {};
+      const oldTop = oldVal || {}, newTop = newVal || {};
+      for (const k of Object.keys(newTop)) {
+        if (k === "completed") continue;
+        if (!sameValue(oldTop[k], newTop[k])) { fields[k] = newTop[k]; baseFields[k] = oldTop[k]; changed = true; }
+      }
+      if (!changed) return {};
+      return { kind: "callLists", base: oldVal, set, del, fields, baseFields };
+    }
+    if (key === "garlandAccountActivities") {
+      const accounts = {};
+      const oldTop = oldVal || {}, newTop = newVal || {};
+      const allAccts = new Set([...Object.keys(oldTop), ...Object.keys(newTop)]);
+      for (const acct of allAccts) {
+        const oldArr = Array.isArray(oldTop[acct]) ? oldTop[acct] : [];
+        const newArr = Array.isArray(newTop[acct]) ? newTop[acct] : [];
+        const oldById = new Map(), newById = new Map();
+        for (const r of oldArr) if (r && r.id != null) oldById.set(r.id, r);
+        for (const r of newArr) if (r && r.id != null) newById.set(r.id, r);
+        const added = [], changedRecs = [], removed = [];
+        for (const [id, rec] of newById) {
+          if (!oldById.has(id)) added.push(rec);
+          else if (!sameValue(oldById.get(id), rec)) changedRecs.push({ id, before: oldById.get(id), after: rec });
+        }
+        for (const [id, rec] of oldById) {
+          if (!newById.has(id)) removed.push({ id, before: rec });
+        }
+        if (added.length || changedRecs.length || removed.length) {
+          accounts[acct] = { added, changed: changedRecs, removed };
+        }
+      }
+      if (!Object.keys(accounts).length) return {};
+      return { kind: "activities", accounts };
+    }
+    return null;
+  }
+
+  function conflictError(what) {
+    return Object.assign(new Error("CONFLICT: " + what), { gripConflict: true });
+  }
+
+  function mergeRecordChanges(key, remote, edits) {
+    if (!edits || !Object.keys(edits).length) return deepClone(remote) || {};
+    const kind = edits.kind ||
+      (key === "garlandCallLists" ? "callLists" :
+       key === "garlandAccountActivities" ? "activities" : null);
+    if (kind === "callLists") {
+      const merged = deepClone(remote) || {};
+      const rComp = { ...((merged && merged.completed) || {}) };
+      const baseComp = (edits.base && edits.base.completed) || {};
+      for (const k of Object.keys(edits.set || {})) {
+        const v = edits.set[k], was = baseComp[k], rem = rComp[k];
+        if (sameValue(v, was)) continue;
+        if (rem === undefined || sameValue(rem, was) || sameValue(rem, v)) rComp[k] = v;
+        else throw conflictError("call '" + k + "' changed on this device and in the cloud");
+      }
+      for (const k of Object.keys(edits.del || {})) {
+        const was = edits.del[k], rem = rComp[k];
+        if (rem === undefined) continue;
+        if (sameValue(rem, was)) delete rComp[k];
+        else throw conflictError("call '" + k + "' removed here but changed in the cloud");
+      }
+      merged.completed = rComp;
+      const baseFields = edits.baseFields || {};
+      for (const k of Object.keys(edits.fields || {})) {
+        const v = edits.fields[k], was = baseFields[k], rem = merged[k];
+        if (sameValue(v, was)) continue;
+        if (rem === undefined || sameValue(rem, was) || sameValue(rem, v)) merged[k] = v;
+        else throw conflictError("field '" + k + "' changed on this device and in the cloud");
+      }
+      return merged;
+    }
+    if (kind === "activities") {
+      const merged = deepClone(remote) || {};
+      for (const acct of Object.keys(edits.accounts || {})) {
+        const ch = edits.accounts[acct];
+        const rArr = Array.isArray(merged[acct]) ? merged[acct].slice() : [];
+        const reindex = () => {
+          const m = new Map();
+          rArr.forEach((r, i) => { if (r && r.id != null) m.set(r.id, i); });
+          return m;
+        };
+        let rById = reindex();
+        for (const item of ch.removed || []) {
+          const idx = rById.get(item.id);
+          if (idx === undefined) continue;
+          if (!sameValue(rArr[idx], item.before)) throw conflictError("activity '" + item.id + "' removed here but changed in the cloud");
+          rArr.splice(idx, 1);
+          rById = reindex();
+        }
+        for (const item of ch.changed || []) {
+          const idx = rById.get(item.id);
+          if (idx === undefined) throw conflictError("activity '" + item.id + "' changed here but removed in the cloud");
+          const rRec = rArr[idx];
+          if (!sameValue(rRec, item.before) && !sameValue(rRec, item.after)) throw conflictError("activity '" + item.id + "' changed on this device and in the cloud");
+          rArr[idx] = item.after;
+        }
+        for (const rec of ch.added || []) {
+          if (rec && rec.id != null && rById.has(rec.id)) {
+            if (!sameValue(rArr[rById.get(rec.id)], rec)) throw conflictError("activity '" + rec.id + "' added on both sides");
+            continue;
+          }
+          rArr.push(rec);
+          rById = reindex();
+        }
+        merged[acct] = rArr;
+      }
+      return merged;
+    }
+    return null;
+  }
+
+  // ── Debounced push queue ─────────────────────────────────────────
+  // Accumulates writes, then flushes after 300 ms of quiet. Failures retry
+  // with backoff; the pending queue keeps them durable across reloads.
+
+  const pushQueue = {};
+  const retryDelay = {};
 
   function schedulePush(key) {
     clearTimeout(pushQueue[key]);
-    pushQueue[key] = setTimeout(() => flushKey(key), 300);
+    pushQueue[key] = setTimeout(() => {
+      delete pushQueue[key];
+      flushKey(key).catch(() => {});
+    }, 300);
   }
 
-  // Intercept writes to sync keys and push them to Supabase immediately.
+  function scheduleRetry(key) {
+    clearTimeout(pushQueue[key]);
+    const d = Math.min(retryDelay[key] || 2000, 30000);
+    retryDelay[key] = d * 2;
+    pushQueue[key] = setTimeout(() => {
+      delete pushQueue[key];
+      flushKey(key).catch(() => {});
+    }, d);
+  }
+
+  // Cloud write with optimistic concurrency: read the cloud row, merge local
+  // edits onto it (record-level for call lists / activities, conflict-checked
+  // for everything else), then write back only if nobody beat us to it.
+  async function flushKey(key) {
+    if (flushing.has(key)) return flushing.get(key);
+    const task = (async () => {
+      const raw = localStorage.getItem(key);
+      const entry = readPendingQueue()[key];
+      if (raw == null) { if (entry) clearPending(key); return true; }
+      let client = null, user = null;
+      try {
+        client = getClient();
+        user = await getUser();
+      } catch (_) { user = null; }
+      if (!client || !user) return false; // offline — stay pending
+      const snapshot = String(raw);
+      // base is the last-synced value (null when the key never synced).
+      // A null base means the entire local value is new — never fall back to
+      // the snapshot here, or local edits become invisible to the merge.
+      const base = entry ? entry.base : snapshot;
+      updateSyncIndicator("syncing");
+      let row = null;
+      try {
+        const res = await client.from("grip_data")
+          .select("data_key,data_value,updated_at")
+          .eq("user_id", user.id)
+          .eq("data_key", key)
+          .maybeSingle();
+        if (res.error) throw res.error;
+        row = res.data || null;
+      } catch (err) {
+        console.warn("GRIP save failed:", key, err);
+        ensurePending(key, snapshot);
+        markPendingError(key, "network");
+        refreshSyncProblem(); updateSyncIndicator(syncProblem || "error");
+        scheduleRetry(key);
+        return false;
+      }
+      const localVal = safeParse(snapshot);
+      const baseVal = safeParse(base);
+      const cloudVal = row ? row.data_value : undefined;
+      let toPush;
+      let conflicted = false;
+      try {
+        if (row && !sameValue(cloudVal, sanitizeForSync(key, baseVal))) {
+          // Cloud moved since our base.
+          if (sameValue(localVal, baseVal)) {
+            // No local edits — nothing to push.
+            clearPending(key);
+            refreshSyncProblem();
+            return true;
+          }
+          const edits = trackRecordChanges(key, base, snapshot);
+          if (edits) toPush = mergeRecordChanges(key, cloudVal, edits);
+          else conflicted = true;
+        } else {
+          toPush = localVal;
+        }
+      } catch (err) {
+        if (err && (err.gripConflict || /CONFLICT/.test(err.message || ""))) conflicted = true;
+        else throw err;
+      }
+      if (conflicted) {
+        ensurePending(key, snapshot);
+        markPendingError(key, "conflict");
+        refreshSyncProblem(); updateSyncIndicator(syncProblem || "conflict");
+        return false;
+      }
+      const sanitized = sanitizeForSync(key, toPush);
+      try {
+        if (row) {
+          const res = await client.from("grip_data")
+            .update({ data_value: sanitized })
+            .eq("user_id", user.id)
+            .eq("data_key", key)
+            .eq("updated_at", row.updated_at);
+          if (res.error) throw res.error;
+          if (!res.data || !res.data.length) {
+            // Lost the race: someone wrote between our read and write.
+            // Stay pending; the next flush re-reads and merges.
+            ensurePending(key, snapshot);
+            scheduleRetry(key);
+            return true;
+          }
+          if (res.data[0] && res.data[0].updated_at) setPushVersion(key, res.data[0].updated_at);
+        } else {
+          const res = await client.from("grip_data")
+            .insert({ user_id: user.id, data_key: key, data_value: sanitized });
+          if (res.error) {
+            if (/duplicate/i.test(res.error.message || "")) {
+              ensurePending(key, snapshot);
+              scheduleRetry(key);
+              return true; // raced insert; retry as update
+            }
+            throw res.error;
+          }
+          if (res.data && res.data[0] && res.data[0].updated_at) setPushVersion(key, res.data[0].updated_at);
+        }
+      } catch (err) {
+        console.warn("GRIP save failed:", key, err);
+        ensurePending(key, snapshot);
+        markPendingError(key, "network");
+        refreshSyncProblem(); updateSyncIndicator(syncProblem || "error");
+        scheduleRetry(key);
+        return false;
+      }
+      // Success.
+      try { _origSetItem(LAST_PUSH_KEY, String(Date.now())); } catch (_) {}
+      delete retryDelay[key];
+      broadcastChange(key, JSON.stringify(sanitized));
+      if (localStorage.getItem(key) === snapshot) {
+        clearPending(key);
+      } else {
+        // Edited during upload — the pushed value becomes the new base.
+        setPendingBase(key, snapshot);
+        schedulePush(key);
+      }
+      refreshSyncProblem();
+      updateSyncIndicator(syncProblem || "saved");
+      return true;
+    })();
+    flushing.set(key, task);
+    try { return await task; } finally { flushing.delete(key); }
+  }
+
+  async function flushPending() {
+    const keys = Object.keys(readPendingQueue());
+    let ok = true;
+    for (const key of keys) {
+      try { if (!await flushKey(key)) ok = false; }
+      catch (err) { console.warn("GRIP flush failed:", key, err); ok = false; }
+    }
+    return ok;
+  }
+
+  // Intercept writes to sync keys: record them as pending and push them to
+  // Supabase. Pre-hydration seed/normalization writes are suppressed so they
+  // can never become user edits or replace cloud data.
   // Storage instances have a named-property setter — wrap the prototype so
   // sessionStorage and other instances are unaffected (notably Safari).
   const storagePrototype = Object.getPrototypeOf(localStorage);
   const nativeSetItem = storagePrototype.setItem;
+  const nativeGetItem = storagePrototype.getItem;
   storagePrototype.setItem = function (key, value) {
     if (this !== localStorage) return nativeSetItem.call(this, key, value);
     key = String(key);
     value = String(value);
+    if (SYNC_KEYS.has(key) && !initialDataReady) return;
+    let prevRaw = null;
+    if (SYNC_KEYS.has(key)) {
+      try { prevRaw = nativeGetItem.call(this, key); } catch (_) { prevRaw = null; }
+    }
     try {
       nativeSetItem.call(this, key, value);
     } catch (error) {
@@ -177,37 +545,53 @@
       updateSyncIndicator("storage");
       throw error;
     }
-    if (SYNC_KEYS.has(key) && isConfigured() && initialDataReady && _userSetupDone) {
-      schedulePush(key);
+    if (SYNC_KEYS.has(key) && initialDataReady) {
+      markPending(key, prevRaw);
+      if (isConfigured() && _userSetupDone) schedulePush(key);
     }
   };
 
   // ── Pull from Supabase ───────────────────────────────────────────
-  // Cloud is the source of truth. pullAll always wins over local cache,
-  // except for keys currently being written (skip those to avoid clobbering
-  // an in-flight push that hasn't reached the server yet).
+  // Cloud is the source of truth — except for keys with unsynced local edits,
+  // which pulls must never clobber. A pull that started before a newer pull
+  // is discarded, so a slow read can never overwrite fresher data.
+
+  let pullGen = 0;
 
   async function pullAll() {
     const client = getClient();
     const user = await getUser();
     if (!client || !user) return false;
+    // Snapshot pending state BEFORE the read: anything pending now, or that
+    // becomes pending while the read is in flight, is skipped below.
+    const pendingBefore = readPendingQueue();
+    const myGen = ++pullGen;
     try {
       const { data, error } = await client
         .from("grip_data")
-        .select("data_key, data_value")
+        .select("data_key,data_value,updated_at")
         .eq("user_id", user.id);
+      if (myGen !== pullGen) return "stale"; // a newer pull started; discard
       if (error) { updateSyncIndicator("error"); return false; }
       if (!data?.length) return "empty";
+      const pendingAfter = readPendingQueue();
+      const pushVer = readPushVersions();
       let anyChanged = false;
       for (const row of data) {
         if (!SYNC_KEYS.has(row.data_key)) continue;
+        // Never clobber unsynced local work.
+        if (pendingBefore[row.data_key] || pendingAfter[row.data_key]) continue;
         // Don't clobber a key that's currently being pushed to the cloud.
-        if (inFlight.has(row.data_key)) continue;
+        if (flushing.has(row.data_key)) continue;
+        // Skip rows older than (or equal to) our last successful push —
+        // the read started before the push landed.
+        if (pushVer[row.data_key] != null && row.updated_at != null &&
+            verCmp(row.updated_at, pushVer[row.data_key]) <= 0) continue;
         // Preserve this device's active Gmail token (never stored in cloud).
         let incoming = row.data_value;
         if (row.data_key === "garlandOutreach" && incoming && typeof incoming === "object") {
           try {
-            const local = JSON.parse(localStorage.getItem("garlandOutreach") || "{}");
+            const local = safeParse(localStorage.getItem("garlandOutreach")) || {};
             if (local.settings?.gmailToken) {
               incoming = { ...incoming, settings: { ...incoming.settings,
                 gmailToken: local.settings.gmailToken,
@@ -217,9 +601,9 @@
             }
           } catch (_) {}
         }
-        const serialized = JSON.stringify(incoming);
-        if (localStorage.getItem(row.data_key) !== serialized) {
-          _origSetItem(row.data_key, serialized);
+        const curRaw = localStorage.getItem(row.data_key);
+        if (curRaw == null || !sameValue(safeParse(curRaw), incoming)) {
+          _origSetItem(row.data_key, JSON.stringify(incoming));
           anyChanged = true;
         }
       }
@@ -254,10 +638,11 @@
     const isOn = ["syncing", "saved", "ready"].includes(state);
     el.innerHTML = isOn
       ? `<span class="sync-dot sync-dot--on"></span>Cloud On`
-      : state === "error"   ? "⚠ Save failed — tap to retry"
-      : state === "storage" ? "⚠ Storage full"
+      : state === "error"    ? "⚠ Save failed — tap to retry"
+      : state === "conflict" ? "⚠ Sync conflict — conflicting changes kept locally"
+      : state === "storage"  ? "⚠ Storage full"
       : `<span class="sync-dot sync-dot--off"></span>Cloud Off`;
-    el.className = `grip-sync-status ${isOn ? "sync-on" : state === "error" || state === "storage" ? "sync-error" : "sync-local"}`;
+    el.className = `grip-sync-status ${isOn ? "sync-on" : state === "error" || state === "storage" || state === "conflict" ? "sync-error" : "sync-local"}`;
   }
 
   function updateUserDisplay(user) {
@@ -395,34 +780,9 @@
   let _realtimeChannel = null;
   let _channelStatus = "UNSUBSCRIBED";
 
-  // Shared handler: write remote data into localStorage, refresh in-memory
-  // state, and re-render — used by both broadcast and postgres_changes paths.
-  function applyRemoteData(key, incoming) {
-    if (inFlight.has(key)) return; // don't clobber an in-flight write
-    // Preserve this device's active Gmail tokens so they aren't stomped by
-    // another device that doesn't have Gmail connected.
-    if (key === "garlandOutreach" && incoming && typeof incoming === "object") {
-      try {
-        const local = JSON.parse(localStorage.getItem("garlandOutreach") || "{}");
-        if (local.settings?.gmailToken) {
-          incoming = { ...incoming, settings: { ...incoming.settings,
-            gmailToken: local.settings.gmailToken,
-            gmailTokenExpiry: local.settings.gmailTokenExpiry,
-            gmailEmail: local.settings.gmailEmail,
-          }};
-        }
-      } catch (_) {}
-    }
-    _origSetItem(key, JSON.stringify(incoming));
-    // Refresh all in-memory singletons so the next render sees fresh data.
-    if (typeof window.gripReloadData === "function") window.gripReloadData();
-    // Notify specialized modules that their key changed.
-    if (typeof window._gripHandleRemoteUpdate === "function") {
-      window._gripHandleRemoteUpdate(key);
-    }
-    _gripFullRender();
-    updateSyncIndicator("saved");
-  }
+  // NOTE: remote updates are applied via pullAll() (see the broadcast handler
+  // below), which skips keys with unsynced local edits. There is intentionally
+  // no direct-apply path — it could clobber pending work.
 
   // Send an instant broadcast to all other connected devices. Falls back
   // silently — postgres_changes will catch up within ~1 s if broadcast fails.
@@ -468,7 +828,7 @@
         const { key, value } = payload.payload || {};
         if (!key || !SYNC_KEYS.has(key)) return;
         // Skip if we're currently pushing this key (we'll receive a broadcast for it already)
-        if (inFlight.has(key)) return;
+        if (flushing.has(key)) return;
         // Treat broadcasts as a notification; read the durable cloud version.
         pullAll().then(result => {
           if (result === "changed") {
@@ -681,9 +1041,16 @@
   // ── Public API ───────────────────────────────────────────────────
 
   function callSaveStatus(accountId, activityId, completionKey = "") {
-    if (!isConfigured() || !_userSetupDone) return "Local only";
-    const saving = inFlight.has("garlandAccountActivities") ||
-                   (completionKey && inFlight.has("garlandCallLists"));
+    const q = readPendingQueue();
+    const actEntry = q["garlandAccountActivities"];
+    const callEntry = completionKey ? q["garlandCallLists"] : null;
+    if ((actEntry && actEntry.error) || (callEntry && callEntry.error)) {
+      return "Save failed — tap sync to retry";
+    }
+    if (actEntry || callEntry) return "Sync pending…";
+    if (!isConfigured()) return "Local only";
+    const saving = flushing.has("garlandAccountActivities") ||
+                   (completionKey && flushing.has("garlandCallLists"));
     if (saving) return "Saving…";
     if (syncProblem === "error") return "Save failed — tap sync to retry";
     return "Saved to cloud";
@@ -695,6 +1062,8 @@
     getClient,
     getUser,
     pushAllLocalData,
+    flushPending,
+    hasPending,
     generateContractorLink,
     loadContractorSubmissions,
 
@@ -865,6 +1234,7 @@
     // dropped WebSocket, iOS background) without hammering the API.
     _heartbeatInterval = setInterval(async () => {
       if (!_userSetupDone) return;
+      try { await flushPending(); } catch (_) {} // durable retry for offline edits
       const result = await pullAll();
       if (result === "changed") {
         if (typeof window.gripReloadData === "function") window.gripReloadData();
@@ -888,6 +1258,7 @@
     if (!_userSetupDone) return;
     const u = await getUser();
     if (u) subscribeToRemoteChanges(u);
+    try { await flushPending(); } catch (_) {} // retry anything queued while away
     const applyResult = async (result) => {
       if (result === "changed") {
         if (typeof window.gripReloadData === "function") window.gripReloadData();
