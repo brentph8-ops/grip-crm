@@ -238,6 +238,14 @@
   function trackRecordChanges(key, oldJson, newJson) {
     const oldVal = safeParse(oldJson);
     const newVal = safeParse(newJson);
+    if (key === "garlandContacts") {
+      // Flat array of contact records — diff by record id.
+      const oldArr = Array.isArray(oldVal) ? oldVal : [];
+      const newArr = Array.isArray(newVal) ? newVal : [];
+      const diff = diffRecordArray(oldArr, newArr);
+      if (!diff.added.length && !diff.changed.length && !diff.removed.length) return {};
+      return { kind: "recordArray", ...diff };
+    }
     if (key === "garlandCallLists") {
       const oldC = (oldVal && oldVal.completed) || {};
       const newC = (newVal && newVal.completed) || {};
@@ -265,19 +273,9 @@
       for (const acct of allAccts) {
         const oldArr = Array.isArray(oldTop[acct]) ? oldTop[acct] : [];
         const newArr = Array.isArray(newTop[acct]) ? newTop[acct] : [];
-        const oldById = new Map(), newById = new Map();
-        for (const r of oldArr) if (r && r.id != null) oldById.set(r.id, r);
-        for (const r of newArr) if (r && r.id != null) newById.set(r.id, r);
-        const added = [], changedRecs = [], removed = [];
-        for (const [id, rec] of newById) {
-          if (!oldById.has(id)) added.push(rec);
-          else if (!sameValue(oldById.get(id), rec)) changedRecs.push({ id, before: oldById.get(id), after: rec });
-        }
-        for (const [id, rec] of oldById) {
-          if (!newById.has(id)) removed.push({ id, before: rec });
-        }
-        if (added.length || changedRecs.length || removed.length) {
-          accounts[acct] = { added, changed: changedRecs, removed };
+        const diff = diffRecordArray(oldArr, newArr);
+        if (diff.added.length || diff.changed.length || diff.removed.length) {
+          accounts[acct] = diff;
         }
       }
       if (!Object.keys(accounts).length) return {};
@@ -290,11 +288,65 @@
     return Object.assign(new Error("CONFLICT: " + what), { gripConflict: true });
   }
 
+  // Diff two flat arrays of {id, ...} records.
+  function diffRecordArray(oldArr, newArr) {
+    const oldById = new Map(), newById = new Map();
+    for (const r of oldArr) if (r && r.id != null) oldById.set(r.id, r);
+    for (const r of newArr) if (r && r.id != null) newById.set(r.id, r);
+    const added = [], changed = [], removed = [];
+    for (const [id, rec] of newById) {
+      if (!oldById.has(id)) added.push(rec);
+      else if (!sameValue(oldById.get(id), rec)) changed.push({ id, before: oldById.get(id), after: rec });
+    }
+    for (const [id, rec] of oldById) {
+      if (!newById.has(id)) removed.push({ id, before: rec });
+    }
+    return { added, changed, removed };
+  }
+
+  // 3-way merge a record-array diff onto a remote array. Throws on conflict.
+  function mergeRecordArray(remoteArr, diff) {
+    const rArr = Array.isArray(remoteArr) ? deepClone(remoteArr) : [];
+    const reindex = () => {
+      const m = new Map();
+      rArr.forEach((r, i) => { if (r && r.id != null) m.set(r.id, i); });
+      return m;
+    };
+    let rById = reindex();
+    for (const item of diff.removed || []) {
+      const idx = rById.get(item.id);
+      if (idx === undefined) continue;
+      if (!sameValue(rArr[idx], item.before)) throw conflictError("record '" + item.id + "' removed here but changed in the cloud");
+      rArr.splice(idx, 1);
+      rById = reindex();
+    }
+    for (const item of diff.changed || []) {
+      const idx = rById.get(item.id);
+      if (idx === undefined) throw conflictError("record '" + item.id + "' changed here but removed in the cloud");
+      const rRec = rArr[idx];
+      if (!sameValue(rRec, item.before) && !sameValue(rRec, item.after)) throw conflictError("record '" + item.id + "' changed on this device and in the cloud");
+      rArr[idx] = item.after;
+    }
+    for (const rec of diff.added || []) {
+      if (rec && rec.id != null && rById.has(rec.id)) {
+        if (!sameValue(rArr[rById.get(rec.id)], rec)) throw conflictError("record '" + rec.id + "' added on both sides");
+        continue;
+      }
+      rArr.push(rec);
+      rById = reindex();
+    }
+    return rArr;
+  }
+
   function mergeRecordChanges(key, remote, edits) {
     if (!edits || !Object.keys(edits).length) return deepClone(remote) || {};
     const kind = edits.kind ||
       (key === "garlandCallLists" ? "callLists" :
-       key === "garlandAccountActivities" ? "activities" : null);
+       key === "garlandAccountActivities" ? "activities" :
+       key === "garlandContacts" ? "recordArray" : null);
+    if (kind === "recordArray") {
+      return mergeRecordArray(remote, edits);
+    }
     if (kind === "callLists") {
       const merged = deepClone(remote) || {};
       const rComp = { ...((merged && merged.completed) || {}) };
@@ -324,37 +376,7 @@
     if (kind === "activities") {
       const merged = deepClone(remote) || {};
       for (const acct of Object.keys(edits.accounts || {})) {
-        const ch = edits.accounts[acct];
-        const rArr = Array.isArray(merged[acct]) ? merged[acct].slice() : [];
-        const reindex = () => {
-          const m = new Map();
-          rArr.forEach((r, i) => { if (r && r.id != null) m.set(r.id, i); });
-          return m;
-        };
-        let rById = reindex();
-        for (const item of ch.removed || []) {
-          const idx = rById.get(item.id);
-          if (idx === undefined) continue;
-          if (!sameValue(rArr[idx], item.before)) throw conflictError("activity '" + item.id + "' removed here but changed in the cloud");
-          rArr.splice(idx, 1);
-          rById = reindex();
-        }
-        for (const item of ch.changed || []) {
-          const idx = rById.get(item.id);
-          if (idx === undefined) throw conflictError("activity '" + item.id + "' changed here but removed in the cloud");
-          const rRec = rArr[idx];
-          if (!sameValue(rRec, item.before) && !sameValue(rRec, item.after)) throw conflictError("activity '" + item.id + "' changed on this device and in the cloud");
-          rArr[idx] = item.after;
-        }
-        for (const rec of ch.added || []) {
-          if (rec && rec.id != null && rById.has(rec.id)) {
-            if (!sameValue(rArr[rById.get(rec.id)], rec)) throw conflictError("activity '" + rec.id + "' added on both sides");
-            continue;
-          }
-          rArr.push(rec);
-          rById = reindex();
-        }
-        merged[acct] = rArr;
+        merged[acct] = mergeRecordArray(merged[acct], edits.accounts[acct]);
       }
       return merged;
     }
