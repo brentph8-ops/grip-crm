@@ -13,6 +13,8 @@ try {
   html += '<h2>Pending Queue (grip_pending_saves_v1)</h2>';
   const pendingRaw = localStorage.getItem('grip_pending_saves_v1');
   html += '<pre>' + (pendingRaw ? pendingRaw : '(empty)') + '</pre>';
+  html += '<button onclick="localStorage.removeItem(\'grip_pending_saves_v1\'); location.reload();">Clear Pending Queue</button>';
+  html += '<p><small>Clearing the queue discards unsynced local changes. Use only if sync is stuck.</small></p>';
   
   // Contacts
   html += '<h2>Contacts (garlandContacts)</h2>';
