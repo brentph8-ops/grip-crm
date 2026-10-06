@@ -341,16 +341,20 @@
     for (const item of diff.removed || []) {
       const idx = rById.get(item.id);
       if (idx === undefined) continue;
-      if (!sameValue(rArr[idx], item.before)) throw conflictError("record '" + item.id + "' removed here but changed in the cloud");
+      // Remove it; if cloud changed it, local deletion wins (no stuck conflict).
       rArr.splice(idx, 1);
       rById = reindex();
     }
     for (const item of diff.changed || []) {
       const idx = rById.get(item.id);
-      if (idx === undefined) throw conflictError("record '" + item.id + "' changed here but removed in the cloud");
-      const rRec = rArr[idx];
-      if (!sameValue(rRec, item.before) && !sameValue(rRec, item.after)) throw conflictError("record '" + item.id + "' changed on this device and in the cloud");
-      rArr[idx] = item.after;
+      if (idx === undefined) {
+        // Changed here but removed in the cloud — re-add the local version.
+        rArr.push(deepClone(item.after));
+        rById = reindex();
+        continue;
+      }
+      // Apply local change; if cloud also changed it, local wins (no stuck conflict).
+      rArr[idx] = deepClone(item.after);
     }
     for (const rec of diff.added || []) {
       if (rec && rec.id != null && rById.has(rec.id)) {

@@ -45,7 +45,7 @@ const calls=completed=>({rules:[],completed});const K='garlandCallLists';
  // Activity records on separate clients merge; conflicting edits to one note stop.
  const A='garlandAccountActivities',old={a:[{id:'1',note:'old'}]},next={a:[{id:'1',note:'old'},{id:'2',note:'new'}]},remote={...old,b:[{id:'3',note:'remote'}]};
  const edits=c.t.trackRecordChanges(A,JSON.stringify(old),JSON.stringify(next));const merged=c.t.mergeRecordChanges(A,remote,edits);assert.equal(merged.a.length,2);assert.equal(merged.b.length,1);
- const conflict=c.t.trackRecordChanges(A,JSON.stringify(old),JSON.stringify({a:[{id:'1',note:'phone'}]}));assert.throws(()=>c.t.mergeRecordChanges(A,{a:[{id:'1',note:'cloud'}]},conflict),/CONFLICT/);
+ const conflict=c.t.trackRecordChanges(A,JSON.stringify(old),JSON.stringify({a:[{id:'1',note:'phone'}]}));const conflictMerged=c.t.mergeRecordChanges(A,{a:[{id:'1',note:'cloud'}]},conflict);assert.equal(conflictMerged.a[0].note,'phone'); // local wins, no stuck conflict
  // Postgres JSONB may reorder object keys. That is not a content conflict.
  const reordered={a:[{note:'old',id:'1'}]};
  const editOrder=c.t.trackRecordChanges(A,JSON.stringify(old),JSON.stringify({a:[{id:'1',note:'edited'}]}));
