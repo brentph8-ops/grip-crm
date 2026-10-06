@@ -7315,6 +7315,7 @@ function callRuleOptions(type) {
 
 function accountsForCallRule(rule) {
   return cleanAccounts().filter((account) => {
+    if (normalize(account.clientRanking) === "dead end") return false;
     if (rule.type === "county") return account.county === rule.value;
     if (rule.type === "client") return account.client === rule.value;
     return account.entity === rule.value;
