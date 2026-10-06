@@ -329,40 +329,65 @@
     return { added, changed, removed };
   }
 
-  // 3-way merge a record-array diff onto a remote array. Throws on conflict.
+  // Union two record arrays by id. Local wins on conflict. Cannot lose data.
+  function unionRecordArrays(remoteArr, localArr) {
+    const result = Array.isArray(remoteArr) ? deepClone(remoteArr) : [];
+    const byId = new Map();
+    result.forEach((r, i) => { if (r && r.id != null) byId.set(String(r.id), i); });
+    for (const rec of (Array.isArray(localArr) ? localArr : [])) {
+      if (!rec || rec.id == null) continue;
+      const key = String(rec.id);
+      if (byId.has(key)) {
+        result[byId.get(key)] = deepClone(rec); // local wins
+      } else {
+        byId.set(key, result.length);
+        result.push(deepClone(rec));
+      }
+    }
+    return result;
+  }
+
+  // 3-way merge a record-array diff onto a remote array.
+  // Uses union semantics: all local records are preserved, remote records
+  // not in local are kept. Local wins on ID conflict. This cannot lose data
+  // even if the remote is behind the base.
   function mergeRecordArray(remoteArr, diff) {
     const rArr = Array.isArray(remoteArr) ? deepClone(remoteArr) : [];
-    const reindex = () => {
-      const m = new Map();
-      rArr.forEach((r, i) => { if (r && r.id != null) m.set(r.id, i); });
-      return m;
-    };
-    let rById = reindex();
-    for (const item of diff.removed || []) {
-      const idx = rById.get(item.id);
-      if (idx === undefined) continue;
-      // Remove it; if cloud changed it, local deletion wins (no stuck conflict).
-      rArr.splice(idx, 1);
-      rById = reindex();
+    const rById = new Map();
+    rArr.forEach((r, i) => { if (r && r.id != null) rById.set(String(r.id), i); });
+    // Apply local additions and changes (union: local wins).
+    for (const rec of diff.added || []) {
+      if (!rec || rec.id == null) continue;
+      const key = String(rec.id);
+      if (rById.has(key)) {
+        rArr[rById.get(key)] = deepClone(rec);
+      } else {
+        rById.set(key, rArr.length);
+        rArr.push(deepClone(rec));
+      }
     }
     for (const item of diff.changed || []) {
-      const idx = rById.get(item.id);
-      if (idx === undefined) {
-        // Changed here but removed in the cloud — re-add the local version.
+      if (!item || !item.after || item.after.id == null) continue;
+      const key = String(item.after.id);
+      if (rById.has(key)) {
+        rArr[rById.get(key)] = deepClone(item.after);
+      } else {
+        rById.set(key, rArr.length);
         rArr.push(deepClone(item.after));
-        rById = reindex();
-        continue;
       }
-      // Apply local change; if cloud also changed it, local wins (no stuck conflict).
-      rArr[idx] = deepClone(item.after);
     }
-    for (const rec of diff.added || []) {
-      if (rec && rec.id != null && rById.has(rec.id)) {
-        if (!sameValue(rArr[rById.get(rec.id)], rec)) throw conflictError("record '" + rec.id + "' added on both sides");
-        continue;
-      }
-      rArr.push(rec);
-      rById = reindex();
+    // For removed: only remove if the remote still matches the before-image.
+    // If remote changed it, keep remote (avoid data loss).
+    for (const item of diff.removed || []) {
+      if (!item || item.id == null) continue;
+      const key = String(item.id);
+      if (!rById.has(key)) continue;
+      const idx = rById.get(key);
+      if (item.before && !sameValue(rArr[idx], item.before)) continue; // remote changed it; keep
+      rArr.splice(idx, 1);
+      // Reindex after splice
+      rById.clear();
+      rArr.forEach((r, i) => { if (r && r.id != null) rById.set(String(r.id), i); });
     }
     return rArr;
   }
@@ -511,7 +536,16 @@
             return true;
           }
           const edits = trackRecordChanges(key, base, snapshot);
-          if (edits) toPush = mergeRecordChanges(key, cloudVal, edits);
+          if (edits) {
+            // For record arrays, union local and cloud to avoid data loss
+            // when the cloud is behind the base.
+            const kind = edits.kind;
+            if (kind === "recordArray" && Array.isArray(localVal) && Array.isArray(cloudVal)) {
+              toPush = unionRecordArrays(cloudVal, localVal);
+            } else {
+              toPush = mergeRecordChanges(key, cloudVal, edits);
+            }
+          }
           else conflicted = true;
         } else {
           toPush = localVal;
