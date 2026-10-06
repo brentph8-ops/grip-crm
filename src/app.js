@@ -6888,12 +6888,9 @@ function showDetail(type, id) {
 }
 
 function showAccountDetail(record) {
-  // Track last viewed account for AI Assistant hub card
+  // Track last viewed account for AI Assistant hub card (non-synced UI state)
   try {
-    const raw = localStorage.getItem("garlandCrmData");
-    const d = raw ? JSON.parse(raw) : {};
-    d._lastViewedAccount = record.client || "";
-    localStorage.setItem("garlandCrmData", JSON.stringify(d));
+    localStorage.setItem("garlandLastViewedAccount", record.client || "");
   } catch {}
   const related = relatedFor(record.client || "");
   const noteValue = state.notes[record.id] || "";
