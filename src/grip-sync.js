@@ -102,6 +102,7 @@
   const _origSetItem = localStorage.setItem.bind(localStorage);
   const flushing = new Map();
   let syncProblem = false;
+  let syncProblemDetail = "";
   // Before authentication/hydration, app scripts may seed or normalize data.
   // Those automatic writes must not become user edits or replace stored work:
   // sync-key writes are suppressed until the first cloud hydration completes.
@@ -223,11 +224,13 @@
   function refreshSyncProblem() {
     const q = readPendingQueue();
     let problem = false;
+    let detail = "";
     for (const k of Object.keys(q)) {
-      if (q[k] && q[k].error === "conflict") { problem = "conflict"; break; }
-      if (q[k] && q[k].error) problem = "error";
+      if (q[k] && q[k].error === "conflict") { problem = "conflict"; detail = k; break; }
+      if (q[k] && q[k].error) { problem = "error"; detail = detail || k; }
     }
     syncProblem = problem;
+    syncProblemDetail = detail;
     return problem;
   }
 
@@ -661,7 +664,7 @@
     el.innerHTML = isOn
       ? `<span class="sync-dot sync-dot--on"></span>Cloud On`
       : state === "error"    ? "⚠ Save failed — tap to retry"
-      : state === "conflict" ? "⚠ Sync conflict — conflicting changes kept locally"
+      : state === "conflict" ? "⚠ Sync conflict — conflicting changes kept locally" + (syncProblemDetail ? " (" + syncProblemDetail + ")" : "")
       : state === "storage"  ? "⚠ Storage full"
       : `<span class="sync-dot sync-dot--off"></span>Cloud Off`;
     el.className = `grip-sync-status ${isOn ? "sync-on" : state === "error" || state === "storage" || state === "conflict" ? "sync-error" : "sync-local"}`;
