@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head><title>GRIP Sync Diagnostic</title></head>
+<body>
+<h1>GRIP Sync Diagnostic</h1>
+<div id="output">Loading...</div>
+<script>
+try {
+  const out = document.getElementById('output');
+  let html = '';
+  
+  // Pending queue
+  html += '<h2>Pending Queue (grip_pending_saves_v1)</h2>';
+  const pendingRaw = localStorage.getItem('grip_pending_saves_v1');
+  html += '<pre>' + (pendingRaw ? pendingRaw : '(empty)') + '</pre>';
+  
+  // Contacts
+  html += '<h2>Contacts (garlandContacts)</h2>';
+  const contactsRaw = localStorage.getItem('garlandContacts');
+  let contacts = [];
+  try { contacts = JSON.parse(contactsRaw || '[]'); } catch(e) {}
+  html += '<p>Count: ' + contacts.length + '</p>';
+  html += '<p>Is array: ' + Array.isArray(contacts) + '</p>';
+  html += '<p>Names: ' + contacts.map(c => c.name).join(', ') + '</p>';
+  
+  // Check for Lauren, Michelle, Eric
+  const names = contacts.map(c => c.name);
+  html += '<p>Has Eric Saunders: ' + names.includes('Eric Saunders') + '</p>';
+  html += '<p>Has Michelle Jilek: ' + names.includes('Michelle Jilek') + '</p>';
+  html += '<p>Has Lauren Ebert: ' + names.includes('Lauren Ebert') + '</p>';
+  
+  out.innerHTML = html;
+} catch(e) {
+  document.getElementById('output').innerHTML = 'Error: ' + e.message;
+}
+</script>
+</body>
+</html>
