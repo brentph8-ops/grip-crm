@@ -566,12 +566,10 @@
           const res = await client.from("grip_data")
             .update({ data_value: sanitized })
             .eq("user_id", user.id)
-            .eq("data_key", key)
-            .eq("updated_at", row.updated_at);
+            .eq("data_key", key);
           if (res.error) throw res.error;
           if (!res.data || !res.data.length) {
-            // Lost the race: someone wrote between our read and write.
-            // Stay pending; the next flush re-reads and merges.
+            // No row matched — stay pending and retry.
             ensurePending(key, snapshot);
             scheduleRetry(key);
             return true;
