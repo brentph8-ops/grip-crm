@@ -249,6 +249,28 @@
       if (!diff.added.length && !diff.changed.length && !diff.removed.length) return {};
       return { kind: "recordArray", ...diff };
     }
+    if (key === "garlandCrmData") {
+      // { accounts: [], proposals: [], contractors: [] } — diff each array by id.
+      const oldTop = oldVal || {}, newTop = newVal || {};
+      const sections = ["accounts", "proposals", "contractors"];
+      const diffs = {};
+      let changed = false;
+      for (const s of sections) {
+        const oldArr = Array.isArray(oldTop[s]) ? oldTop[s] : [];
+        const newArr = Array.isArray(newTop[s]) ? newTop[s] : [];
+        const d = diffRecordArray(oldArr, newArr);
+        if (d.added.length || d.changed.length || d.removed.length) changed = true;
+        diffs[s] = d;
+      }
+      // Also check for other top-level keys
+      const allKeys = new Set([...Object.keys(oldTop), ...Object.keys(newTop)]);
+      for (const k of allKeys) {
+        if (sections.includes(k)) continue;
+        if (!sameValue(oldTop[k], newTop[k])) changed = true;
+      }
+      if (!changed) return {};
+      return { kind: "crmData", sections: diffs, oldTop, newTop };
+    }
     if (key === "garlandCallLists") {
       const oldC = (oldVal && oldVal.completed) || {};
       const newC = (newVal && newVal.completed) || {};
@@ -346,9 +368,30 @@
     const kind = edits.kind ||
       (key === "garlandCallLists" ? "callLists" :
        key === "garlandAccountActivities" ? "activities" :
-       key === "garlandContacts" ? "recordArray" : null);
+       key === "garlandContacts" ? "recordArray" :
+       key === "garlandCrmData" ? "crmData" : null);
     if (kind === "recordArray") {
       return mergeRecordArray(remote, edits);
+    }
+    if (kind === "crmData") {
+      // Merge { accounts, proposals, contractors } arrays by id.
+      const merged = deepClone(remote) || {};
+      const sections = ["accounts", "proposals", "contractors"];
+      for (const s of sections) {
+        const rArr = Array.isArray(merged[s]) ? merged[s] : [];
+        const sDiff = (edits.sections && edits.sections[s]) || { added: [], changed: [], removed: [] };
+        merged[s] = mergeRecordArray(rArr, sDiff);
+      }
+      // For other top-level keys, prefer local (newTop) if it changed.
+      if (edits.newTop) {
+        for (const k of Object.keys(edits.newTop)) {
+          if (sections.includes(k)) continue;
+          if (!sameValue(edits.oldTop?.[k], edits.newTop[k])) {
+            merged[k] = deepClone(edits.newTop[k]);
+          }
+        }
+      }
+      return merged;
     }
     if (kind === "callLists") {
       const merged = deepClone(remote) || {};
