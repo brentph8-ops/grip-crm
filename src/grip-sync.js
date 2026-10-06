@@ -649,7 +649,7 @@
       updateSyncIndicator("storage");
       throw error;
     }
-    if (SYNC_KEYS.has(key) && initialDataReady) {
+    if (SYNC_KEYS.has(key)) {
       markPending(key, prevRaw);
       if (isConfigured() && _userSetupDone) schedulePush(key);
     }
