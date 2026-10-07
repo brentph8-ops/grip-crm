@@ -7266,11 +7266,32 @@ async function editActivity(accountId, activityId) {
   const entries = state.activities[accountId] || [];
   const entry = entries.find((item) => item.id === activityId);
   if (!entry) return;
-  const updated = await gripPrompt("Edit activity", entry.note || "");
-  if (updated === null) return;
-  const cleaned = String(updated).trim();
-  if (!cleaned) return;
-  entry.note = cleaned;
+  const result = await new Promise((resolve) => {
+    const d = byId("editActivityDialog");
+    const dateInput = byId("editActivityDate");
+    const noteInput = byId("editActivityNote");
+    dateInput.value = dateKeyFromValue(entry.createdAt) || toLocalDateKey(new Date());
+    noteInput.value = entry.note || "";
+    const cleanup = (val) => {
+      d.close();
+      byId("editActivitySave").onclick = null;
+      byId("editActivityCancel").onclick = null;
+      resolve(val);
+    };
+    byId("editActivitySave").onclick = () => cleanup({ date: dateInput.value, note: noteInput.value });
+    byId("editActivityCancel").onclick = () => cleanup(null);
+    d.showModal();
+    noteInput.focus();
+  });
+  if (!result) return;
+  const note = String(result.note).trim();
+  if (result.date && result.date !== dateKeyFromValue(entry.createdAt)) {
+    const orig = new Date(entry.createdAt);
+    const [y, m, day] = result.date.split("-").map(Number);
+    orig.setFullYear(y, m - 1, day);
+    entry.createdAt = orig.toISOString();
+  }
+  entry.note = note;
   entry.editedAt = new Date().toISOString();
   saveActivities();
   renderAccounts();
@@ -7410,17 +7431,28 @@ function renderCallList() {
         )
         .join("")
     : `<p class="empty-state">No call list assignments yet.</p>`;
+  const allAddlContacts = loadContacts();
   const callItems = accounts
         .map((account) => {
           const key = callCompletionKey(day, account.id);
           const done = state.callLists.completed[key];
-          const phoneChip = account.phone && phoneHref(account.phone)
-            ? `<a class="call-contact-chip call-contact-chip--phone" href="${phoneHref(account.phone)}">📞 ${escapeHtml(formatPhoneNumber(account.phone) || account.phone)}</a>`
+          const accContacts = [
+            ...(account.poc || account.phone || account.email ? [{ name: account.poc || "Primary", phone: account.phone || "", email: account.email || "" }] : []),
+            ...allAddlContacts.filter(c => c.accountId === account.id).map(c => ({ name: c.name || "", phone: c.phone || "", email: c.email || "" })),
+          ];
+          const primary = accContacts[0] || {};
+          const buildChips = (phone, email) => {
+            const p = phone && phoneHref(phone) ? `<a class="call-contact-chip call-contact-chip--phone" href="${phoneHref(phone)}">📞 ${escapeHtml(formatPhoneNumber(phone) || phone)}</a>` : "";
+            const e = email ? `<a class="call-contact-chip call-contact-chip--email" href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a>` : "";
+            return [p, e].filter(Boolean).join("");
+          };
+          const initialChips = buildChips(primary.phone, primary.email);
+          const switcherOpts = accContacts.map((c, i) =>
+            `<option value="${i}" data-phone="${escapeHtml(c.phone)}" data-email="${escapeHtml(c.email)}">${escapeHtml(c.name)}</option>`
+          ).join("");
+          const switcher = accContacts.length > 1
+            ? `<select class="call-contact-switcher" data-call-switcher="${escapeHtml(account.id)}" aria-label="Switch contact">${switcherOpts}</select>`
             : "";
-          const emailChip = account.email
-            ? `<a class="call-contact-chip call-contact-chip--email" href="mailto:${escapeHtml(account.email)}">${escapeHtml(account.email)}</a>`
-            : "";
-          const contactChips = [phoneChip, emailChip].filter(Boolean).join("");
           return `<div class="call-item ${done ? "is-complete" : ""}">
             <input type="checkbox" aria-label="Log call for ${escapeHtml(account.client)}" data-call-account="${account.id}" data-call-day="${day}" ${done ? "checked" : ""} />
             <div class="call-account-info">
@@ -7428,7 +7460,8 @@ function renderCallList() {
                 <strong>${escapeHtml(account.client)}</strong>
                 ${account.poc ? `<small>${escapeHtml(account.poc)}</small>` : ""}
               </button>
-              ${contactChips ? `<div class="call-contact-chips">${contactChips}</div>` : ""}
+              ${switcher}
+              ${initialChips ? `<div class="call-contact-chips" data-contact-chips="${escapeHtml(account.id)}">${initialChips}</div>` : `<div class="call-contact-chips" data-contact-chips="${escapeHtml(account.id)}"></div>`}
               ${latestAccountActivity(account) ? `<p class="call-saved-note">${escapeHtml(latestAccountActivity(account).note || "")}<small>${escapeHtml(compactDate(latestAccountActivity(account).createdAt))}</small></p>` : ""}
               <button class="mini-button call-log-button" data-open-call-account="${escapeHtml(account.id)}" data-call-log-day="${escapeHtml(day)}" type="button">Log call / note</button>
             </div>
@@ -11382,6 +11415,18 @@ function bindEvents() {
     const button = event.target.closest("[data-call-list-mode]");
     if (button) setCallListMode(button.dataset.callListMode);
   });
+  byId("callListView").addEventListener("change", (event) => {
+    const switcher = event.target.closest("[data-call-switcher]");
+    if (!switcher) return;
+    const selected = switcher.options[switcher.selectedIndex];
+    const phone = selected?.dataset.phone || "";
+    const email = selected?.dataset.email || "";
+    const chipsEl = switcher.closest(".call-item")?.querySelector("[data-contact-chips]");
+    if (!chipsEl) return;
+    const p = phone && phoneHref(phone) ? `<a class="call-contact-chip call-contact-chip--phone" href="${phoneHref(phone)}">📞 ${escapeHtml(formatPhoneNumber(phone) || phone)}</a>` : "";
+    const e = email ? `<a class="call-contact-chip call-contact-chip--email" href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a>` : "";
+    chipsEl.innerHTML = [p, e].filter(Boolean).join("");
+  });
   document.querySelectorAll("[data-view-toggle]").forEach((group) => {
     group.addEventListener("click", (event) => {
       const button = event.target.closest("[data-layout]");
@@ -12629,6 +12674,32 @@ function bindEvents() {
       }
       return;
     }
+    const setPrimaryBtn = event.target.closest("[data-set-primary-contact]");
+    if (setPrimaryBtn) {
+      const contactId = setPrimaryBtn.dataset.setPrimaryContact;
+      const accountId = setPrimaryBtn.dataset.setPrimaryAccount;
+      const contacts = loadContacts();
+      const c = contacts.find(x => x.id === contactId);
+      if (!c || !accountId) return;
+      const storageKey = "garlandCrmData";
+      const raw = (() => { try { return JSON.parse(localStorage.getItem(storageKey) || "{}"); } catch { return {}; } })();
+      const acc = (raw.accounts || {})[accountId];
+      if (!acc) return;
+      const oldPrimary = { poc: acc.poc || "", phone: acc.phone || "", email: acc.email || "", title: acc.title || "" };
+      const newContacts = contacts.filter(x => x.id !== contactId);
+      if (oldPrimary.poc || oldPrimary.phone || oldPrimary.email) {
+        const already = newContacts.find(x => x.accountId === accountId && x.name === oldPrimary.poc && x.phone === oldPrimary.phone);
+        if (!already) newContacts.push({ id: makeContactId(), accountId, name: oldPrimary.poc, phone: oldPrimary.phone, email: oldPrimary.email, title: oldPrimary.title, notes: "" });
+      }
+      saveContacts(newContacts);
+      persistRecordEdit("account", accountId, "poc", c.name, false);
+      persistRecordEdit("account", accountId, "phone", c.phone || "", false);
+      persistRecordEdit("account", accountId, "email", c.email || "", false);
+      persistRecordEdit("account", accountId, "title", c.title || "", false);
+      const updatedAcc = cleanAccounts().find(a => a.id === accountId);
+      if (updatedAcc) showAccountDetail(updatedAcc);
+      return;
+    }
     const contactGroupHeader = event.target.closest("[data-contact-group]");
     if (contactGroupHeader && !event.target.closest("[data-add-contact-account]")) {
       const body = contactGroupHeader.nextElementSibling;
@@ -13194,6 +13265,7 @@ function accountContactsSection(record) {
       </div>
       <div class="contact-card-actions">
         <button class="mini-button" data-edit-contact="${escapeHtml(c.id)}" type="button">Edit</button>
+        <button class="mini-button mini-button-accent" data-set-primary-contact="${escapeHtml(c.id)}" data-set-primary-account="${escapeHtml(record.id)}" type="button" title="Set as primary contact">★ Primary</button>
         <button class="mini-button mini-button-danger" data-delete-contact="${escapeHtml(c.id)}" type="button">✕</button>
       </div>
     </div>`).join("");

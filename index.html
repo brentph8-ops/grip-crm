@@ -2659,6 +2659,18 @@
         <button id="gripPromptOk" class="primary-button" type="button">Save</button>
       </div>
     </dialog>
+    <!-- Edit activity dialog -->
+    <dialog id="editActivityDialog" class="grip-modal-dialog">
+      <p class="grip-modal-message">Edit Activity</p>
+      <label class="grip-modal-label" for="editActivityDate">Date</label>
+      <input id="editActivityDate" class="grip-modal-date-input" type="date" />
+      <label class="grip-modal-label" for="editActivityNote">Note</label>
+      <textarea id="editActivityNote" class="note-box grip-modal-input" rows="3"></textarea>
+      <div class="grip-modal-actions">
+        <button id="editActivityCancel" class="secondary-button" type="button">Cancel</button>
+        <button id="editActivitySave" class="primary-button" type="button">Save</button>
+      </div>
+    </dialog>
     <!-- Offline banner -->
     <div id="gripOfflineBanner" class="grip-offline-banner" hidden>⚠ You're offline — changes are saved locally and will sync when you reconnect.</div>
 

@@ -1944,6 +1944,16 @@ textarea {
   flex: 1;
   min-width: 0;
 }
+.call-contact-switcher {
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border-color, #dde3ec);
+  background: var(--card-bg, #fff);
+  color: var(--text-primary, #1a2030);
+  cursor: pointer;
+  max-width: 100%;
+}
 .call-contact-chips {
   display: flex;
   flex-wrap: wrap;
@@ -6553,6 +6563,26 @@ textarea {
   margin-bottom: 16px;
   box-sizing: border-box;
 }
+.grip-modal-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.grip-modal-date-input {
+  width: 100%;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 0.9rem;
+  background: var(--panel);
+  color: var(--ink);
+}
 .grip-modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -8729,6 +8759,8 @@ button#gripSyncStatus:hover { opacity: 0.75; }
 .contact-card-actions { display: flex; gap: 4px; flex-shrink: 0; flex-direction: column; }
 .mini-button-danger { color: var(--red) !important; }
 .mini-button-danger:hover { background: rgba(156,63,58,.08) !important; border-color: rgba(156,63,58,.3) !important; }
+.mini-button-accent { color: #a16207 !important; }
+.mini-button-accent:hover { background: rgba(161,98,7,.08) !important; border-color: rgba(161,98,7,.3) !important; }
 /* Contact dialog */
 #contactDialog { max-width: 420px; width: calc(100% - 32px); }
 #contactDialog label { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: .85rem; color: var(--muted); }
