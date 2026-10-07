@@ -1057,6 +1057,7 @@ const state = {
   detailsHidden: false,
   callListMode: "today",
   callListDay: todayCallDay(),
+  callListEntity: "",
   takeoffMode: "builder",
   activeTakeoffEstimateId: "",
   accountMode: "browse",
@@ -7364,7 +7365,17 @@ function sortCallListAccounts(a, b) {
 }
 
 function callCompletionKey(day, accountId) {
+  const userPrefix = window._gripCurrentUserEmail ? window._gripCurrentUserEmail + "|" : "";
+  return `${userPrefix}${callListDateForDay(day)}|${day}|${accountId}`;
+}
+
+function callCompletionKeyLegacy(day, accountId) {
   return `${callListDateForDay(day)}|${day}|${accountId}`;
+}
+
+function isCallComplete(day, accountId) {
+  return !!(state.callLists.completed[callCompletionKey(day, accountId)] ||
+    (!window._gripCurrentUserEmail && state.callLists.completed[callCompletionKeyLegacy(day, accountId)]));
 }
 
 function callListDateForDay(day) {
@@ -7401,10 +7412,33 @@ function renderCallList() {
   const day = state.callListDay || byId("callListDay").value || todayCallDay();
   byId("callListDay").value = day;
   const gydIds = graveyardAccountIds();
-  const accounts = accountsForCallDay(day).filter(a => !gydIds.has(a.id));
+  const allAccounts = accountsForCallDay(day).filter(a => !gydIds.has(a.id));
+
+  // Entity filter buttons — unique values from rules for this day
+  const dayRules = state.callLists.rules.filter(r => r.day === day);
+  const entityValues = [...new Set(dayRules.map(r => r.value).filter(Boolean))];
+  if (!entityValues.includes(state.callListEntity)) state.callListEntity = "";
+  const accounts = state.callListEntity
+    ? allAccounts.filter(a => {
+        const matchingRules = dayRules.filter(r => r.value === state.callListEntity);
+        return matchingRules.some(r => {
+          if (r.type === "county") return a.county === r.value;
+          if (r.type === "client") return a.client === r.value;
+          return a.entity === r.value;
+        });
+      })
+    : allAccounts;
+  const filterEl = byId("callListEntityFilter");
+  if (filterEl) {
+    filterEl.innerHTML = entityValues.length > 1 ? [
+      `<button class="call-entity-btn ${!state.callListEntity ? "is-active" : ""}" data-call-entity="" type="button">All</button>`,
+      ...entityValues.map(v => `<button class="call-entity-btn ${state.callListEntity === v ? "is-active" : ""}" data-call-entity="${escapeHtml(v)}" type="button">${escapeHtml(v)}</button>`)
+    ].join("") : "";
+  }
+
   const dateLabel = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   byId("callListTitle").textContent = `${day} Calls`;
-  byId("callListCount").textContent = `${accounts.filter((account) => state.callLists.completed[callCompletionKey(day, account.id)]).length} of ${accounts.length} complete`;
+  byId("callListCount").textContent = `${accounts.filter((account) => isCallComplete(day, account.id)).length} of ${accounts.length} complete`;
   byId("callListTodayPanel").querySelector(".panel-header span").textContent = `${dateLabel} · ${byId("callListCount").textContent}`;
   byId("callListSetupPanel").querySelector(".panel-header span").textContent = "Assign by Day";
   byId("callListView").querySelectorAll("[data-call-list-mode]").forEach((button) => {
@@ -7434,8 +7468,7 @@ function renderCallList() {
   const allAddlContacts = loadContacts();
   const callItems = accounts
         .map((account) => {
-          const key = callCompletionKey(day, account.id);
-          const done = state.callLists.completed[key];
+          const done = isCallComplete(day, account.id);
           const accContacts = [
             ...(account.poc || account.phone || account.email ? [{ name: account.poc || "Primary", phone: account.phone || "", email: account.email || "" }] : []),
             ...allAddlContacts.filter(c => c.accountId === account.id).map(c => ({ name: c.name || "", phone: c.phone || "", email: c.email || "" })),
@@ -7476,12 +7509,12 @@ function renderCallList() {
       ? `<div class="kanban-shell">
           <button class="kanban-nav kanban-nav-left" data-kanban-scroll="left" type="button" aria-label="Scroll kanban left">‹</button>
           <div class="kanban-board">
-          <section class="kanban-column"><h3>To Call <span>${accounts.filter((account) => !state.callLists.completed[callCompletionKey(day, account.id)]).length}</span></h3><div class="kanban-items">${accounts
-            .filter((account) => !state.callLists.completed[callCompletionKey(day, account.id)])
+          <section class="kanban-column"><h3>To Call <span>${accounts.filter((account) => !isCallComplete(day, account.id)).length}</span></h3><div class="kanban-items">${accounts
+            .filter((account) => !isCallComplete(day, account.id))
             .map((account) => callItems[accounts.indexOf(account)])
             .join("")}</div></section>
-          <section class="kanban-column"><h3>Complete <span>${accounts.filter((account) => state.callLists.completed[callCompletionKey(day, account.id)]).length}</span></h3><div class="kanban-items">${accounts
-            .filter((account) => state.callLists.completed[callCompletionKey(day, account.id)])
+          <section class="kanban-column"><h3>Complete <span>${accounts.filter((account) => isCallComplete(day, account.id)).length}</span></h3><div class="kanban-items">${accounts
+            .filter((account) => isCallComplete(day, account.id))
             .map((account) => callItems[accounts.indexOf(account)])
             .join("")}</div></section>
           </div>
@@ -11414,6 +11447,12 @@ function bindEvents() {
     }
     const button = event.target.closest("[data-call-list-mode]");
     if (button) setCallListMode(button.dataset.callListMode);
+    const entityBtn = event.target.closest("[data-call-entity]");
+    if (entityBtn) {
+      state.callListEntity = entityBtn.dataset.callEntity;
+      renderCallList();
+      return;
+    }
   });
   byId("callListView").addEventListener("change", (event) => {
     const switcher = event.target.closest("[data-call-switcher]");

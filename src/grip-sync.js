@@ -762,6 +762,7 @@
     if (el) { el.textContent = user?.email || ""; el.hidden = !user; }
     const signOutBtn = document.getElementById("gripSignOutButton");
     if (signOutBtn) signOutBtn.hidden = !user;
+    window._gripCurrentUserEmail = user?.email || null;
   }
 
   // ── Contractor token generation ──────────────────────────────────
