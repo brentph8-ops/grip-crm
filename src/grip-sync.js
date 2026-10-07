@@ -436,22 +436,23 @@
       for (const k of Object.keys(edits.set || {})) {
         const v = edits.set[k], was = baseComp[k], rem = rComp[k];
         if (sameValue(v, was)) continue;
-        if (rem === undefined || sameValue(rem, was) || sameValue(rem, v)) rComp[k] = v;
-        else throw conflictError("call '" + k + "' changed on this device and in the cloud");
+        // Done wins: if either side marks it complete, keep it complete.
+        if (rem === undefined || sameValue(rem, was) || sameValue(rem, v) || !rem) rComp[k] = v;
+        // else remote already has it done — leave it
       }
       for (const k of Object.keys(edits.del || {})) {
         const was = edits.del[k], rem = rComp[k];
         if (rem === undefined) continue;
+        // Only delete if remote still has the original value; if remote changed it, keep it.
         if (sameValue(rem, was)) delete rComp[k];
-        else throw conflictError("call '" + k + "' removed here but changed in the cloud");
       }
       merged.completed = rComp;
       const baseFields = edits.baseFields || {};
       for (const k of Object.keys(edits.fields || {})) {
         const v = edits.fields[k], was = baseFields[k], rem = merged[k];
         if (sameValue(v, was)) continue;
-        if (rem === undefined || sameValue(rem, was) || sameValue(rem, v)) merged[k] = v;
-        else throw conflictError("field '" + k + "' changed on this device and in the cloud");
+        // Local wins for call list config fields (rules, etc.)
+        merged[k] = deepClone(v);
       }
       return merged;
     }
