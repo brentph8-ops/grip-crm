@@ -167,6 +167,7 @@ textarea {
 .sync-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; vertical-align: middle; position: relative; top: -1px; }
 .sync-dot--on  { background: #22a05a; box-shadow: 0 0 0 2px #bbf7d0; }
 .sync-dot--off { background: #94a3b8; }
+.sync-retry-btn { background: none; border: 1px solid currentColor; border-radius: 3px; color: inherit; cursor: pointer; font-size: inherit; font-weight: 700; margin-left: 6px; padding: 1px 6px; }
 
 .grip-user-display {
   font-size: 0.75rem;

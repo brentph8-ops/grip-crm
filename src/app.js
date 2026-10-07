@@ -6591,6 +6591,9 @@ function persistRecordEdit(type, id, key, value, refresh = true) {
   }
   if (type === "account" && key === "clientRanking" && cleanedValue === "Dead End") {
     setTimeout(() => window.gripPipeline?.moveDealToGraveyardForAccount(id), 100);
+    const comp = state.callLists.completed;
+    const toRemove = Object.keys(comp).filter(k => k.endsWith(`|${id}`));
+    if (toRemove.length) { toRemove.forEach(k => delete comp[k]); saveCallLists(); }
   }
   // When an address component changes, sync the composite address field and re-geocode
   if (type === "account" && ["street", "city", "state", "zip"].includes(key) && record) {

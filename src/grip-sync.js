@@ -291,6 +291,13 @@
       if (!changed) return {};
       return { kind: "callLists", base: oldVal, set, del, fields, baseFields };
     }
+    if (key === "garlandPipeline") {
+      const oldArr = Array.isArray(oldVal) ? oldVal : [];
+      const newArr = Array.isArray(newVal) ? newVal : [];
+      const diff = diffRecordArray(oldArr, newArr);
+      if (!diff.added.length && !diff.changed.length && !diff.removed.length) return {};
+      return { kind: "recordArray", ...diff };
+    }
     if (key === "garlandAccountActivities") {
       const accounts = {};
       const oldTop = oldVal || {}, newTop = newVal || {};
@@ -743,7 +750,7 @@
     el.innerHTML = isOn
       ? `<span class="sync-dot sync-dot--on"></span>Cloud On`
       : state === "error"    ? "⚠ Save failed — tap to retry"
-      : state === "conflict" ? "⚠ Sync conflict — conflicting changes kept locally" + (syncProblemDetail ? " (" + syncProblemDetail + ")" : "")
+      : state === "conflict" ? `⚠ Sync conflict — conflicting changes kept locally${syncProblemDetail ? " (" + syncProblemDetail + ")" : ""} <button type="button" class="sync-retry-btn" onclick="window.gripSync?.retryConflicts()">Retry</button>`
       : state === "storage"  ? "⚠ Storage full"
       : `<span class="sync-dot sync-dot--off"></span>Cloud Off`;
     el.className = `grip-sync-status ${isOn ? "sync-on" : state === "error" || state === "storage" || state === "conflict" ? "sync-error" : "sync-local"}`;
@@ -1160,6 +1167,23 @@
     return "Saved to cloud";
   }
 
+  function retryConflicts() {
+    const q = readPendingQueue();
+    let retried = false;
+    for (const key of Object.keys(q)) {
+      if (q[key] && q[key].error === "conflict") {
+        q[key].error = false;
+        retried = true;
+      }
+    }
+    if (retried) {
+      writePendingQueue(q);
+      refreshSyncProblem();
+      updateSyncIndicator(syncProblem || "syncing");
+      flushPending().catch(() => {});
+    }
+  }
+
   window.gripSync = {
     callSaveStatus,
     isConfigured,
@@ -1167,6 +1191,7 @@
     getUser,
     pushAllLocalData,
     flushPending,
+    retryConflicts,
     hasPending,
     generateContractorLink,
     loadContractorSubmissions,
