@@ -7431,8 +7431,8 @@ function renderCallList() {
     : allAccounts;
   const filterEl = byId("callListEntityFilter");
   if (filterEl) {
-    filterEl.innerHTML = entityValues.length > 1 ? [
-      `<button class="call-entity-btn ${!state.callListEntity ? "is-active" : ""}" data-call-entity="" type="button">All</button>`,
+    filterEl.innerHTML = entityValues.length ? [
+      ...(entityValues.length > 1 ? [`<button class="call-entity-btn ${!state.callListEntity ? "is-active" : ""}" data-call-entity="" type="button">All</button>`] : []),
       ...entityValues.map(v => `<button class="call-entity-btn ${state.callListEntity === v ? "is-active" : ""}" data-call-entity="${escapeHtml(v)}" type="button">${escapeHtml(v)}</button>`)
     ].join("") : "";
   }

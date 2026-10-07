@@ -2632,28 +2632,57 @@ textarea {
 
 .sort-tabs {
   display: inline-flex;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  overflow: hidden;
-  background: var(--panel);
+  gap: 2px;
+  background: transparent;
 }
 
 .sort-tab {
-  height: 38px;
-  border: 0;
-  border-right: 1px solid var(--line);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  border: 1.5px solid var(--border-color, #dde3ec);
+  border-radius: 999px;
   background: transparent;
   padding: 0 12px;
   cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-secondary, #4a5568);
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
 }
 
-.sort-tab:last-child {
-  border-right: 0;
+.sort-tab::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--border-color, #bbb);
+  background: transparent;
+  flex-shrink: 0;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.sort-tab:hover {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.sort-tab:hover::before {
+  border-color: var(--green);
 }
 
 .sort-tab.is-active {
+  background: transparent;
+  border-color: var(--green);
+  color: var(--green);
+  font-weight: 600;
+}
+
+.sort-tab.is-active::before {
+  border-color: var(--green);
   background: var(--green);
-  color: #fff;
 }
 
 .primary-button,
