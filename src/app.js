@@ -7333,14 +7333,15 @@ function saveCallLists() {
 }
 
 function callRuleOptions(type) {
-  if (type === "county") return accountCountyOptions();
-  if (type === "client") return accountNames();
-  return accountEntityOptions();
+  if (type === "county") return ["All", ...accountCountyOptions()];
+  if (type === "client") return ["All", ...accountNames()];
+  return ["All", ...accountEntityOptions()];
 }
 
 function accountsForCallRule(rule) {
   return cleanAccounts().filter((account) => {
     if (normalize(account.clientRanking) === "dead end") return false;
+    if (rule.value === "All") return true;
     if (rule.type === "county") return account.county === rule.value;
     if (rule.type === "client") return account.client === rule.value;
     return account.entity === rule.value;
