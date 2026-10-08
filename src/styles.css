@@ -1857,6 +1857,7 @@ textarea {
 .call-list-layout[data-mode="email"] .call-list-current { display: none; }
 .call-list-drip { display: none; }
 .call-list-layout[data-mode="email"] .call-list-drip { display: block; }
+#emailListView .call-list-drip { display: block; }
 
 /* Drip sub-tabs */
 .drip-sub-tabs { display: flex; gap: 6px; padding: 10px 0; flex-wrap: wrap; }
