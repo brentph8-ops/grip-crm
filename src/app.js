@@ -1243,6 +1243,7 @@ const state = {
   selectedProjectContractors: [],
   detailsHidden: false,
   callListMode: "today",
+  projectPipelineGrouping: "abc",
   callListDay: todayCallDay(),
   callListEntity: "",
   takeoffMode: "builder",
@@ -4803,8 +4804,34 @@ function renderProjects() {
         splitContractors(item.biddingContractors).some((contractor) => contractor === state.filters.projectContractor))
     );
   }).sort(sortProjects);
-  applyLayout("projectsList", "projects");
-  byId("projectsList").innerHTML = listWrap(records, projectCard, "No projects match this view.", state.layouts.projects === "kanban" ? (item) => item.stage : null, projectStages);
+  const container = byId("projectsList");
+  const layout = state.layouts.projects || "tile";
+  container.classList.remove("is-list", "is-kanban");
+  if (layout === "kanban" || layout === "pipeline") container.classList.add("is-kanban");
+  else if (layout === "list") container.classList.add("is-list");
+
+  const pipelineToggle = byId("projectPipelineGroupingToggle");
+  if (pipelineToggle) {
+    pipelineToggle.style.display = layout === "pipeline" ? "" : "none";
+    pipelineToggle.querySelectorAll("[data-pipeline-grouping]").forEach(btn => {
+      btn.classList.toggle("is-active", btn.dataset.pipelineGrouping === state.projectPipelineGrouping);
+    });
+  }
+
+  let groupKey = null, groupOrder = null;
+  if (layout === "kanban") {
+    groupKey = (item) => item.stage;
+    groupOrder = projectStages;
+  } else if (layout === "pipeline") {
+    if (state.projectPipelineGrouping === "stage") {
+      groupKey = (item) => item.stage;
+      groupOrder = projectStages;
+    } else {
+      groupKey = (item) => item.abcList || "Unranked";
+      groupOrder = ["C (25%)", "B (50%)", "A (90%)", "Job Won", "Unranked"];
+    }
+  }
+  byId("projectsList").innerHTML = listWrap(records, projectCard, "No projects match this view.", groupKey, groupOrder);
   const projBar = byId("projectsCountBar");
   if (projBar) {
     const total = cleanProjects().filter(i => !projectAutoArchived(i)).length;
@@ -7094,6 +7121,7 @@ function showAccountDetail(record) {
       <div>
         <h3><span class="activity-dot ${activity.level}"></span>${escapeHtml(record.client)}</h3>
         ${latest ? `<p>${escapeHtml(activity.label)}</p>` : "<p>No activity logged yet.</p>"}
+        ${related.projects.length ? `<p class="detail-project-stages">${related.projects.map(p => `<span class="pill ${rankClass(p.stage)}">${escapeHtml(p.stage || "No Stage")}</span>`).join(" ")}</p>` : ""}
       </div>
       <div class="detail-header-actions">
         <span id="detailSaveStatus" class="detail-save-status" aria-live="polite"></span>
@@ -7325,6 +7353,9 @@ function accountProfileTabContent(account, activeTab) {
       }).join("") : `<p class="empty-state">No linked contractors yet.</p>`}</div>
     </section>`;
   }
+  if (activeTab === "contacts") {
+    return accountContactsSection(account);
+  }
   return accountProfileScorecard(account);
 }
 
@@ -7337,6 +7368,7 @@ function accountProfileContent(account, activeTab = "scorecard") {
     ["activity", "Activity"],
     ["notes", "Notes"],
     ["contractors", "Contractors"],
+    ["contacts", "Contacts"],
   ];
   return `
     <div class="account-profile-heading">
@@ -7366,6 +7398,7 @@ function activityEntry(entry) {
   return `<div class="activity-entry">
     <div>
       <strong>${compactDate(entry.createdAt) || "No date"}</strong>
+      ${entry.contactName ? `<span class="activity-contact">[${escapeHtml(entry.contactName)}]</span>` : ""}
       ${entry.source ? `<span>${escapeHtml(entry.source)}</span>` : ""}
     </div>
     <p>${escapeHtml(entry.note || "")}</p>
@@ -7408,6 +7441,7 @@ function addAccountActivity(accountId, note, showDetailAfter = true, extra = {})
       facility: extra.facility || "",
       address: extra.address || "",
       files: extra.files || [],
+      contactName: extra.contactName || "",
     },
     ...(state.activities[accountId] || []),
   ];
@@ -7637,6 +7671,7 @@ function renderCallList() {
     .map((weekday) => `<button class="sort-tab ${weekday === day ? "is-active" : ""}" data-call-day="${weekday}" type="button">${weekday.slice(0, 3)}</button>`)
     .join("");
   byId("callListView").querySelector(".call-list-layout").dataset.mode = state.callListMode;
+  if (state.callListMode === "email") window.gripDrip?.render?.();
   byId("dailyCallList").classList.remove("is-list", "is-kanban");
   byId("dailyCallList").classList.toggle("is-list", state.layouts.callList === "list");
   byId("dailyCallList").classList.toggle("is-kanban", state.layouts.callList === "kanban");
@@ -7679,7 +7714,7 @@ function renderCallList() {
             <div class="call-account-info">
               <button class="call-account-button" data-open-account-dialog="${account.id}" type="button" title="Edit account">
                 <strong>${escapeHtml(account.client)}</strong>
-                ${account.poc ? `<small>${escapeHtml(account.poc)}</small>` : ""}
+                ${account.poc && !switcher ? `<small>${escapeHtml(account.poc)}</small>` : ""}
               </button>
               ${switcher}
               ${initialChips ? `<div class="call-contact-chips" data-contact-chips="${escapeHtml(account.id)}">${initialChips}</div>` : `<div class="call-contact-chips" data-contact-chips="${escapeHtml(account.id)}"></div>`}
@@ -7858,7 +7893,7 @@ async function saveNoteTakerEntry(formEl) {
 }
 
 function setCallListMode(mode) {
-  state.callListMode = mode === "setup" ? "setup" : "today";
+  state.callListMode = ["setup", "email"].includes(mode) ? mode : "today";
   renderCallList();
 }
 
@@ -7904,26 +7939,38 @@ function handleCallListCheckbox(callCheckbox) {
   }
 }
 
-function openCallActivityDialog(accountId, day = "", completeCall = false) {
+function openCallActivityDialog(accountId, day = "", completeCall = false, selectedContactName = "") {
   const account = cleanAccounts().find((item) => item.id === accountId);
   if (!account) return;
   if (byId("callActivityDialog").open && !finishCallActivity(false)) return;
   clearTimeout(callActivitySaveTimer);
   const latest = latestAccountActivity(account);
+  const allAddlContacts = loadContacts();
+  const accContacts = [
+    ...(account.poc || account.phone || account.email ? [{ name: account.poc || "Primary", phone: account.phone || "", email: account.email || "", title: account.title || "" }] : []),
+    ...allAddlContacts.filter(c => c.accountId === account.id).map(c => ({ name: c.name || "", phone: c.phone || "", email: c.email || "", title: c.title || "" })),
+  ];
+  const selectedIdx = accContacts.findIndex(c => c.name === selectedContactName);
+  const chosenContact = accContacts[Math.max(0, selectedIdx)] || accContacts[0] || { name: account.poc || "", phone: account.phone || "", email: account.email || "" };
   byId("callActivityForm").reset();
   byId("callActivityAccountId").value = account.id;
   byId("callActivityDay").value = day;
   byId("callActivityComplete").value = completeCall ? "yes" : "";
   byId("callActivityTitle").textContent = account.client || "Client Call";
+  const contactSelectHtml = accContacts.length > 1
+    ? `<div class="call-dialog-contact-row"><label class="call-dialog-contact-label">Contact <select name="callContact" class="call-dialog-contact-select" aria-label="Select contact">
+        ${accContacts.map((c, i) => `<option value="${escapeHtml(c.name)}" ${i === Math.max(0, selectedIdx) ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("")}
+      </select></label></div>`
+    : `<input type="hidden" name="callContact" value="${escapeHtml(chosenContact.name)}" />`;
   byId("callActivityDetails").innerHTML = `
-    <p class="call-contact-summary">${escapeHtml(account.poc || account.client || "")}
-      ${account.phone ? `<a class="mini-button" href="tel:${escapeHtml(String(account.phone).replace(/[^0-9+]/g, ""))}">Call ${escapeHtml(account.phone)}</a>` : ""}
+    ${contactSelectHtml}
+    <p class="call-contact-summary">${escapeHtml(chosenContact.name || account.client || "")}
+      ${chosenContact.phone ? `<a class="mini-button" href="tel:${escapeHtml(String(chosenContact.phone).replace(/[^0-9+]/g, ""))}">Call ${escapeHtml(chosenContact.phone)}</a>` : ""}
     </p>
     <details class="call-context"><summary>Contact details &amp; previous activity</summary><div class="field-grid">
-      ${field("Contact", account.poc)}
-      ${field("Title", account.title)}
-      ${account.phone ? `<div class="field"><span>Phone</span><strong><a href="tel:${escapeHtml(String(account.phone).replace(/[^0-9+]/g, ""))}">${escapeHtml(account.phone)}</a></strong></div>` : ""}
-      ${account.email ? `<div class="field"><span>Email</span><strong><a href="mailto:${escapeHtml(account.email)}">${escapeHtml(account.email)}</a></strong></div>` : ""}
+      ${field("Title", chosenContact.title)}
+      ${chosenContact.phone ? `<div class="field"><span>Phone</span><strong><a href="tel:${escapeHtml(String(chosenContact.phone).replace(/[^0-9+]/g, ""))}">${escapeHtml(chosenContact.phone)}</a></strong></div>` : ""}
+      ${chosenContact.email ? `<div class="field"><span>Email</span><strong><a href="mailto:${escapeHtml(chosenContact.email)}">${escapeHtml(chosenContact.email)}</a></strong></div>` : ""}
       ${field("Entity", account.entity)}
       ${field("County", account.county)}
       ${field("Address", buildFullAddress(account))}
@@ -7994,7 +8041,8 @@ function persistCallActivity() {
     const entries = Array.isArray(activities[accountId]) ? activities[accountId] : [];
     const existing = entries.find((item) => item.id === form.dataset.activityId);
     const entry = { ...existing, id:form.dataset.activityId, accountId, note,
-      createdAt:existing?.createdAt || form.dataset.createdAt, source:"Call List", completionKey:form.elements.completeCall.value === "yes" ? callCompletionKey(form.elements.day.value, accountId) : "", files:existing?.files || [] };
+      createdAt:existing?.createdAt || form.dataset.createdAt, source:"Call List", completionKey:form.elements.completeCall.value === "yes" ? callCompletionKey(form.elements.day.value, accountId) : "", files:existing?.files || [],
+      contactName: form.elements.callContact?.value || "" };
     const next = { ...activities, [accountId]:[entry, ...entries.filter((item) => item.id !== entry.id)] };
     if (!existing || existing.note !== note) localStorage.setItem("garlandAccountActivities", JSON.stringify(next));
     state.activities = next;
@@ -11661,6 +11709,12 @@ function bindEvents() {
       setLayout(group.dataset.viewToggle, button.dataset.layout);
     });
   });
+  byId("projectPipelineGroupingToggle")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-pipeline-grouping]");
+    if (!button) return;
+    state.projectPipelineGrouping = button.dataset.pipelineGrouping;
+    renderProjects();
+  });
   byId("accountsView").addEventListener("click", (event) => {
     const button = event.target.closest("[data-account-mode]");
     if (!button) return;
@@ -12793,7 +12847,10 @@ function bindEvents() {
     }
     const openCallAccount = event.target.closest("[data-open-call-account]");
     if (openCallAccount) {
-      openCallActivityDialog(openCallAccount.dataset.openCallAccount, openCallAccount.dataset.callLogDay || "", Boolean(openCallAccount.dataset.callLogDay));
+      const callItem = openCallAccount.closest(".call-item");
+      const switcher = callItem?.querySelector("[data-call-switcher]");
+      const selectedContactName = switcher ? switcher.options[switcher.selectedIndex]?.text || "" : "";
+      openCallActivityDialog(openCallAccount.dataset.openCallAccount, openCallAccount.dataset.callLogDay || "", Boolean(openCallAccount.dataset.callLogDay), selectedContactName);
       return;
     }
     const openAccountPage = event.target.closest("[data-open-account-page]");

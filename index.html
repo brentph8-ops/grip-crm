@@ -484,6 +484,11 @@
                 <button class="sort-tab is-active" data-layout="tile" type="button">Tile</button>
                 <button class="sort-tab" data-layout="list" type="button">List</button>
                 <button class="sort-tab" data-layout="kanban" type="button">Kanban</button>
+                <button class="sort-tab" data-layout="pipeline" type="button">Pipeline</button>
+              </div>
+              <div class="view-toggle pipeline-grouping-toggle" id="projectPipelineGroupingToggle" style="display:none" aria-label="Pipeline grouping">
+                <button class="sort-tab is-active" data-pipeline-grouping="abc" type="button">By ABC</button>
+                <button class="sort-tab" data-pipeline-grouping="stage" type="button">By Stage</button>
               </div>
               <button class="secondary-button" id="exportProjectsCsvButton" type="button">Export CSV</button>
               <button class="secondary-button" id="exportProjectsPdfButton" type="button">Export PDF</button>
@@ -933,6 +938,7 @@
           <div class="call-list-tabs" aria-label="Call list views">
             <button class="sort-tab is-active" data-call-list-mode="today" type="button">Call List</button>
             <button class="sort-tab" data-call-list-mode="setup" type="button">Call List Setup</button>
+            <button class="sort-tab" data-call-list-mode="email" type="button">Email List</button>
             <div class="filter-field" data-label="Sort By"><select id="callListSortFilter" aria-label="Sort call list">
               <option value="name">Name</option>
               <option value="county">County</option>
@@ -986,6 +992,30 @@
               </div>
               <div id="callListEntityFilter" class="call-entity-filter"></div>
               <div id="dailyCallList" class="call-checklist"></div>
+            </section>
+            <section class="panel call-list-drip" id="callListDripPanel">
+              <div id="dripCampaignBar"></div>
+              <div class="drip-sub-tabs sort-tabs">
+                <button class="sort-tab is-active drip-sub-tab" data-drip-view="queue" type="button">Queue</button>
+                <button class="sort-tab drip-sub-tab" data-drip-view="contacts" type="button">All Contacts</button>
+                <button class="sort-tab drip-sub-tab" data-drip-view="templates" type="button">Templates</button>
+              </div>
+              <div id="dripQueuePanel"><div id="dripQueueContent"></div></div>
+              <div id="dripContactsPanel" style="display:none"><div id="dripContactsContent"></div></div>
+              <div id="dripTemplatesPanel" style="display:none">
+                <div class="drip-template-filter">
+                  <label>Entity <select id="dripTemplateEntity">
+                    <option>K-12</option>
+                    <option>Higher Education</option>
+                    <option>Healthcare</option>
+                    <option>Municipal</option>
+                    <option>Manufacturing</option>
+                    <option>Architects</option>
+                    <option>Other</option>
+                  </select></label>
+                </div>
+                <div id="dripTemplatesContent"></div>
+              </div>
             </section>
           </div>
         </section>
@@ -2610,6 +2640,102 @@
       </form>
     </dialog>
 
+    <!-- Drip Campaign Dialogs -->
+    <dialog id="dripCampaignDialog" class="modal small-modal">
+      <form id="dripCampaignForm" method="dialog">
+        <div class="modal-header">
+          <div><p class="eyebrow">Email List</p><h3>New Campaign</h3></div>
+          <button class="icon-button" id="closeDripCampaignDialog" type="button" aria-label="Close">×</button>
+        </div>
+        <label class="full-field"><span>Campaign Name</span><input type="text" name="campaignName" required placeholder="e.g. Q3 Healthcare Outreach" /></label>
+        <fieldset>
+          <legend>Target Entities</legend>
+          <div class="checkbox-grid">
+            <label><input type="checkbox" name="campaignEntities" value="K-12" /> K-12</label>
+            <label><input type="checkbox" name="campaignEntities" value="Higher Education" /> Higher Education</label>
+            <label><input type="checkbox" name="campaignEntities" value="Healthcare" /> Healthcare</label>
+            <label><input type="checkbox" name="campaignEntities" value="Municipal" /> Municipal</label>
+            <label><input type="checkbox" name="campaignEntities" value="Manufacturing" /> Manufacturing</label>
+            <label><input type="checkbox" name="campaignEntities" value="Architects" /> Architects</label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Target Account Stages</legend>
+          <div class="checkbox-grid">
+            <label><input type="checkbox" name="campaignStages" value="Prospecting" /> Prospecting</label>
+            <label><input type="checkbox" name="campaignStages" value="In Progress" /> In Progress</label>
+            <label><input type="checkbox" name="campaignStages" value="Meeting" /> Meeting</label>
+            <label><input type="checkbox" name="campaignStages" value="C" /> C</label>
+            <label><input type="checkbox" name="campaignStages" value="B" /> B</label>
+            <label><input type="checkbox" name="campaignStages" value="A" /> A</label>
+          </div>
+        </fieldset>
+        <div class="modal-actions">
+          <button class="primary-button" type="submit">Create Campaign</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="dripAddContactDialog" class="modal small-modal">
+      <form id="dripAddContactForm" method="dialog">
+        <div class="modal-header">
+          <div><p class="eyebrow">Email List</p><h3>Add Contact</h3></div>
+          <button class="icon-button" id="closeDripAddContactDialog" type="button" aria-label="Close">×</button>
+        </div>
+        <div class="field-grid">
+          <label class="full-field"><span>First Name</span><input type="text" name="dripFirstName" required /></label>
+          <label class="full-field"><span>Last Name</span><input type="text" name="dripLastName" /></label>
+          <label class="full-field"><span>Company</span><input type="text" name="dripCompany" required /></label>
+          <label class="full-field"><span>Email</span><input type="email" name="dripEmail" required /></label>
+          <label class="full-field"><span>Entity</span>
+            <select name="dripEntity">
+              <option>K-12</option><option>Higher Education</option><option>Healthcare</option>
+              <option>Municipal</option><option>Manufacturing</option><option>Architects</option><option>Other</option>
+            </select>
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button class="primary-button" type="submit">Add to Sequence</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="dripImportDialog" class="modal">
+      <div class="modal-header">
+        <div><p class="eyebrow">Email List</p><h3>Import from GRIP</h3></div>
+        <button class="icon-button" id="closeDripImportDialog" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="import-filters">
+        <input id="dripImportSearch" class="search-input" type="search" placeholder="Search name, email…" />
+        <select id="dripImportEntityFilter" aria-label="Filter by entity"><option value="">All entities</option></select>
+        <select id="dripImportStageFilter" aria-label="Filter by stage"><option value="">All stages</option></select>
+        <span id="dripImportCount" class="muted-note"></span>
+      </div>
+      <div id="dripImportList" class="import-grip-list"></div>
+      <div class="modal-actions">
+        <button class="primary-button" id="confirmDripImport" type="button">Import Selected</button>
+      </div>
+    </dialog>
+    <dialog id="dripSwitchDialog" class="modal small-modal">
+      <div class="modal-header">
+        <div><p class="eyebrow">Email List</p><h3>Switch Campaign</h3></div>
+        <button class="icon-button" id="closeDripSwitchDialog" type="button" aria-label="Close">×</button>
+      </div>
+      <div id="dripSwitchList"></div>
+    </dialog>
+    <dialog id="dripEmailDialog" class="modal">
+      <div class="modal-header">
+        <div><p class="eyebrow">Email List</p><h3 id="dripEmailTitle">Draft Email</h3></div>
+        <button class="icon-button" id="closeDripEmailDialog" type="button" aria-label="Close">×</button>
+      </div>
+      <p id="dripEmailReplyNote" class="muted-note"></p>
+      <label class="full-field"><span>To</span><input id="dripEmailTo" type="email" readonly /></label>
+      <label class="full-field"><span>Subject</span><input id="dripEmailSubject" type="text" /></label>
+      <label class="full-field"><span>Body</span><textarea id="dripEmailBody" class="note-box" rows="12" readonly></textarea></label>
+      <div class="modal-actions">
+        <button class="secondary-button" id="dripCopyEmailBtn" type="button">Copy to Clipboard</button>
+        <button class="primary-button" id="dripMarkSentBtn" type="button">Mark as Sent</button>
+      </div>
+    </dialog>
+
     <dialog id="weeklyReviewDialog" class="modal small-modal">
       <div class="quick-record-shell">
         <div class="modal-header">
@@ -2682,6 +2808,7 @@
     <script src="src/leaflet.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="src/outreach.js"></script>
+    <script src="src/drip.js"></script>
     <script src="src/today.js"></script>
     <script src="src/pipeline.js"></script>
     <script src="src/territory.js"></script>

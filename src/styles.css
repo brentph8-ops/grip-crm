@@ -1851,6 +1851,83 @@ textarea {
   display: block;
 }
 
+/* Email / Drip mode */
+#callListView[data-mode="email"] .weekday-ribbon { display: none; }
+.call-list-layout[data-mode="email"] .call-list-setup,
+.call-list-layout[data-mode="email"] .call-list-current { display: none; }
+.call-list-drip { display: none; }
+.call-list-layout[data-mode="email"] .call-list-drip { display: block; }
+
+/* Drip sub-tabs */
+.drip-sub-tabs { display: flex; gap: 6px; padding: 10px 0; flex-wrap: wrap; }
+.drip-template-filter { padding: 10px 0; }
+.drip-campaign-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 10px; }
+.drip-campaign-left { flex: 1; min-width: 0; }
+.drip-campaign-name { font-weight: 600; font-size: 1rem; }
+.drip-campaign-meta { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+.drip-header-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.drip-no-campaign { padding: 16px; text-align: center; color: var(--muted); }
+.drip-section-title { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 12px 0 6px; }
+.drip-contact-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); margin-bottom: 8px; flex-wrap: wrap; }
+.drip-row-due { border-color: var(--accent, #e07b35); background: color-mix(in srgb, var(--accent, #e07b35) 6%, var(--panel)); }
+.drip-contact-info { flex: 1; min-width: 0; }
+.drip-contact-name { font-weight: 600; }
+.drip-contact-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; font-size: 0.82rem; align-items: center; }
+.drip-contact-company { color: var(--muted); }
+.drip-entity-pill { background: var(--line); border-radius: 12px; padding: 1px 7px; font-size: 0.78rem; }
+.drip-status-badge { border-radius: 12px; padding: 1px 7px; font-size: 0.78rem; }
+.drip-status-active { background: #d4f8e8; color: #1a7a4a; }
+.drip-status-replied { background: #d0e8ff; color: #1a55a0; }
+.drip-status-ooo { background: #fff3cd; color: #856404; }
+.drip-status-unresponsive { background: #ffe5e5; color: #b00020; }
+.drip-status-graveyard { background: var(--line); color: var(--muted); }
+.drip-status-completed { background: #e0ffe0; color: #1a6a1a; }
+.drip-progress-dots { display: flex; gap: 5px; margin-top: 8px; }
+.drip-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--line); border: 1.5px solid var(--border, #bbb); }
+.drip-dot-sent { background: var(--accent, #e07b35); border-color: var(--accent, #e07b35); }
+.drip-dot-next { background: transparent; border-color: var(--accent, #e07b35); border-style: dashed; }
+.drip-contact-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; flex-shrink: 0; }
+.drip-next-label { font-size: 0.8rem; color: var(--muted); text-align: right; }
+.drip-seq-done { font-size: 0.8rem; color: var(--muted); }
+.drip-template-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-top: 10px; }
+.drip-template-card { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 14px; }
+.drip-template-header { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.8rem; font-weight: 600; }
+.drip-template-day { color: var(--muted); font-weight: 400; }
+.drip-template-subject { font-weight: 600; margin-bottom: 8px; }
+.drip-template-body { white-space: pre-wrap; font-family: inherit; font-size: 0.82rem; color: var(--muted); background: none; border: none; padding: 0; margin: 0; max-height: 120px; overflow: hidden; }
+.import-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; align-items: center; }
+.import-grip-list { max-height: 340px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.import-grip-item { display: flex; align-items: flex-start; gap: 8px; padding: 8px; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+.import-grip-item:hover { background: var(--hover, rgba(0,0,0,.04)); }
+.import-grip-item > div { display: flex; flex-direction: column; gap: 2px; font-size: 0.85rem; }
+.import-grip-meta { display: flex; gap: 4px; flex-wrap: wrap; }
+.import-tag { background: var(--line); border-radius: 10px; padding: 1px 6px; font-size: 0.75rem; }
+.import-tag-entity { background: color-mix(in srgb, var(--accent, #e07b35) 12%, var(--panel)); }
+.checkbox-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; margin-top: 6px; }
+.checkbox-grid label { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; }
+.payton-select { font-size: 0.8rem; padding: 3px 6px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--text); }
+.payton-remove { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 1rem; padding: 2px 4px; }
+.payton-remove:hover { color: #b00020; }
+.payton-stat-row { display: flex; gap: 12px; }
+.payton-stat { display: flex; flex-direction: column; align-items: center; }
+.payton-stat-num { font-weight: 700; font-size: 1.1rem; }
+.payton-stat-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; }
+.payton-stat-warn .payton-stat-num { color: #e07b35; }
+.outreach-campaign-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 8px; }
+.outreach-campaign-item.is-active { border-color: var(--accent, #e07b35); }
+.outreach-active-label { font-size: 0.8rem; color: var(--muted); font-style: italic; }
+
+/* Activity contact name */
+.activity-contact { font-size: 0.8rem; color: var(--accent, #e07b35); font-weight: 600; margin-left: 4px; }
+
+/* Call dialog contact select */
+.call-dialog-contact-row { margin-bottom: 10px; }
+.call-dialog-contact-label { display: flex; flex-direction: column; gap: 4px; font-size: 0.82rem; font-weight: 600; }
+.call-dialog-contact-select { font-size: 0.9rem; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--text); }
+
+/* Detail project stage pills */
+.detail-project-stages { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+
 .call-rule-list,
 .call-checklist {
   display: grid;
