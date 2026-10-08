@@ -1007,7 +1007,7 @@
               <div class="drip-sub-tabs sort-tabs">
                 <button class="sort-tab is-active drip-sub-tab" data-drip-view="queue" type="button">Queue</button>
                 <button class="sort-tab drip-sub-tab" data-drip-view="contacts" type="button">All Contacts</button>
-                <button class="sort-tab drip-sub-tab" data-drip-view="templates" type="button">Templates</button>
+                <button class="sort-tab drip-sub-tab" data-drip-view="templates" type="button">Sequence</button>
               </div>
               <div id="dripQueuePanel"><div id="dripQueueContent"></div></div>
               <div id="dripContactsPanel" style="display:none"><div id="dripContactsContent"></div></div>
@@ -2663,37 +2663,37 @@
     </dialog>
 
     <!-- Drip Campaign Dialogs -->
-    <dialog id="dripCampaignDialog" class="modal small-modal">
-      <form id="dripCampaignForm" method="dialog">
-        <div class="modal-header">
-          <div><p class="eyebrow">Email List</p><h3>New Campaign</h3></div>
-          <button class="icon-button" id="closeDripCampaignDialog" type="button" aria-label="Close">×</button>
+    <dialog id="dripCampaignDialog" class="modal drip-editor-modal">
+      <div class="modal-header">
+        <div><p class="eyebrow">Email List</p><h3 id="dripCampaignDialogTitle">New Campaign</h3></div>
+        <button class="icon-button" id="closeDripCampaignDialog" type="button" aria-label="Close">×</button>
+      </div>
+      <form id="dripCampaignForm">
+        <div class="drip-editor-layout">
+          <div class="drip-editor-settings">
+            <label class="full-field"><span>Campaign Name</span>
+              <input type="text" id="dripCampaignName" name="campaignName" required placeholder="e.g. Q3 K-12 Outreach" />
+            </label>
+            <label><span>Emails in Sequence</span>
+              <input type="number" id="dripEmailCount" name="emailCount" min="1" max="12" value="6" style="width:70px" />
+            </label>
+            <fieldset>
+              <legend>Target Entities</legend>
+              <div id="dripEntityCheckboxes" class="checkbox-grid"></div>
+            </fieldset>
+            <fieldset>
+              <legend>Target Stages</legend>
+              <div id="dripStageCheckboxes" class="checkbox-grid"></div>
+            </fieldset>
+          </div>
+          <div class="drip-editor-emails">
+            <div id="dripEmailTabs" class="drip-email-tab-row sort-tabs"></div>
+            <div id="dripEmailEditorPanel"></div>
+          </div>
         </div>
-        <label class="full-field"><span>Campaign Name</span><input type="text" name="campaignName" required placeholder="e.g. Q3 Healthcare Outreach" /></label>
-        <fieldset>
-          <legend>Target Entities</legend>
-          <div class="checkbox-grid">
-            <label><input type="checkbox" name="campaignEntities" value="K-12" /> K-12</label>
-            <label><input type="checkbox" name="campaignEntities" value="Higher Education" /> Higher Education</label>
-            <label><input type="checkbox" name="campaignEntities" value="Healthcare" /> Healthcare</label>
-            <label><input type="checkbox" name="campaignEntities" value="Municipal" /> Municipal</label>
-            <label><input type="checkbox" name="campaignEntities" value="Manufacturing" /> Manufacturing</label>
-            <label><input type="checkbox" name="campaignEntities" value="Architects" /> Architects</label>
-          </div>
-        </fieldset>
-        <fieldset>
-          <legend>Target Account Stages</legend>
-          <div class="checkbox-grid">
-            <label><input type="checkbox" name="campaignStages" value="Prospecting" /> Prospecting</label>
-            <label><input type="checkbox" name="campaignStages" value="In Progress" /> In Progress</label>
-            <label><input type="checkbox" name="campaignStages" value="Meeting" /> Meeting</label>
-            <label><input type="checkbox" name="campaignStages" value="C" /> C</label>
-            <label><input type="checkbox" name="campaignStages" value="B" /> B</label>
-            <label><input type="checkbox" name="campaignStages" value="A" /> A</label>
-          </div>
-        </fieldset>
         <div class="modal-actions">
-          <button class="primary-button" type="submit">Create Campaign</button>
+          <button class="secondary-button" type="button" id="cancelDripCampaignBtn">Cancel</button>
+          <button class="primary-button" type="submit">Save Campaign</button>
         </div>
       </form>
     </dialog>
@@ -2709,7 +2709,7 @@
           <label class="full-field"><span>Company</span><input type="text" name="dripCompany" required /></label>
           <label class="full-field"><span>Email</span><input type="email" name="dripEmail" required /></label>
           <label class="full-field"><span>Entity</span>
-            <select name="dripEntity">
+            <select name="dripEntity" id="dripAddEntitySelect">
               <option>K-12</option><option>Higher Education</option><option>Healthcare</option>
               <option>Municipal</option><option>Manufacturing</option><option>Architects</option><option>Other</option>
             </select>

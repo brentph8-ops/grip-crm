@@ -7032,6 +7032,134 @@ textarea {
 .payton-stat-accent { color: #059669; }
 .payton-stat-warn .payton-stat-num  { color: #d97706; }
 .payton-stat-warn .payton-stat-label { color: #d97706; }
+
+/* ── Drip Campaign Editor ─────────────────────────────────────── */
+.drip-editor-modal { max-width: 960px; width: 96vw; }
+.drip-editor-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 24px;
+  margin: 16px 0;
+  min-height: 480px;
+}
+@media (max-width: 680px) {
+  .drip-editor-layout { grid-template-columns: 1fr; }
+}
+.drip-editor-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-right: 1px solid var(--border);
+  padding-right: 20px;
+}
+.drip-editor-settings fieldset {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 0;
+}
+.drip-editor-settings legend {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  padding: 0 4px;
+}
+.drip-editor-emails {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+}
+.drip-email-tab-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 14px;
+}
+.drip-email-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.drip-email-meta-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+}
+.drip-meta-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.drip-meta-field span {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.drip-meta-field input,
+.drip-meta-field select {
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+.drip-placeholder-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 0 4px;
+}
+.drip-placeholder-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-right: 2px;
+}
+.placeholder-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid var(--accent, #e07b35);
+  background: transparent;
+  color: var(--accent, #e07b35);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.placeholder-chip:hover {
+  background: var(--accent, #e07b35);
+  color: #fff;
+}
+.drip-editor-body {
+  font-family: inherit;
+  min-height: 220px;
+  resize: vertical;
+}
+.drip-email-count-badge {
+  font-size: 0.75rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 8px;
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+
 .payton-campaign-actions {
   display: flex;
   align-items: center;

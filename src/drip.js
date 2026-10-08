@@ -1,14 +1,26 @@
 // ─────────────────────────────────────────────────────────────────
-// GRIP Drip — 6-email cold outreach sequence
+// GRIP Drip — configurable email sequence campaigns
 // ─────────────────────────────────────────────────────────────────
 
 (function () {
 
-  const SEQUENCE_DAYS = { 1: 0, 2: 3, 3: 7, 4: 14, 5: 21, 6: 30 };
-  const REPLY_TO = { 2: 1, 4: 3 };
-  const ENTITIES = ["K-12", "Higher Education", "Healthcare", "Municipal", "Manufacturing", "Architects", "Other"];
+  const DEFAULT_ENTITIES = [
+    "K-12", "Higher Education", "Healthcare", "Municipal", "Manufacturing",
+    "Architects", "Government", "Religious", "Senior Living", "Industrial",
+    "Hospitality", "Retail", "Other"
+  ];
+
   const ACCOUNT_STAGES = ["Prospecting", "In Progress", "Meeting", "C", "B", "A", "Unresponsive", "Dead End"];
   const STATUSES = ["Active", "Replied", "OOO Paused", "Unresponsive", "Graveyard", "Completed"];
+
+  const PLACEHOLDERS = [
+    { label: "First Name",     value: "[First Name]" },
+    { label: "Full Name",      value: "[Full Name]" },
+    { label: "Account Name",   value: "[Account Name]" },
+    { label: "Entity",         value: "[Entity]" },
+    { label: "Rep Name",       value: "[Rep Name]" },
+    { label: "Meeting Times",  value: "[Meeting Times]" },
+  ];
 
   // ── State ─────────────────────────────────────────────────────────
 
@@ -17,6 +29,9 @@
   let _viewMode = "queue";
   let _pendingEmailContactId = null;
   let _pendingEmailNumber = null;
+  let _editingCampaignId = null;
+  let _editorCurrentTab = 1;
+  let _editorEmails = [];
 
   // ── Data I/O ──────────────────────────────────────────────────────
 
@@ -39,6 +54,22 @@
 
   function uid() {
     return `dr-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  }
+
+  // ── Entity helpers ────────────────────────────────────────────────
+
+  function allEntities() {
+    const crmEntities = typeof window.cleanAccounts === "function"
+      ? [...new Set(window.cleanAccounts().map(a => a.entity).filter(Boolean))]
+      : [];
+    const combined = [...new Set([...DEFAULT_ENTITIES, ...crmEntities])];
+    return combined.sort((a, b) => {
+      const ai = DEFAULT_ENTITIES.indexOf(a), bi = DEFAULT_ENTITIES.indexOf(b);
+      if (ai >= 0 && bi >= 0) return ai - bi;
+      if (ai >= 0) return -1;
+      if (bi >= 0) return 1;
+      return a.localeCompare(b);
+    });
   }
 
   // ── Date helpers ──────────────────────────────────────────────────
@@ -70,85 +101,88 @@
     return slots.join("\n");
   }
 
-  // ── Email Templates ───────────────────────────────────────────────
+  // ── Placeholder resolution ────────────────────────────────────────
+
+  function resolvePlaceholders(text, contact) {
+    const first   = contact.firstName || "there";
+    const last    = contact.lastName  || "";
+    const full    = [first, last].filter(Boolean).join(" ") || contact.company || "there";
+    const company = contact.company || "your organization";
+    const entity  = contact.entity  || "";
+    const repName = "Brent Phillips";
+    return (text || "")
+      .replace(/\[First Name\]/g, first)
+      .replace(/\[Last Name\]/g,  last)
+      .replace(/\[Full Name\]/g,  full)
+      .replace(/\[Account Name\]/g, company)
+      .replace(/\[Entity\]/g,     entity)
+      .replace(/\[Rep Name\]/g,   repName)
+      .replace(/\[Meeting Times\]/g, generateMeetingTimes());
+  }
+
+  // ── Default email templates ───────────────────────────────────────
+
+  function defaultEmailTemplate(num) {
+    const defaults = [
+      { dayOffset: 0,  replyTo: null, subject: "Can we schedule a meeting? - Garland",
+        body: `Hi [First Name],\n\nBrent Phillips with The Garland Company. We assist facilities with roofing, waterproofing, and building envelope needs.\n\nI was going to initially stop by but wanted to try to schedule an appointment first. Would any of these times work?\n\n[Meeting Times]\n\nOr just name a better time.` },
+      { dayOffset: 3,  replyTo: 1,    subject: "Re: Can we schedule a meeting? - Garland",
+        body: `Hi [First Name],\n\nWanted to reach back out and see if you had anything available for a phone call or in person.` },
+      { dayOffset: 7,  replyTo: null, subject: "Building budgets at [Account Name]?",
+        body: `Hi [First Name],\n\nWe do building assessments that turn roof conditions into a phased capital plan. Worth 15 minutes to walk through what that looks like for [Account Name]? We could start with your worst building.` },
+      { dayOffset: 14, replyTo: 3,    subject: "Re: Building budgets at [Account Name]?",
+        body: `Hi [First Name],\n\nIf now's not a good time, is there a better time to connect?` },
+      { dayOffset: 21, replyTo: null, subject: "Quick question",
+        body: `Hi [First Name],\n\nDo you have any problems I can look at? Roof leaks or building envelope issues?` },
+      { dayOffset: 30, replyTo: null, subject: "Is there a better time to connect?",
+        body: `Hi [First Name],\n\nHaven't heard back but is there a better time to connect? If the timing changes, just reply and we can connect.` },
+    ];
+    const d = defaults[num - 1] || {
+      dayOffset: (num - 1) * 7, replyTo: null,
+      subject: `Follow-up ${num}`, body: `Hi [First Name],\n\n`,
+    };
+    return { number: num, ...d };
+  }
+
+  function defaultEmailTemplates(count) {
+    return Array.from({ length: count }, (_, i) => defaultEmailTemplate(i + 1));
+  }
+
+  // ── Campaign helpers ──────────────────────────────────────────────
+
+  function campaignEmailCount(campaign) {
+    if (!campaign) return 6;
+    return campaign.emails?.length || campaign.emailCount || 6;
+  }
+
+  function campaignEmails(campaign) {
+    if (!campaign) return defaultEmailTemplates(6);
+    if (campaign.emails?.length) return campaign.emails;
+    return defaultEmailTemplates(campaignEmailCount(campaign));
+  }
+
+  function getDayGap(campaign, fromEmailNum) {
+    const emails = campaignEmails(campaign);
+    const from = emails.find(e => e.number === fromEmailNum);
+    const to   = emails.find(e => e.number === fromEmailNum + 1);
+    if (!from || !to) return 7;
+    return Math.max(1, to.dayOffset - from.dayOffset);
+  }
+
+  // ── buildDripEmail ────────────────────────────────────────────────
 
   function buildDripEmail(contact, emailNumber) {
-    const first = contact.firstName || "there";
-    const company = contact.company || "your organization";
-    const entity = contact.entity || "Other";
-    const isArchitect = entity === "Architects";
-
-    if (emailNumber === 1) {
-      const meetingTimes = generateMeetingTimes();
-      let intro = "We assist facilities with roofing, waterproofing, and building envelope needs.";
-      if (entity === "Healthcare") {
-        intro = "We're a preferred supplier for GPOs like Vizient, Premier, Healthtrust, and Advantus, helping healthcare facilities with roofing, waterproofing, and building envelope needs.";
-      } else if (entity === "K-12" || entity === "Higher Education") {
-        intro = "We assist school districts with full-service capabilities through design and engineering services for roofing, waterproofing, and building envelope needs.";
-      } else if (entity === "Municipal") {
-        intro = "We work with municipalities on preventative maintenance, deferred maintenance, and budget forecasting for turnkey roofing and building envelope solutions.";
-      } else if (entity === "Manufacturing") {
-        intro = "We help facility teams with roofing, waterproofing, and building envelope needs.";
-      } else if (isArchitect) {
-        intro = "We're a building envelope manufacturer providing design assistance on roofing, waterproofing, and envelope specs. Happy to help with projects, custom details, or stop by for a quick intro or lunch and learn.";
-      }
+    const campaign = _data.campaigns.find(c => c.id === contact.campaignId);
+    const emails = campaignEmails(campaign);
+    const emailData = emails.find(e => e.number === emailNumber);
+    if (emailData) {
       return {
-        subject: "Can we schedule a meeting? - Garland",
-        body: `Hi ${first},\n\nBrent Phillips with The Garland Company. ${intro}\n\nI was going to initially stop by but wanted to try to schedule an appointment first. Would any of these work?\n\n${meetingTimes}\n\nOr just name a better time.`,
+        subject:   resolvePlaceholders(emailData.subject, contact),
+        body:      resolvePlaceholders(emailData.body,    contact),
+        isReplyTo: emailData.replyTo || null,
       };
     }
-
-    if (emailNumber === 2) {
-      return {
-        subject: "Re: Can we schedule a meeting? - Garland",
-        body: `Hi ${first},\n\nWanted to reach back out and see if you had anything available for a phone call or in person.`,
-        isReplyTo: 1,
-      };
-    }
-
-    if (emailNumber === 3) {
-      if (isArchitect) {
-        return {
-          subject: "Design support for your projects",
-          body: `Hi ${first},\n\nWe provide design assistance on roofing and envelope specs, including custom details for your projects. Worth 15 minutes to talk through how we can support your team? Happy to do a lunch and learn or CE course as well.`,
-        };
-      }
-      return {
-        subject: `Building budgets at ${company}?`,
-        body: `Hi ${first},\n\nWe do building assessments that turn roof conditions into a phased capital plan. Worth 15 minutes to walk through what that looks like for ${company}? We could start with your worst building.`,
-      };
-    }
-
-    if (emailNumber === 4) {
-      const replySubject = isArchitect ? "Re: Design support for your projects" : `Re: Building budgets at ${company}?`;
-      return {
-        subject: replySubject,
-        body: `Hi ${first},\n\nIf now's not a good time, is there a better time to connect?`,
-        isReplyTo: 3,
-      };
-    }
-
-    if (emailNumber === 5) {
-      if (isArchitect) {
-        return {
-          subject: "Quick question",
-          body: `Hi ${first},\n\nWorking on any projects where we could help with roofing or envelope specs? Happy to assist with details, a lunch and learn, or stop by for a quick intro.`,
-        };
-      }
-      return {
-        subject: "Quick question",
-        body: `Hi ${first},\n\nDo you have any problems I can look at? Roof leaks or building envelope issues?`,
-      };
-    }
-
-    if (emailNumber === 6) {
-      return {
-        subject: "Is there a better time to connect?",
-        body: `Hi ${first},\n\nHaven't heard back but is there a better time to connect? If the timing changes, just reply and we can connect.`,
-      };
-    }
-
-    return { subject: "", body: "" };
+    return { subject: `Email ${emailNumber}`, body: `Hi [First Name],\n\n`, isReplyTo: null };
   }
 
   // ── Campaign CRUD ─────────────────────────────────────────────────
@@ -157,18 +191,27 @@
     return _data.campaigns.find(c => c.id === _activeCampaignId) || null;
   }
 
-  function createCampaign(name, entities, stages) {
+  function createCampaign(name, entities, stages, emails) {
     _data.campaigns.forEach(c => { if (c.status === "active") c.status = "paused"; });
     const c = {
-      id: uid(),
-      name: name.trim(),
-      entities: entities || [],
-      stages: stages || [],
-      status: "active",
+      id: uid(), name: name.trim(), entities, stages, status: "active",
+      emailCount: emails.length, emails,
       createdAt: new Date().toISOString(),
     };
     _data.campaigns.push(c);
     _activeCampaignId = c.id;
+    saveData();
+    renderDrip();
+  }
+
+  function updateCampaign(id, name, entities, stages, emails) {
+    const c = _data.campaigns.find(c => c.id === id);
+    if (!c) return;
+    c.name = name.trim();
+    c.entities = entities;
+    c.stages = stages;
+    c.emailCount = emails.length;
+    c.emails = emails;
     saveData();
     renderDrip();
   }
@@ -192,20 +235,16 @@
   function addDripContact(campaignId, { firstName, lastName, company, email, entity, accountId }) {
     if (!email) return;
     const contact = {
-      id: uid(),
-      campaignId,
+      id: uid(), campaignId,
       accountId: accountId || null,
       firstName: (firstName || "").trim(),
       lastName:  (lastName  || "").trim(),
       company:   (company   || "").trim(),
       email:     (email     || "").trim(),
       entity:    (entity    || "Other").trim(),
-      emailNumber: 0,
-      status: "Active",
-      sentDates: {},
-      nextDueDate: todayIso(),
-      log: [],
-      notes: "",
+      emailNumber: 0, status: "Active",
+      sentDates: {}, nextDueDate: todayIso(),
+      log: [], notes: "",
       createdAt: new Date().toISOString(),
     };
     _data.contacts.push(contact);
@@ -221,15 +260,16 @@
   function markEmailSent(contactId, emailNumber, subject) {
     const c = findContact(contactId);
     if (!c) return;
+    const campaign = _data.campaigns.find(cp => cp.id === c.campaignId);
+    const totalEmails = campaignEmailCount(campaign);
     const now = new Date().toISOString();
     const today = now.slice(0, 10);
     c.emailNumber = emailNumber;
     c.sentDates[emailNumber] = today;
-    c.log.push({ emailNum: emailNumber, logLabel: `Email ${emailNumber} of 6 sent`, subject, sentAt: now });
+    c.log.push({ emailNum: emailNumber, logLabel: `Email ${emailNumber} of ${totalEmails} sent`, subject, sentAt: now });
 
-    if (emailNumber < 6) {
-      const nextNum = emailNumber + 1;
-      c.nextDueDate = addDays(today, SEQUENCE_DAYS[nextNum] - SEQUENCE_DAYS[emailNumber]);
+    if (emailNumber < totalEmails) {
+      c.nextDueDate = addDays(today, getDayGap(campaign, emailNumber));
     } else {
       c.nextDueDate = null;
       c.status = "Unresponsive";
@@ -237,7 +277,7 @@
 
     if (c.accountId && typeof window.addAccountActivity === "function") {
       const name = [c.firstName, c.lastName].filter(Boolean).join(" ") || c.company;
-      window.addAccountActivity(c.accountId, `Email ${emailNumber} of 6 sent to ${name} (${c.email}) · "${subject}"`, false, { source: "Email List", contactName: name });
+      window.addAccountActivity(c.accountId, `Email ${emailNumber} of ${totalEmails} sent to ${name} (${c.email}) · "${subject}"`, false, { source: "Email List", contactName: name });
     }
     if (emailNumber === 1 && c.accountId && typeof window.gripApp?.persistRecordEdit === "function") {
       window.gripApp.persistRecordEdit("account", c.accountId, "clientRanking", "Unresponsive", false);
@@ -245,7 +285,7 @@
 
     saveData();
     renderDrip();
-    (window.showToast || alert)(`Email ${emailNumber} of 6 marked as sent.`, "success");
+    (window.showToast || alert)(`Email ${emailNumber} of ${totalEmails} marked as sent.`, "success");
   }
 
   function updateContactStatus(id, status) {
@@ -306,16 +346,22 @@
   // ── Render helpers ────────────────────────────────────────────────
 
   function progressDots(c) {
+    const campaign = _data.campaigns.find(cp => cp.id === c.campaignId);
+    const total = campaignEmailCount(campaign);
     const next = c.emailNumber + 1;
-    return [1, 2, 3, 4, 5, 6].map(n =>
+    return Array.from({ length: total }, (_, i) => i + 1).map(n =>
       `<span class="drip-dot ${c.sentDates[n] ? "drip-dot-sent" : n === next && c.status === "Active" ? "drip-dot-next" : ""}" title="Email ${n}${c.sentDates[n] ? " · sent " + fmtDate(c.sentDates[n]) : n === next ? " · next" : ""}"></span>`
     ).join("");
   }
 
   function renderContactCard(c, isDue) {
+    const campaign = _data.campaigns.find(cp => cp.id === c.campaignId);
+    const totalEmails = campaignEmailCount(campaign);
     const nextNum = c.emailNumber + 1;
-    const canDraft = nextNum <= 6 && ["Active", "OOO Paused"].includes(c.status);
-    const isReply = REPLY_TO[nextNum];
+    const canDraft = nextNum <= totalEmails && ["Active", "OOO Paused"].includes(c.status);
+    const emails = campaignEmails(campaign);
+    const nextEmailData = emails.find(e => e.number === nextNum);
+    const isReply = nextEmailData?.replyTo;
     const name = [c.firstName, c.lastName].filter(Boolean).join(" ") || c.company;
     return `
       <div class="drip-contact-row${isDue ? " drip-row-due" : ""}">
@@ -349,15 +395,19 @@
     const campaign = activeCampaign();
     if (!campaign) {
       el.innerHTML = `<div class="drip-no-campaign">No active campaign — <button class="link-button" id="dripCreateFirst" type="button">create one to get started</button></div>`;
-      document.getElementById("dripCreateFirst")?.addEventListener("click", openDripCampaignDialog);
+      document.getElementById("dripCreateFirst")?.addEventListener("click", () => openCampaignEditor(null));
       return;
     }
     const stats = campaignStats(campaign.id);
+    const totalEmails = campaignEmailCount(campaign);
     el.innerHTML = `
       <div class="drip-campaign-bar">
         <div class="drip-campaign-left">
           <div class="drip-campaign-name">${esc(campaign.name)}</div>
-          ${campaign.entities?.length ? `<div class="drip-campaign-meta">${campaign.entities.map(e => `<span class="import-tag import-tag-entity">${esc(e)}</span>`).join("")}</div>` : ""}
+          <div class="drip-campaign-meta">
+            ${campaign.entities?.length ? campaign.entities.map(e => `<span class="import-tag import-tag-entity">${esc(e)}</span>`).join("") : ""}
+            <span class="drip-email-count-badge">${totalEmails}-email sequence</span>
+          </div>
         </div>
         <div class="payton-stat-row">
           <div class="payton-stat"><span class="payton-stat-num">${stats.total}</span><span class="payton-stat-label">Contacts</span></div>
@@ -367,13 +417,15 @@
         </div>
         <div class="drip-header-actions">
           ${_data.campaigns.length > 1 ? `<button class="secondary-button btn-sm" id="dripSwitchBtn" type="button">Switch</button>` : ""}
+          <button class="secondary-button btn-sm" id="dripEditCampaignBtn" type="button">✏ Edit</button>
           <button class="secondary-button btn-sm" id="dripNewCampaignBtn" type="button">+ Campaign</button>
           <button class="secondary-button btn-sm" id="dripImportBtn" type="button">Import</button>
           <button class="secondary-button btn-sm" id="dripAddContactBtn" type="button">+ Contact</button>
         </div>
       </div>`;
     document.getElementById("dripSwitchBtn")?.addEventListener("click", openSwitchDialog);
-    document.getElementById("dripNewCampaignBtn")?.addEventListener("click", openDripCampaignDialog);
+    document.getElementById("dripEditCampaignBtn")?.addEventListener("click", () => openCampaignEditor(campaign.id));
+    document.getElementById("dripNewCampaignBtn")?.addEventListener("click", () => openCampaignEditor(null));
     document.getElementById("dripImportBtn")?.addEventListener("click", openDripImportDialog);
     document.getElementById("dripAddContactBtn")?.addEventListener("click", openDripAddContactDialog);
   }
@@ -410,27 +462,32 @@
     el.innerHTML = contacts.map(c => renderContactCard(c, false)).join("");
   }
 
-  function renderDripTemplates() {
+  function renderDripSequence() {
     const el = document.getElementById("dripTemplatesContent");
     if (!el) return;
-    const entity = document.getElementById("dripTemplateEntity")?.value || "K-12";
-    const mock = { firstName: "John", company: "Sample Organization", entity };
-    let html = `<div class="drip-template-grid">`;
-    for (let n = 1; n <= 6; n++) {
-      const tpl = buildDripEmail(mock, n);
-      const isReply = REPLY_TO[n];
-      html += `
+    const campaign = activeCampaign();
+    if (!campaign) { el.innerHTML = `<p class="empty-state">Create a campaign to see its email sequence.</p>`; return; }
+    const emails = campaignEmails(campaign);
+    el.innerHTML = `<div class="drip-template-grid">${emails.map(em => {
+      const previewBody = em.body.length > 200 ? em.body.slice(0, 200) + "…" : em.body;
+      return `
         <div class="drip-template-card">
           <div class="drip-template-header">
-            <span class="drip-template-num">Email ${n}</span>
-            <span class="drip-template-day">Day ${SEQUENCE_DAYS[n]}${isReply ? " · ↩ reply to Email " + REPLY_TO[n] : ""}</span>
+            <span class="drip-template-num">Email ${em.number}</span>
+            <span class="drip-template-day">Day ${em.dayOffset}${em.replyTo ? " · ↩ reply to Email " + em.replyTo : ""}</span>
+            <button class="mini-button" type="button" data-edit-email="${em.number}">Edit</button>
           </div>
-          <div class="drip-template-subject">${esc(tpl.subject)}</div>
-          <pre class="drip-template-body">${esc(tpl.body)}</pre>
+          <div class="drip-template-subject">${esc(em.subject)}</div>
+          <pre class="drip-template-body">${esc(previewBody)}</pre>
         </div>`;
-    }
-    html += `</div>`;
-    el.innerHTML = html;
+    }).join("")}</div>`;
+
+    el.querySelectorAll("[data-edit-email]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const num = parseInt(btn.dataset.editEmail, 10);
+        openCampaignEditor(campaign.id, num);
+      });
+    });
   }
 
   function renderDrip() {
@@ -443,17 +500,127 @@
     document.querySelectorAll(".drip-sub-tab").forEach(btn => {
       btn.classList.toggle("is-active", btn.dataset.dripView === _viewMode);
     });
-    if (_viewMode === "queue") renderDripQueue();
+    if (_viewMode === "queue")     renderDripQueue();
     else if (_viewMode === "contacts") renderDripContacts();
-    else if (_viewMode === "templates") renderDripTemplates();
+    else if (_viewMode === "templates") renderDripSequence();
+  }
+
+  // ── Campaign Editor ───────────────────────────────────────────────
+
+  function openCampaignEditor(campaignId = null, jumpToEmail = null) {
+    _editingCampaignId = campaignId;
+    const campaign = campaignId ? _data.campaigns.find(c => c.id === campaignId) : null;
+    const count = campaign ? campaignEmailCount(campaign) : 6;
+    _editorEmails = campaign?.emails?.length
+      ? JSON.parse(JSON.stringify(campaign.emails))
+      : defaultEmailTemplates(count);
+    _editorCurrentTab = jumpToEmail || 1;
+
+    document.getElementById("dripCampaignDialogTitle").textContent = campaignId ? "Edit Campaign" : "New Campaign";
+    document.getElementById("dripCampaignName").value = campaign?.name || "";
+    const countEl = document.getElementById("dripEmailCount");
+    if (countEl) countEl.value = count;
+
+    renderEntityCheckboxes(campaign?.entities || []);
+    renderStageCheckboxes(campaign?.stages || []);
+    renderEditorEmailTabs(count);
+    renderEditorEmailPanel(_editorCurrentTab);
+
+    document.getElementById("dripCampaignDialog").showModal();
+  }
+
+  function renderEntityCheckboxes(selected) {
+    const el = document.getElementById("dripEntityCheckboxes");
+    if (!el) return;
+    const entities = allEntities();
+    el.innerHTML = entities.map(e =>
+      `<label><input type="checkbox" name="campaignEntities" value="${esc(e)}" ${selected.includes(e) ? "checked" : ""} /> ${esc(e)}</label>`
+    ).join("");
+  }
+
+  function renderStageCheckboxes(selected) {
+    const el = document.getElementById("dripStageCheckboxes");
+    if (!el) return;
+    el.innerHTML = ACCOUNT_STAGES.map(s =>
+      `<label><input type="checkbox" name="campaignStages" value="${esc(s)}" ${selected.includes(s) ? "checked" : ""} /> ${esc(s)}</label>`
+    ).join("");
+  }
+
+  function renderEditorEmailTabs(count) {
+    const el = document.getElementById("dripEmailTabs");
+    if (!el) return;
+    el.innerHTML = Array.from({ length: count }, (_, i) => i + 1).map(n =>
+      `<button class="sort-tab${n === _editorCurrentTab ? " is-active" : ""}" type="button" data-editor-email-tab="${n}">Email ${n}</button>`
+    ).join("");
+  }
+
+  function renderEditorEmailPanel(num) {
+    _editorCurrentTab = num;
+    const el = document.getElementById("dripEmailEditorPanel");
+    if (!el) return;
+    const emailData = _editorEmails.find(e => e.number === num) || defaultEmailTemplate(num);
+    const replyOptions = Array.from({ length: num - 1 }, (_, i) => i + 1)
+      .map(n => `<option value="${n}"${emailData.replyTo === n ? " selected" : ""}>Reply to Email ${n}</option>`)
+      .join("");
+    el.innerHTML = `
+      <div class="drip-email-editor">
+        <div class="drip-email-meta-row">
+          <label class="drip-meta-field"><span>Send on Day</span>
+            <input type="number" id="editorDayOffset" min="0" max="365" value="${emailData.dayOffset}" />
+          </label>
+          <label class="drip-meta-field"><span>Thread</span>
+            <select id="editorReplyTo">
+              <option value="">New thread</option>${replyOptions}
+            </select>
+          </label>
+        </div>
+        <label class="full-field"><span>Subject</span>
+          <input type="text" id="editorSubject" value="${esc(emailData.subject)}" placeholder="Email subject line" />
+        </label>
+        <div class="drip-placeholder-toolbar">
+          <span class="drip-placeholder-label">Insert:</span>
+          ${PLACEHOLDERS.map(p => `<button class="placeholder-chip" type="button" data-insert-placeholder="${esc(p.value)}">${esc(p.label)}</button>`).join("")}
+        </div>
+        <label class="full-field"><span>Body</span>
+          <textarea id="editorBody" class="note-box drip-editor-body" rows="12">${esc(emailData.body)}</textarea>
+        </label>
+      </div>`;
+
+    document.querySelectorAll("[data-editor-email-tab]").forEach(btn => {
+      btn.classList.toggle("is-active", parseInt(btn.dataset.editorEmailTab) === num);
+    });
+  }
+
+  function saveCurrentEditorTab() {
+    const num = _editorCurrentTab;
+    const dayOffset = parseInt(document.getElementById("editorDayOffset")?.value || "0", 10);
+    const replyToVal = document.getElementById("editorReplyTo")?.value;
+    const replyTo = replyToVal ? parseInt(replyToVal, 10) : null;
+    const subject = document.getElementById("editorSubject")?.value || "";
+    const body    = document.getElementById("editorBody")?.value || "";
+    const idx = _editorEmails.findIndex(e => e.number === num);
+    const obj = { number: num, dayOffset, replyTo, subject, body };
+    if (idx >= 0) _editorEmails[idx] = obj;
+    else _editorEmails.push(obj);
+    _editorEmails.sort((a, b) => a.number - b.number);
+  }
+
+  function handleEmailCountChange(newCount) {
+    saveCurrentEditorTab();
+    const oldCount = _editorEmails.length;
+    if (newCount > oldCount) {
+      for (let n = oldCount + 1; n <= newCount; n++) {
+        _editorEmails.push(defaultEmailTemplate(n));
+      }
+    } else {
+      _editorEmails = _editorEmails.filter(e => e.number <= newCount);
+    }
+    if (_editorCurrentTab > newCount) _editorCurrentTab = newCount;
+    renderEditorEmailTabs(newCount);
+    renderEditorEmailPanel(_editorCurrentTab);
   }
 
   // ── Dialogs ───────────────────────────────────────────────────────
-
-  function openDripCampaignDialog() {
-    document.getElementById("dripCampaignForm")?.reset();
-    document.getElementById("dripCampaignDialog")?.showModal();
-  }
 
   function openSwitchDialog() {
     const el = document.getElementById("dripSwitchList");
@@ -475,6 +642,10 @@
 
   function openDripAddContactDialog() {
     if (!activeCampaign()) { (window.showToast || alert)("Create a campaign first.", "warning"); return; }
+    const sel = document.getElementById("dripAddEntitySelect");
+    if (sel) {
+      sel.innerHTML = allEntities().map(e => `<option>${esc(e)}</option>`).join("");
+    }
     document.getElementById("dripAddContactForm")?.reset();
     document.getElementById("dripAddContactDialog")?.showModal();
   }
@@ -488,14 +659,14 @@
 
   function populateDripImportFilters() {
     const stageEl = document.getElementById("dripImportStageFilter");
-    if (stageEl && stageEl.children.length <= 1) {
+    if (stageEl) {
       stageEl.innerHTML = `<option value="">All stages</option>` +
         ACCOUNT_STAGES.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join("");
     }
     const entityEl = document.getElementById("dripImportEntityFilter");
-    if (entityEl && entityEl.children.length <= 1) {
+    if (entityEl) {
       entityEl.innerHTML = `<option value="">All entities</option>` +
-        ENTITIES.filter(e => e !== "Other").map(e => `<option value="${esc(e)}">${esc(e)}</option>`).join("");
+        allEntities().map(e => `<option value="${esc(e)}">${esc(e)}</option>`).join("");
     }
   }
 
@@ -504,7 +675,7 @@
     if (!el || typeof window.cleanAccounts !== "function") return;
     const existing = new Set(_data.contacts.filter(c => c.campaignId === _activeCampaignId).map(c => c.email.toLowerCase()));
     const entityFilter = document.getElementById("dripImportEntityFilter")?.value || "";
-    const stageFilter  = document.getElementById("dripImportStageFilter")?.value || "";
+    const stageFilter  = document.getElementById("dripImportStageFilter")?.value  || "";
     const search = document.getElementById("dripImportSearch")?.value?.toLowerCase() || "";
 
     const accounts = window.cleanAccounts()
@@ -536,9 +707,11 @@
     _pendingEmailContactId = contactId;
     _pendingEmailNumber = emailNumber;
     const email = buildDripEmail(contact, emailNumber);
+    const campaign = _data.campaigns.find(c => c.id === contact.campaignId);
+    const totalEmails = campaignEmailCount(campaign);
     const name = [contact.firstName, contact.lastName].filter(Boolean).join(" ") || contact.company;
 
-    document.getElementById("dripEmailTitle").textContent = `Email ${emailNumber} of 6 — ${name}`;
+    document.getElementById("dripEmailTitle").textContent = `Email ${emailNumber} of ${totalEmails} — ${name}`;
     document.getElementById("dripEmailTo").value = contact.email;
     document.getElementById("dripEmailSubject").value = email.subject;
     document.getElementById("dripEmailBody").value = email.body;
@@ -554,7 +727,6 @@
     const panel = document.getElementById("callListDripPanel");
     if (!panel) return;
 
-    // Sub-tab clicks
     panel.addEventListener("click", (e) => {
       const tab = e.target.closest("[data-drip-view]");
       if (tab) { _viewMode = tab.dataset.dripView; renderDrip(); return; }
@@ -574,19 +746,58 @@
       if (sel) updateContactStatus(sel.dataset.dripStatus, sel.value);
     });
 
-    // Campaign form
+    // Campaign editor dialog
+    const campaignDialog = document.getElementById("dripCampaignDialog");
+
+    campaignDialog?.addEventListener("click", (e) => {
+      // Email tab switching
+      const tab = e.target.closest("[data-editor-email-tab]");
+      if (tab) {
+        saveCurrentEditorTab();
+        renderEditorEmailPanel(parseInt(tab.dataset.editorEmailTab, 10));
+        return;
+      }
+      // Placeholder insertion
+      const ph = e.target.closest("[data-insert-placeholder]");
+      if (ph) {
+        const textarea = document.getElementById("editorBody");
+        if (!textarea) return;
+        const val = ph.dataset.insertPlaceholder;
+        const start = textarea.selectionStart;
+        const end   = textarea.selectionEnd;
+        textarea.value = textarea.value.slice(0, start) + val + textarea.value.slice(end);
+        textarea.selectionStart = textarea.selectionEnd = start + val.length;
+        textarea.focus();
+        return;
+      }
+    });
+
+    document.getElementById("dripEmailCount")?.addEventListener("input", (e) => {
+      const n = Math.max(1, Math.min(12, parseInt(e.target.value, 10) || 6));
+      handleEmailCountChange(n);
+    });
+
     document.getElementById("dripCampaignForm")?.addEventListener("submit", (e) => {
       e.preventDefault();
-      const form = new FormData(e.currentTarget);
-      const name = (form.get("campaignName") || "").trim();
+      saveCurrentEditorTab();
+      const form = e.currentTarget;
+      const name = (document.getElementById("dripCampaignName")?.value || "").trim();
       if (!name) return;
-      const entities = [...e.currentTarget.querySelectorAll('[name="campaignEntities"]:checked')].map(i => i.value);
-      const stages   = [...e.currentTarget.querySelectorAll('[name="campaignStages"]:checked')].map(i => i.value);
-      createCampaign(name, entities, stages);
-      document.getElementById("dripCampaignDialog")?.close();
-      (window.showToast || alert)("Campaign created.", "success");
+      const entities = [...form.querySelectorAll('[name="campaignEntities"]:checked')].map(i => i.value);
+      const stages   = [...form.querySelectorAll('[name="campaignStages"]:checked')].map(i => i.value);
+      const emails   = [..._editorEmails].sort((a, b) => a.number - b.number);
+      if (_editingCampaignId) {
+        updateCampaign(_editingCampaignId, name, entities, stages, emails);
+        (window.showToast || alert)("Campaign updated.", "success");
+      } else {
+        createCampaign(name, entities, stages, emails);
+        (window.showToast || alert)("Campaign created.", "success");
+      }
+      campaignDialog?.close();
     });
-    document.getElementById("closeDripCampaignDialog")?.addEventListener("click", () => document.getElementById("dripCampaignDialog")?.close());
+
+    document.getElementById("cancelDripCampaignBtn")?.addEventListener("click", () => campaignDialog?.close());
+    document.getElementById("closeDripCampaignDialog")?.addEventListener("click", () => campaignDialog?.close());
 
     // Add contact form
     document.getElementById("dripAddContactForm")?.addEventListener("submit", (e) => {
@@ -631,14 +842,11 @@
       (window.showToast || alert)(`${accts.length} contact${accts.length === 1 ? "" : "s"} added to sequence.`, "success");
     });
 
-    // Template entity filter
-    document.getElementById("dripTemplateEntity")?.addEventListener("change", renderDripTemplates);
-
-    // Email dialog
+    // Email draft dialog
     document.getElementById("closeDripEmailDialog")?.addEventListener("click", () => document.getElementById("dripEmailDialog")?.close());
     document.getElementById("dripCopyEmailBtn")?.addEventListener("click", () => {
       const subject = document.getElementById("dripEmailSubject")?.value || "";
-      const body    = document.getElementById("dripEmailBody")?.value || "";
+      const body    = document.getElementById("dripEmailBody")?.value    || "";
       navigator.clipboard.writeText(`Subject: ${subject}\n\n${body}`)
         .then(() => (window.showToast || alert)("Copied to clipboard.", "success"))
         .catch(() => (window.showToast || alert)("Copy failed — select manually.", "warning"));
