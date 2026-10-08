@@ -560,8 +560,18 @@
             }
           }
           else if (key === "garlandGeocoords") {
-            // Geocode cache is a plain object {accountId: {lat,lng}} — just union keys, local wins.
+            // Geocode cache is a plain object {accountId: {lat,lng}} — union keys, local wins.
             toPush = { ...(cloudVal || {}), ...(localVal || {}) };
+          }
+          else if (key === "garlandTerritorySettings") {
+            // Settings object with array fields — union each array, local scalars win.
+            const merged = { ...(cloudVal || {}), ...(localVal || {}) };
+            for (const k of ["entities", "counties", "hiddenEntities", "hiddenCounties"]) {
+              const cArr = Array.isArray(cloudVal?.[k]) ? cloudVal[k] : [];
+              const lArr = Array.isArray(localVal?.[k]) ? localVal[k] : [];
+              merged[k] = [...new Set([...cArr, ...lArr])];
+            }
+            toPush = merged;
           }
           else conflicted = true;
         } else {
