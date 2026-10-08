@@ -1682,6 +1682,28 @@ function sheetNoteActivityEntries(account) {
   return entries;
 }
 
+function migrateContactedAccountStages() {
+  const key = "garlandMigration_contactedStages_v1";
+  if (localStorage.getItem(key)) return;
+  const legacyStages = new Set(["Client", "Contacted"]);
+  let changed = false;
+  data.accounts.forEach(account => {
+    if (!legacyStages.has(account.clientRanking)) return;
+    const hasActivity = (state.activities[account.id] || []).length > 0;
+    const next = hasActivity ? "Unresponsive" : "Prospecting";
+    if (account.clientRanking !== next) {
+      const rec = savedCrm.accounts.find(a => a.id === account.id);
+      if (rec) { rec.clientRanking = next; changed = true; }
+      if (!savedCrm.accounts.some(a => a.id === account.id)) {
+        savedCrm.edits.accounts[account.id] = { ...(savedCrm.edits.accounts[account.id] || {}), clientRanking: next };
+        changed = true;
+      }
+    }
+  });
+  if (changed) saveCrm();
+  localStorage.setItem(key, "1");
+}
+
 function migrateSheetNotesToActivities() {
   if (localStorage.getItem(sheetActivityImportKey)) return;
   ensureAccountsForSheetNoteClients();
@@ -7105,6 +7127,35 @@ function showDetail(type, id) {
   byId("detailDrawer").classList.add("is-open");
 }
 
+function accountDripStatus(accountId) {
+  try {
+    const dripData = readStorageJson("garlandDrip", { contacts: [] });
+    const contacts = (dripData.contacts || []).filter(c => c.accountId === accountId);
+    if (!contacts.length) return "";
+    const esc = (s) => escapeHtml(String(s || ""));
+    const statusClass = { Active: "drip-status-active", Replied: "drip-status-replied", "OOO Paused": "drip-status-ooo", Unresponsive: "drip-status-unresponsive", Graveyard: "drip-status-graveyard", Completed: "drip-status-completed" };
+    const rows = contacts.map(c => {
+      const name = [c.firstName, c.lastName].filter(Boolean).join(" ") || c.company || "Contact";
+      const dots = [1,2,3,4,5,6].map(n =>
+        `<span class="drip-dot ${c.sentDates?.[n] ? "drip-dot-sent" : n === c.emailNumber + 1 && c.status === "Active" ? "drip-dot-next" : ""}" title="Email ${n}${c.sentDates?.[n] ? " · sent" : n === c.emailNumber + 1 ? " · next" : ""}"></span>`
+      ).join("");
+      const logLines = (c.log || []).map(l => `<div class="drip-log-line">${esc(l.logLabel)} · ${esc(l.subject)}</div>`).join("");
+      return `<div class="drip-status-row">
+        <div class="drip-status-row-top">
+          <span class="drip-contact-name">${esc(name)}</span>
+          <span class="drip-status-badge ${statusClass[c.status] || ""}">${esc(c.status)}</span>
+          <span class="drip-progress-dots">${dots}</span>
+        </div>
+        ${logLines ? `<div class="drip-log-lines">${logLines}</div>` : ""}
+      </div>`;
+    }).join("");
+    return `<section class="detail-section drip-detail-section">
+      <h4>Email Sequence</h4>
+      ${rows}
+    </section>`;
+  } catch (_) { return ""; }
+}
+
 function showAccountDetail(record) {
   // Track last viewed account for AI Assistant hub card (non-synced UI state)
   try {
@@ -7168,6 +7219,7 @@ function showAccountDetail(record) {
       </div>
     </section>
 
+    ${accountDripStatus(record.id)}
     <section class="detail-section">
       <h4>CRM Note</h4>
       <textarea class="note-box" data-note-id="${record.id}" placeholder="Add a private note for this browser">${escapeHtml(noteValue)}</textarea>
@@ -7763,6 +7815,7 @@ function renderNoteTaker() {
   const records = noteTakerRecords().filter(includesSearch);
   byId("noteTakerCount").textContent = `${records.length} notes`;
   byId("noteTakerLog").innerHTML = records.length ? records.map(activityTimelineItem).join("") : empty("No notes saved yet.");
+  renderAttendanceChart();
 }
 
 function syncNoteClientFields() {
@@ -7790,6 +7843,100 @@ function resetNoteTakerForm() {
   setNoteNewAccountVisible(false);
   updateNoteMediaSummary();
   renderNoteTaker();
+}
+
+// ── Attendance Chart ──────────────────────────────────────────────────────────
+const _attendance = { seats: [], youIdx: -1 };
+
+function renderAttendanceChart() {
+  const wrap = byId("attendanceChartWrap");
+  if (!wrap) return;
+  const n = Math.min(20, Math.max(2, parseInt(byId("attendeeCountInput")?.value || "6", 10)));
+  if (_attendance.seats.length !== n) {
+    _attendance.seats = Array.from({ length: n }, (_, i) => _attendance.seats[i] || { name: "", note: "" });
+    if (_attendance.youIdx >= n) _attendance.youIdx = -1;
+  }
+  // Layout: table box + seats arranged in an oval around it
+  const W = 340, H = 230, tW = 140, tH = 80;
+  const cx = W / 2, cy = H / 2;
+  const rx = cx - 28, ry = cy - 28;
+  const R = 18;
+  const seats = _attendance.seats.map((s, i) => {
+    const angle = (i / n) * 2 * Math.PI - Math.PI / 2;
+    const x = cx + rx * Math.cos(angle);
+    const y = cy + ry * Math.sin(angle);
+    return { ...s, x, y, i, angle };
+  });
+  const tableFill = getComputedStyle(document.documentElement).getPropertyValue("--panel").trim() || "#fff";
+  const lineColor = getComputedStyle(document.documentElement).getPropertyValue("--line").trim() || "#ddd";
+  const accentColor = "#e07b35";
+  const svgSeats = seats.map(seat => {
+    const isYou = seat.i === _attendance.youIdx;
+    const hasName = seat.name.trim();
+    const fill = isYou ? accentColor : hasName ? "#4a90d9" : tableFill;
+    const stroke = isYou ? accentColor : hasName ? "#3a7bc8" : lineColor;
+    const textColor = (isYou || hasName) ? "#fff" : "#888";
+    const label = isYou ? "You" : hasName ? seat.name.split(" ")[0].slice(0, 5) : "+";
+    return `<g class="attendance-seat" data-seat="${seat.i}" style="cursor:pointer">
+      <circle cx="${seat.x.toFixed(1)}" cy="${seat.y.toFixed(1)}" r="${R}" fill="${fill}" stroke="${stroke}" stroke-width="2"/>
+      <text x="${seat.x.toFixed(1)}" y="${(seat.y + 4.5).toFixed(1)}" text-anchor="middle" font-size="9" fill="${textColor}" font-weight="${hasName || isYou ? "600" : "400"}" pointer-events="none">${escapeHtml(label)}</text>
+    </g>`;
+  }).join("");
+  wrap.innerHTML = `
+    <svg class="attendance-svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+      <rect x="${(cx - tW/2).toFixed(1)}" y="${(cy - tH/2).toFixed(1)}" width="${tW}" height="${tH}" rx="8" fill="${tableFill}" stroke="${lineColor}" stroke-width="2"/>
+      <text x="${cx}" y="${(cy + 5).toFixed(1)}" text-anchor="middle" font-size="12" fill="#888">Table</text>
+      ${svgSeats}
+    </svg>
+    <div id="attendanceSeatEditor" class="attendance-seat-editor" hidden></div>`;
+  wrap.querySelectorAll(".attendance-seat").forEach(g => {
+    g.addEventListener("click", () => openAttendanceSeatEditor(parseInt(g.dataset.seat, 10), seats[parseInt(g.dataset.seat, 10)]));
+  });
+}
+
+function openAttendanceSeatEditor(idx, seatData) {
+  const editor = byId("attendanceSeatEditor");
+  if (!editor) return;
+  const seat = _attendance.seats[idx] || { name: "", note: "" };
+  const isYou = _attendance.youIdx === idx;
+  editor.hidden = false;
+  editor.innerHTML = `
+    <div class="seat-editor-inner">
+      <strong>Seat ${idx + 1}</strong>
+      <label>Name <input id="seatNameInput" type="text" value="${escapeHtml(seat.name)}" placeholder="Full name" /></label>
+      <label>Note <input id="seatNoteInput" type="text" value="${escapeHtml(seat.note)}" placeholder="Role, title, notes…" /></label>
+      <div class="seat-editor-actions">
+        <button class="mini-button ${isYou ? "is-active" : ""}" id="seatMarkYouBtn" type="button">${isYou ? "✓ That's You" : "Mark as You"}</button>
+        <button class="mini-button" id="seatClearBtn" type="button">Clear</button>
+        <button class="primary-button" id="seatSaveBtn" type="button">Save</button>
+      </div>
+    </div>`;
+  byId("seatSaveBtn").addEventListener("click", () => {
+    _attendance.seats[idx] = { name: byId("seatNameInput").value, note: byId("seatNoteInput").value };
+    editor.hidden = true;
+    renderAttendanceChart();
+  });
+  byId("seatClearBtn").addEventListener("click", () => {
+    _attendance.seats[idx] = { name: "", note: "" };
+    if (_attendance.youIdx === idx) _attendance.youIdx = -1;
+    editor.hidden = true;
+    renderAttendanceChart();
+  });
+  byId("seatMarkYouBtn").addEventListener("click", () => {
+    _attendance.youIdx = _attendance.youIdx === idx ? -1 : idx;
+    renderAttendanceChart();
+    openAttendanceSeatEditor(idx, _attendance.seats[idx]);
+  });
+  byId("seatNameInput").focus();
+}
+
+function attendanceToText() {
+  const lines = _attendance.seats.map((s, i) => {
+    const you = i === _attendance.youIdx ? " (You)" : "";
+    const name = s.name.trim() || `Seat ${i + 1}`;
+    return s.note.trim() ? `• ${name}${you} — ${s.note}` : `• ${name}${you}`;
+  });
+  return `\n\nAttendees:\n${lines.join("\n")}`;
 }
 
 function pluralizeFile(count, label) {
@@ -12359,6 +12506,11 @@ function bindEvents() {
     event.preventDefault();
     saveNoteTakerEntry(event.currentTarget);
   });
+  byId("attendeeCountInput")?.addEventListener("input", renderAttendanceChart);
+  byId("addAttendanceToNoteBtn")?.addEventListener("click", () => {
+    const ta = byId("noteTakerForm")?.elements.note;
+    if (ta) { ta.value = (ta.value || "").trimEnd() + attendanceToText(); ta.focus(); }
+  });
   document.body.addEventListener("click", async (event) => {
     const toggleChecklistNa = event.target.closest("[data-toggle-checklist-na]");
     if (toggleChecklistNa) {
@@ -13358,6 +13510,7 @@ standardizeStageLabels();
 standardizeProjectTypeLabels();
 standardizeAbcScoreLabels();
 applyRequestedDataCleanup();
+migrateContactedAccountStages();
 applyMissingAddressFixes();
 migrateSheetNotesToActivities();
 renderFilters();

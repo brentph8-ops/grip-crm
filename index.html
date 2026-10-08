@@ -1100,6 +1100,19 @@
                     <small id="noteAudioSummary">Record a memo on your phone or upload audio.</small>
                   </div>
                 </div>
+                <!-- Attendance List -->
+                <div class="note-attendance-section" id="noteAttendanceSection">
+                  <div class="note-attendance-header">
+                    <h4>Meeting Attendance</h4>
+                    <div class="note-attendance-controls">
+                      <label class="attendance-count-label">Attendees
+                        <input id="attendeeCountInput" type="number" min="2" max="20" value="6" class="attendance-count-input" />
+                      </label>
+                      <button class="mini-button" id="addAttendanceToNoteBtn" type="button">Add to Note</button>
+                    </div>
+                  </div>
+                  <div id="attendanceChartWrap" class="attendance-chart-wrap"></div>
+                </div>
                 <div class="modal-actions">
                   <button class="secondary-button" id="clearNoteTakerButton" type="button">Clear</button>
                   <button class="primary-button" type="submit">Save note</button>

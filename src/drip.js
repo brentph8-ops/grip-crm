@@ -237,7 +237,10 @@
 
     if (c.accountId && typeof window.addAccountActivity === "function") {
       const name = [c.firstName, c.lastName].filter(Boolean).join(" ") || c.company;
-      window.addAccountActivity(c.accountId, `Email ${emailNumber} of 6 sent to ${name} (${c.email}) · "${subject}"`, false, { source: "Email List" });
+      window.addAccountActivity(c.accountId, `Email ${emailNumber} of 6 sent to ${name} (${c.email}) · "${subject}"`, false, { source: "Email List", contactName: name });
+    }
+    if (emailNumber === 1 && c.accountId && typeof window.gripApp?.persistRecordEdit === "function") {
+      window.gripApp.persistRecordEdit("account", c.accountId, "clientRanking", "Unresponsive", false);
     }
 
     saveData();

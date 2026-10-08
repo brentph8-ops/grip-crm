@@ -534,6 +534,11 @@
       const cloudVal = row ? row.data_value : undefined;
       let toPush;
       let conflicted = false;
+      // If this is a forced retry after a conflict, local always wins.
+      if (entry && entry.force) {
+        toPush = localVal;
+        const q2 = readPendingQueue(); if (q2[key]) { delete q2[key].force; writePendingQueue(q2); }
+      } else
       try {
         if (row && !sameValue(cloudVal, sanitizeForSync(key, baseVal))) {
           // Cloud moved since our base.
@@ -1175,6 +1180,8 @@
     for (const key of Object.keys(q)) {
       if (q[key] && q[key].error === "conflict") {
         q[key].error = false;
+        // Force local wins on retry — local data is always the most recent state.
+        q[key].force = true;
         retried = true;
       }
     }

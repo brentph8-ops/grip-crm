@@ -1928,6 +1928,12 @@ textarea {
 /* Detail project stage pills */
 .detail-project-stages { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 
+/* Drip email status in account detail */
+.drip-detail-section .drip-status-row { border: 1px solid var(--line); border-radius: 6px; padding: 10px; margin-bottom: 8px; background: var(--panel); }
+.drip-detail-section .drip-status-row-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.drip-log-lines { margin-top: 6px; display: flex; flex-direction: column; gap: 2px; }
+.drip-log-line { font-size: 0.78rem; color: var(--muted); padding-left: 4px; border-left: 2px solid var(--line); }
+
 .call-rule-list,
 .call-checklist {
   display: grid;
@@ -4552,6 +4558,23 @@ textarea {
   color: var(--muted);
   font-size: 0.82rem;
 }
+
+.note-attendance-section { border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 12px; background: var(--bg, #f7f7f7); }
+.note-attendance-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.note-attendance-header h4 { margin: 0; font-size: 0.9rem; }
+.note-attendance-controls { display: flex; align-items: center; gap: 8px; }
+.attendance-count-label { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 600; }
+.attendance-count-input { width: 52px; padding: 3px 6px; border: 1px solid var(--line); border-radius: 4px; font-size: 0.85rem; text-align: center; }
+.attendance-chart-wrap { position: relative; }
+.attendance-svg { width: 100%; max-width: 340px; height: auto; display: block; margin: 0 auto; }
+.attendance-seat circle { transition: fill 0.15s; }
+.attendance-seat:hover circle { opacity: 0.85; }
+.attendance-seat-editor { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-top: 8px; }
+.seat-editor-inner { display: flex; flex-direction: column; gap: 8px; }
+.seat-editor-inner label { display: flex; flex-direction: column; gap: 3px; font-size: 0.82rem; font-weight: 600; }
+.seat-editor-inner input { padding: 5px 8px; border: 1px solid var(--line); border-radius: 4px; font-size: 0.88rem; }
+.seat-editor-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.seat-editor-actions .is-active { background: var(--accent, #e07b35); color: #fff; border-color: var(--accent, #e07b35); }
 
 .note-media-grid {
   display: grid;
