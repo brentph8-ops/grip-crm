@@ -11655,7 +11655,7 @@ function setView(view) {
   }
   const projectSubViews = ["punchList", "takeoffEstimator", "warrantySummary", "coverageRate"];
   const territorySubViews = ["accounts", "contacts", "contractors"];
-  const activitySubViews = ["callList", "tasks", "noteTaker", "followUpQueue", "newsReport"];
+  const activitySubViews = ["callList", "emailList", "tasks", "noteTaker", "followUpQueue", "newsReport"];
   document.querySelectorAll(".nav-button").forEach((button) => {
     const isMatch = button.dataset.view === view;
     const isProjectParent = button.dataset.view === "projects" && projectSubViews.includes(view) && !button.classList.contains("nav-sub-button");
@@ -11664,7 +11664,7 @@ function setView(view) {
     const isActivityParent = button.dataset.view === "activityLog" && activitySubViews.includes(view) && !button.classList.contains("nav-sub-button");
     button.classList.toggle("is-active", isMatch || isProjectParent || isTerritoryParent || isAccountsForContacts || isActivityParent);
   });
-  const overflowViews = ["punchList", "takeoffEstimator", "warrantySummary", "coverageRate", "noteTaker", "activityLog", "scopeDatabase", "outreach", "tasks", "followUpQueue", "newsReport"];
+  const overflowViews = ["punchList", "takeoffEstimator", "warrantySummary", "coverageRate", "noteTaker", "activityLog", "scopeDatabase", "outreach", "tasks", "followUpQueue", "newsReport", "emailList"];
   byId("mobileMoreButton")?.classList.toggle("is-active", overflowViews.includes(view));
   document.querySelectorAll(".view").forEach((section) => section.classList.toggle("is-active", section.id === `${view}View`));
   if (view === "newsReport") renderNewsReport();
@@ -11674,12 +11674,13 @@ function setView(view) {
   if (view === "warrantySummary") renderWarrantySummaryChart();
   if (view === "coverageRate") renderCoverageRate();
   if (view === "noteTaker") renderNoteTaker();
+  if (view === "emailList") { window.gripDrip?.render?.(); }
   if (view === "outreach") { if (window.gripOutreach) window.gripOutreach.render(); }
   if (view === "today")     { if (window.gripToday)    window.gripToday.render(); }
   if (view === "pipeline")  { if (window.gripPipeline) window.gripPipeline.render(); }
   if (view === "territory" || view === "liveMap") { if (window.gripMap) window.gripMap.render(); }
   if (view === "contacts") renderContacts();
-  const _viewTitles = { today: "Today", dashboard: "Dashboard", pipeline: "Pipeline", territory: "Territory", accounts: "Accounts", contacts: "Contacts", projects: "Projects", punchList: "Punch List", takeoffEstimator: "Takeoff Estimator", warrantySummary: "Warranty Summary Chart", coverageRate: "Coverage Rates", proposals: "Proposals", scopeDatabase: "Scope of Work", tasks: "Tasks", callList: "Call List", followUpQueue: "Follow-Up Queue", activityLog: "Activity Log", newsReport: "Your News Report", contractors: "Contractors", noteTaker: "Note Taker", outreach: "Assistant", liveMap: "Live Account Map" };
+  const _viewTitles = { today: "Today", dashboard: "Dashboard", pipeline: "Pipeline", territory: "Territory", accounts: "Accounts", contacts: "Contacts", projects: "Projects", punchList: "Punch List", takeoffEstimator: "Takeoff Estimator", warrantySummary: "Warranty Summary Chart", coverageRate: "Coverage Rates", proposals: "Proposals", scopeDatabase: "Scope of Work", tasks: "Tasks", callList: "Call List", emailList: "Email List", followUpQueue: "Follow-Up Queue", activityLog: "Activity Log", newsReport: "Your News Report", contractors: "Contractors", noteTaker: "Note Taker", outreach: "Assistant", liveMap: "Live Account Map" };
   const _resolvedTitle = _viewTitles[view] || view;
   byId("viewTitle").textContent = _resolvedTitle;
   updateMobileViewLabel(_resolvedTitle);

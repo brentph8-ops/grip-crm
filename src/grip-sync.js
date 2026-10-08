@@ -559,6 +559,10 @@
               toPush = mergeRecordChanges(key, cloudVal, edits);
             }
           }
+          else if (key === "garlandGeocoords") {
+            // Geocode cache is a plain object {accountId: {lat,lng}} — just union keys, local wins.
+            toPush = { ...(cloudVal || {}), ...(localVal || {}) };
+          }
           else conflicted = true;
         } else {
           toPush = localVal;
