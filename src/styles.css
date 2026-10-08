@@ -2793,6 +2793,14 @@ textarea {
   color: var(--ink);
   padding: 0 14px;
 }
+.danger-button {
+  min-height: 40px;
+  border: 1px solid #dc2626;
+  background: transparent;
+  color: #dc2626;
+  padding: 0 14px;
+}
+.danger-button:hover { background: #dc2626; color: #fff; }
 
 #newTaskButton,
 [data-add-task-account] {

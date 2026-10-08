@@ -419,7 +419,7 @@
           ${stats.dueToday ? `<div class="payton-stat payton-stat-warn"><span class="payton-stat-num">${stats.dueToday}</span><span class="payton-stat-label">Due Today</span></div>` : ""}
         </div>
         <div class="drip-header-actions">
-          ${_data.campaigns.length > 1 ? `<button class="secondary-button btn-sm" id="dripSwitchBtn" type="button">Switch</button>` : ""}
+          <button class="secondary-button btn-sm" id="dripSwitchBtn" type="button">Campaigns</button>
           <button class="secondary-button btn-sm" id="dripEditCampaignBtn" type="button">✏ Edit</button>
           <button class="secondary-button btn-sm" id="dripNewCampaignBtn" type="button">+ Campaign</button>
           <button class="secondary-button btn-sm" id="dripImportBtn" type="button">Import</button>
@@ -632,6 +632,24 @@
 
   // ── Dialogs ───────────────────────────────────────────────────────
 
+  function deleteCampaign(id) {
+    const c = _data.campaigns.find(c => c.id === id);
+    if (!c) return;
+    const contactCount = campaignContacts(id).length;
+    const msg = contactCount
+      ? `Delete "${c.name}"? This will also remove ${contactCount} contact${contactCount === 1 ? "" : "s"} from the sequence.`
+      : `Delete "${c.name}"?`;
+    if (!confirm(msg)) return;
+    _data.campaigns = _data.campaigns.filter(c => c.id !== id);
+    _data.contacts  = _data.contacts.filter(c => c.campaignId !== id);
+    if (_activeCampaignId === id) {
+      _activeCampaignId = _data.campaigns.find(c => c.status === "active")?.id || _data.campaigns[0]?.id || null;
+    }
+    saveData();
+    openSwitchDialog();
+    renderDrip();
+  }
+
   function openSwitchDialog() {
     const el = document.getElementById("dripSwitchList");
     if (el) {
@@ -643,9 +661,16 @@
             <strong>${esc(c.name)}</strong>
             <span class="muted-note">${stats.total} contacts · ${stats.replied} replied</span>
           </div>
-          ${!isActive ? `<button class="secondary-button btn-sm" type="button" data-drip-activate="${esc(c.id)}">Activate</button>` : `<span class="outreach-active-label">Active</span>`}
+          <div style="display:flex;gap:6px;align-items:center">
+            ${!isActive ? `<button class="secondary-button btn-sm" type="button" data-drip-activate="${esc(c.id)}">Activate</button>` : `<span class="outreach-active-label">Active</span>`}
+            <button class="danger-button btn-sm" type="button" data-drip-delete-campaign="${esc(c.id)}" title="Delete campaign">Delete</button>
+          </div>
         </div>`;
       }).join("") || `<p class="empty-state">No campaigns yet.</p>`;
+
+      el.querySelectorAll("[data-drip-delete-campaign]").forEach(btn => {
+        btn.addEventListener("click", () => deleteCampaign(btn.dataset.dripDeleteCampaign));
+      });
     }
     document.getElementById("dripSwitchDialog")?.showModal();
   }
