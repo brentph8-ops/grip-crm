@@ -124,7 +124,7 @@
 
   function defaultEmailTemplate(num) {
     const defaults = [
-      { dayOffset: 0,  replyTo: null, subject: "Can we schedule a meeting? - Garland",
+      { dayOffset: 0,  replyTo: null, stageOnSend: "Unresponsive", subject: "Can we schedule a meeting? - Garland",
         body: `Hi [First Name],\n\nBrent Phillips with The Garland Company. We assist facilities with roofing, waterproofing, and building envelope needs.\n\nI was going to initially stop by but wanted to try to schedule an appointment first. Would any of these times work?\n\n[Meeting Times]\n\nOr just name a better time.` },
       { dayOffset: 3,  replyTo: 1,    subject: "Re: Can we schedule a meeting? - Garland",
         body: `Hi [First Name],\n\nWanted to reach back out and see if you had anything available for a phone call or in person.` },
@@ -277,10 +277,13 @@
 
     if (c.accountId && typeof window.addAccountActivity === "function") {
       const name = [c.firstName, c.lastName].filter(Boolean).join(" ") || c.company;
-      window.addAccountActivity(c.accountId, `Email ${emailNumber} of ${totalEmails} sent to ${name} (${c.email}) · "${subject}"`, false, { source: "Email List", contactName: name });
-    }
-    if (emailNumber === 1 && c.accountId && typeof window.gripApp?.persistRecordEdit === "function") {
-      window.gripApp.persistRecordEdit("account", c.accountId, "clientRanking", "Unresponsive", false);
+      const emails = campaignEmails(campaign);
+      const emailData = emails.find(e => e.number === emailNumber);
+      const stageNote = emailData?.stageOnSend ? ` → stage moved to "${emailData.stageOnSend}"` : "";
+      window.addAccountActivity(c.accountId, `Email ${emailNumber} of ${totalEmails} sent to ${name} (${c.email}) · "${subject}"${stageNote}`, false, { source: "Email List", contactName: name });
+      if (emailData?.stageOnSend && typeof window.gripApp?.persistRecordEdit === "function") {
+        window.gripApp.persistRecordEdit("account", c.accountId, "clientRanking", emailData.stageOnSend, false);
+      }
     }
 
     saveData();
@@ -474,7 +477,7 @@
         <div class="drip-template-card">
           <div class="drip-template-header">
             <span class="drip-template-num">Email ${em.number}</span>
-            <span class="drip-template-day">Day ${em.dayOffset}${em.replyTo ? " · ↩ reply to Email " + em.replyTo : ""}</span>
+            <span class="drip-template-day">Day ${em.dayOffset}${em.replyTo ? " · ↩ reply to Email " + em.replyTo : ""}${em.stageOnSend ? ` · → <strong>${esc(em.stageOnSend)}</strong>` : ""}</span>
             <button class="mini-button" type="button" data-edit-email="${em.number}">Edit</button>
           </div>
           <div class="drip-template-subject">${esc(em.subject)}</div>
@@ -562,6 +565,9 @@
     const replyOptions = Array.from({ length: num - 1 }, (_, i) => i + 1)
       .map(n => `<option value="${n}"${emailData.replyTo === n ? " selected" : ""}>Reply to Email ${n}</option>`)
       .join("");
+    const stageOptions = ["", ...ACCOUNT_STAGES]
+      .map(s => `<option value="${esc(s)}"${emailData.stageOnSend === s ? " selected" : ""}>${s ? esc(s) : "No change"}</option>`)
+      .join("");
     el.innerHTML = `
       <div class="drip-email-editor">
         <div class="drip-email-meta-row">
@@ -572,6 +578,9 @@
             <select id="editorReplyTo">
               <option value="">New thread</option>${replyOptions}
             </select>
+          </label>
+          <label class="drip-meta-field"><span>On Send → Move Stage To</span>
+            <select id="editorStageOnSend">${stageOptions}</select>
           </label>
         </div>
         <label class="full-field"><span>Subject</span>
@@ -596,10 +605,11 @@
     const dayOffset = parseInt(document.getElementById("editorDayOffset")?.value || "0", 10);
     const replyToVal = document.getElementById("editorReplyTo")?.value;
     const replyTo = replyToVal ? parseInt(replyToVal, 10) : null;
-    const subject = document.getElementById("editorSubject")?.value || "";
-    const body    = document.getElementById("editorBody")?.value || "";
+    const subject      = document.getElementById("editorSubject")?.value || "";
+    const body         = document.getElementById("editorBody")?.value || "";
+    const stageOnSend  = document.getElementById("editorStageOnSend")?.value || "";
     const idx = _editorEmails.findIndex(e => e.number === num);
-    const obj = { number: num, dayOffset, replyTo, subject, body };
+    const obj = { number: num, dayOffset, replyTo, subject, body, stageOnSend: stageOnSend || null };
     if (idx >= 0) _editorEmails[idx] = obj;
     else _editorEmails.push(obj);
     _editorEmails.sort((a, b) => a.number - b.number);
