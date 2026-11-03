@@ -241,8 +241,8 @@
   function trackRecordChanges(key, oldJson, newJson) {
     const oldVal = safeParse(oldJson);
     const newVal = safeParse(newJson);
-    if (key === "garlandContacts") {
-      // Flat array of contact records — diff by record id.
+    if (key === "garlandContacts" || key === "garlandTasks") {
+      // Flat array of records — diff by record id.
       const oldArr = Array.isArray(oldVal) ? oldVal : [];
       const newArr = Array.isArray(newVal) ? newVal : [];
       const diff = diffRecordArray(oldArr, newArr);
