@@ -595,7 +595,46 @@
             }
             toPush = merged;
           }
-          else conflicted = true;
+          else if (key === "garlandPunchLists") {
+            // Punch lists use punch_list_id not id — union by that field.
+            const pBase = Array.isArray(cloudVal) ? deepClone(cloudVal) : [];
+            const pById = new Map(pBase.map((r, i) => [r.punch_list_id, i]));
+            for (const rec of (Array.isArray(localVal) ? localVal : [])) {
+              if (!rec || !rec.punch_list_id) continue;
+              if (pById.has(rec.punch_list_id)) {
+                pBase[pById.get(rec.punch_list_id)] = deepClone(rec);
+              } else {
+                pBase.push(deepClone(rec));
+              }
+            }
+            toPush = pBase;
+          }
+          else {
+            // Generic fallback: arrays → union by id (or local if no ids); objects → 2-level
+            // spread merge (cloud base, local wins per key); primitives → local wins.
+            // This means no key ever shows the conflict banner unless it throws above.
+            if (Array.isArray(localVal) && Array.isArray(cloudVal)) {
+              const merged = unionRecordArrays(cloudVal, localVal);
+              // unionRecordArrays skips records without .id; if that zeroed it out, use local.
+              toPush = (merged.length === 0 && localVal.length > 0) ? deepClone(localVal) : merged;
+            } else if (localVal !== null && cloudVal !== null &&
+                       typeof localVal === "object" && typeof cloudVal === "object") {
+              // 2-level spread: cloud is base, local keys win; for nested objects merge one more level.
+              const obj = { ...cloudVal };
+              for (const k of Object.keys(localVal)) {
+                const lv = localVal[k], cv = obj[k];
+                if (lv && cv && typeof lv === "object" && typeof cv === "object" &&
+                    !Array.isArray(lv) && !Array.isArray(cv)) {
+                  obj[k] = { ...cv, ...lv };
+                } else {
+                  obj[k] = deepClone(lv);
+                }
+              }
+              toPush = obj;
+            } else {
+              toPush = deepClone(localVal);
+            }
+          }
         } else {
           toPush = localVal;
         }
