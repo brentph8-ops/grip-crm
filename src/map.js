@@ -42,6 +42,7 @@
   // ── Map/filter state ───────────────────────────────────────────────
 
   let _map            = null;
+  let _mapInitializing = false;
   let _markersGroup   = null;
   let _hiddenRankings = new Set();
   let _hiddenEntities = new Set();
@@ -1198,6 +1199,8 @@
     const el = document.getElementById("leafletMap");
     if (!el) return;
     if (_map) { _map.invalidateSize(); return; }
+    if (_mapInitializing) return;
+    _mapInitializing = true;
     // Clear stale Leaflet container state (e.g. from a previous init that lost its reference)
     if (el._leaflet_id) delete el._leaflet_id;
 
@@ -1222,6 +1225,7 @@
     }
 
     _map = L.map("leafletMap", { center: MAP_CENTER, zoom: MAP_ZOOM, zoomControl: true });
+    _mapInitializing = false;
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors',
