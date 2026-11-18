@@ -1196,7 +1196,10 @@
 
   async function initMap() {
     const el = document.getElementById("leafletMap");
-    if (!el || _map) return;
+    if (!el) return;
+    if (_map) { _map.invalidateSize(); return; }
+    // Clear stale Leaflet container state (e.g. from a previous init that lost its reference)
+    if (el._leaflet_id) delete el._leaflet_id;
 
     // Load Leaflet.markercluster for grouped pins in dense areas
     if (!window.L?.MarkerClusterGroup) {
