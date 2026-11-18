@@ -34,6 +34,7 @@
     "garlandPriceBooks",         // price books
     "garlandPriceBookProducts",  // price book line items
     "garlandContacts",           // additional contacts per account
+    "garlandDrip",               // drip email campaigns + enrolled contacts
   ]);
 
   // ── Helpers ──────────────────────────────────────────────────────
@@ -241,7 +242,7 @@
   function trackRecordChanges(key, oldJson, newJson) {
     const oldVal = safeParse(oldJson);
     const newVal = safeParse(newJson);
-    if (key === "garlandContacts" || key === "garlandTasks") {
+    if (key === "garlandContacts") {
       // Flat array of records — diff by record id.
       const oldArr = Array.isArray(oldVal) ? oldVal : [];
       const newArr = Array.isArray(newVal) ? newVal : [];
@@ -559,6 +560,13 @@
               toPush = mergeRecordChanges(key, cloudVal, edits);
             }
           }
+          else if (key === "garlandDrip") {
+            // { campaigns: [{id}], contacts: [{id}] } — union each array by id.
+            toPush = {
+              campaigns: unionRecordArrays(cloudVal?.campaigns, localVal?.campaigns),
+              contacts:  unionRecordArrays(cloudVal?.contacts,  localVal?.contacts),
+            };
+          }
           else if (key === "garlandTasks") {
             // Tasks use task_id not id — union arrays by task_id, local wins on conflict.
             const base2 = Array.isArray(cloudVal) ? deepClone(cloudVal) : [];
@@ -607,10 +615,11 @@
           const res = await client.from("grip_data")
             .update({ data_value: sanitized })
             .eq("user_id", user.id)
-            .eq("data_key", key);
+            .eq("data_key", key)
+            .select("updated_at");
           if (res.error) throw res.error;
           if (!res.data || !res.data.length) {
-            // No row matched — stay pending and retry.
+            // No row matched (deleted externally) — re-insert on next retry.
             ensurePending(key, snapshot);
             scheduleRetry(key);
             return true;
@@ -618,7 +627,8 @@
           if (res.data[0] && res.data[0].updated_at) setPushVersion(key, res.data[0].updated_at);
         } else {
           const res = await client.from("grip_data")
-            .insert({ user_id: user.id, data_key: key, data_value: sanitized });
+            .insert({ user_id: user.id, data_key: key, data_value: sanitized })
+            .select("updated_at");
           if (res.error) {
             if (/duplicate/i.test(res.error.message || "")) {
               ensurePending(key, snapshot);
