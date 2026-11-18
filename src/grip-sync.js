@@ -559,6 +559,20 @@
               toPush = mergeRecordChanges(key, cloudVal, edits);
             }
           }
+          else if (key === "garlandTasks") {
+            // Tasks use task_id not id — union arrays by task_id, local wins on conflict.
+            const base2 = Array.isArray(cloudVal) ? deepClone(cloudVal) : [];
+            const byTaskId = new Map(base2.map((r, i) => [r.task_id, i]));
+            for (const rec of (Array.isArray(localVal) ? localVal : [])) {
+              if (!rec || !rec.task_id) continue;
+              if (byTaskId.has(rec.task_id)) {
+                base2[byTaskId.get(rec.task_id)] = deepClone(rec);
+              } else {
+                base2.push(deepClone(rec));
+              }
+            }
+            toPush = base2;
+          }
           else if (key === "garlandGeocoords") {
             // Geocode cache is a plain object {accountId: {lat,lng}} — union keys, local wins.
             toPush = { ...(cloudVal || {}), ...(localVal || {}) };
