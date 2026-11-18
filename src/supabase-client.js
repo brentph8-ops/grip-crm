@@ -11,4 +11,4 @@ window.GRIP_SUPABASE_ANON    = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJ
 
 // Garland Google accounts authorized to access GRIP.
 // Add emails to the array to grant additional users access.
-window.GRIP_AUTHORIZED_EMAIL = ["bphillips@garlandco.com", "tmeyers@garlandco.com"];
+window.GRIP_AUTHORIZED_EMAIL = ["bphillips@garlandco.com", "tmeyers@garlandco.com", "sschaad@garlandco.com"];
